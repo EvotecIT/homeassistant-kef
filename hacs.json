@@ -1,0 +1,7 @@
+{
+  "name": "KEF",
+  "content_in_root": false,
+  "render_readme": true,
+  "domains": ["kef"],
+  "homeassistant": "2025.1.0"
+}

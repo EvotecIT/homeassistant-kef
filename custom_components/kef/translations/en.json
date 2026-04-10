@@ -1,0 +1,63 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add KEF speaker",
+        "description": "Enter the host or IP address of your KEF speaker.",
+        "data": {
+          "host": "Host or IP address"
+        }
+      },
+      "confirm": {
+        "title": "Set up KEF speaker",
+        "description": "Do you want to set up {title}?"
+      },
+      "reconfigure": {
+        "title": "Reconfigure KEF",
+        "description": "Update the network details for this KEF device.",
+        "data": {
+          "host": "Host or IP address"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the KEF speaker",
+      "unsupported": "No supported KEF API was detected"
+    },
+    "abort": {
+      "already_configured": "This KEF speaker is already configured",
+      "unsupported": "This discovered device is not a supported KEF speaker"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "KEF options",
+        "data": {
+          "scan_interval": "Polling interval (seconds)",
+          "enable_diagnostics": "Expose diagnostic sensors",
+          "enable_eq_sensors": "Expose EQ read-only sensors"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "backend": { "name": "Backend" },
+      "speaker_status": { "name": "Speaker status" },
+      "play_mode": { "name": "Play mode" },
+      "service_id": { "name": "Service ID" },
+      "balance": { "name": "Balance" },
+      "bass_extension": { "name": "Bass extension" },
+      "treble_amount": { "name": "Treble amount" },
+      "subwoofer_gain": { "name": "Subwoofer gain" },
+      "high_pass_frequency": { "name": "High-pass frequency" }
+    },
+    "binary_sensor": {
+      "desk_mode": { "name": "Desk mode" },
+      "wall_mode": { "name": "Wall mode" },
+      "phase_correction": { "name": "Phase correction" },
+      "high_pass_mode": { "name": "High-pass mode" }
+    }
+  }
+}

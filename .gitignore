@@ -1,0 +1,8 @@
+.codex_tmp/
+.ruff_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+old/

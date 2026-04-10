@@ -1,0 +1,694 @@
+"""Client helpers for KEF local APIs."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import socket
+from abc import ABC, abstractmethod
+from collections.abc import Mapping
+from typing import Any
+
+import aiohttp
+
+from .const import (
+    API_ROOT,
+    DEFAULT_LEGACY_PORT,
+    DEFAULT_PORT,
+    GET_DATA_ENDPOINT,
+    LEGACY_SOURCE_LIST,
+    MODERN_SOURCE_LIST,
+    PROBE_PATHS,
+    SET_DATA_ENDPOINT,
+    STATE_OFF,
+)
+from .exceptions import (
+    KefConnectionError,
+    KefError,
+    KefResponseError,
+    KefUnsupportedDeviceError,
+)
+from .models import (
+    KefBackend,
+    KefDeviceInfo,
+    KefEqProfile,
+    KefPlaybackInfo,
+    KefSnapshot,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+_LEGACY_RESPONSE_OK = 17
+_LEGACY_GET_START = ord("G")
+_LEGACY_SET_START = ord("S")
+_LEGACY_GET_END = 128
+_LEGACY_SET_MID = 129
+
+_INPUT_SOURCES_BASE = {
+    "Bluetooth": 9,
+    "Bluetooth_paired": 15,
+    "Aux": 10,
+    "Opt": 11,
+    "Usb": 12,
+    "Wifi": 2,
+}
+
+_STANDBY_OPTIONS = [20, 60, None]
+_INPUT_SOURCES: dict[str, dict[int | None, tuple[int, int]]] = {}
+_INPUT_SOURCES_RESPONSE: dict[int, tuple[str, int | None, str]] = {}
+for source, code in _INPUT_SOURCES_BASE.items():
+    source_map = {
+        option: code + index * 16
+        for index, option in enumerate(_STANDBY_OPTIONS)
+    }
+    _INPUT_SOURCES[source] = {
+        option: (lr, lr + 64) for option, lr in source_map.items()
+    }
+for source, mapping in _INPUT_SOURCES.items():
+    normalized_source = source.replace("_paired", "")
+    for standby_time, (lr, rl) in mapping.items():
+        _INPUT_SOURCES_RESPONSE[lr] = (normalized_source, standby_time, "L/R")
+        _INPUT_SOURCES_RESPONSE[rl] = (normalized_source, standby_time, "R/L")
+_INPUT_SOURCES_RESPONSE[48] = _INPUT_SOURCES_RESPONSE[82]
+
+
+class BaseKefClient(ABC):
+    """Base KEF backend interface."""
+
+    def __init__(self, host: str) -> None:
+        """Initialize the backend."""
+        self._host = host
+
+    @property
+    @abstractmethod
+    def backend(self) -> KefBackend:
+        """Return the backend type."""
+
+    @abstractmethod
+    async def async_identify(self) -> KefDeviceInfo:
+        """Probe the speaker and return device information."""
+
+    @abstractmethod
+    async def async_refresh(self) -> KefSnapshot:
+        """Fetch the current device state."""
+
+    @abstractmethod
+    async def async_turn_on(self) -> None:
+        """Turn on the speaker."""
+
+    @abstractmethod
+    async def async_turn_off(self) -> None:
+        """Turn off the speaker."""
+
+    @abstractmethod
+    async def async_set_volume_raw(self, volume: int) -> None:
+        """Set the raw 0..100 volume value."""
+
+    @abstractmethod
+    async def async_toggle_play_pause(self) -> None:
+        """Toggle play/pause."""
+
+    @abstractmethod
+    async def async_set_muted(self, muted: bool) -> None:
+        """Set the muted state."""
+
+    @abstractmethod
+    async def async_next_track(self) -> None:
+        """Skip to the next track."""
+
+    @abstractmethod
+    async def async_previous_track(self) -> None:
+        """Go to the previous track."""
+
+    @abstractmethod
+    async def async_select_source(self, source: str) -> None:
+        """Select the active source."""
+
+
+class ModernKefClient(BaseKefClient):
+    """Modern HTTP client for LSX II-era KEF speakers."""
+
+    backend = KefBackend.MODERN
+
+    def __init__(
+        self,
+        host: str,
+        session: aiohttp.ClientSession,
+        *,
+        port: int = DEFAULT_PORT,
+        request_timeout: float = 4.0,
+    ) -> None:
+        """Initialize the client."""
+        super().__init__(host)
+        self._session = session
+        self._port = port
+        self._request_timeout = request_timeout
+        self._last_active_source: str | None = None
+
+    async def async_identify(self) -> KefDeviceInfo:
+        """Probe the modern HTTP API."""
+        device_name = await self._get_value(PROBE_PATHS["device_name"])
+        firmware_version = await self._get_value(PROBE_PATHS["version"])
+        release_text = await self._get_value(PROBE_PATHS["release_text"])
+        mac_address = await self._get_value(PROBE_PATHS["mac"])
+        model_code = await self._get_value(PROBE_PATHS["model_code"])
+
+        release_value = self._extract_string(release_text)
+        model = (
+            release_value.split("_", 1)[0]
+            if release_value and "_" in release_value
+            else "KEF"
+        )
+        mac_value = self._extract_string(mac_address)
+        unique_id = (
+            f"kef-{mac_value.lower()}" if mac_value else f"kef-modern-{self._host}"
+        )
+
+        return KefDeviceInfo(
+            backend=self.backend,
+            unique_id=unique_id,
+            device_name=self._extract_string(device_name) or "KEF",
+            model=model,
+            mac_address=mac_value,
+            firmware_version=self._extract_string(firmware_version),
+            release_text=release_value,
+            model_code=self._extract_string(model_code),
+            host=self._host,
+            port=self._port,
+        )
+
+    async def async_refresh(self) -> KefSnapshot:
+        """Fetch the current state from the speaker."""
+        device = await self.async_identify()
+        speaker_status = self._extract_string(
+            await self._get_value(
+                PROBE_PATHS["speaker_status"],
+                typed_key="kefSpeakerStatus",
+            )
+        )
+        source = self._extract_string(
+            await self._get_value(PROBE_PATHS["source"], typed_key="kefPhysicalSource")
+        )
+        volume_raw = self._extract_int(
+            await self._get_value(PROBE_PATHS["volume"], typed_key="i32_")
+        )
+        is_muted = self._extract_bool(
+            await self._get_value(PROBE_PATHS["mute"], typed_key="bool_")
+        )
+        play_mode = self._extract_string(
+            await self._get_value(PROBE_PATHS["play_mode"], typed_key="playerPlayMode")
+        )
+        player_data = await self._get_optional_value(PROBE_PATHS["player_data"])
+        play_time = await self._get_optional_value(
+            PROBE_PATHS["play_time"],
+            typed_key="i64_",
+        )
+        eq_profile = await self._get_optional_value(PROBE_PATHS["eq_profile"])
+        if source not in (None, STATE_OFF):
+            self._last_active_source = source
+
+        return KefSnapshot(
+            device=device,
+            speaker_status=speaker_status or STATE_OFF,
+            source=source,
+            volume_raw=volume_raw,
+            volume_level=None if volume_raw is None else volume_raw / 100.0,
+            is_muted=is_muted,
+            play_mode=play_mode,
+            playback=self._parse_playback(player_data, play_time),
+            eq_profile=(
+                KefEqProfile.from_modern_value(eq_profile)
+                if isinstance(eq_profile, dict)
+                else None
+            ),
+            source_list=MODERN_SOURCE_LIST,
+        )
+
+    async def async_turn_on(self) -> None:
+        """Turn on the speaker by selecting a reasonable source."""
+        snapshot = await self.async_refresh()
+        target_source = self._last_active_source
+        if target_source in (None, STATE_OFF):
+            current_source = snapshot.source
+            target_source = (
+                current_source if current_source not in (None, STATE_OFF) else "wifi"
+            )
+        await self.async_select_source(target_source)
+
+    async def async_turn_off(self) -> None:
+        """Turn off the speaker."""
+        await self._set_data(
+            PROBE_PATHS["source"],
+            role="value",
+            value={"type": "kefPhysicalSource", "kefPhysicalSource": STATE_OFF},
+        )
+
+    async def async_set_volume_raw(self, volume: int) -> None:
+        """Set the raw volume level."""
+        await self._set_data(
+            PROBE_PATHS["volume"],
+            role="value",
+            value={"type": "i32_", "i32_": max(0, min(100, volume))},
+        )
+
+    async def async_toggle_play_pause(self) -> None:
+        """Toggle play/pause."""
+        await self._set_data(
+            "player:player/control",
+            role="activate",
+            value={"control": "pause"},
+        )
+
+    async def async_set_muted(self, muted: bool) -> None:
+        """Set the muted state."""
+        await self._set_data(
+            "settings:/mediaPlayer/mute",
+            role="value",
+            value={"type": "bool_", "bool_": muted},
+        )
+
+    async def async_next_track(self) -> None:
+        """Go to the next track."""
+        await self._set_data(
+            "player:player/control",
+            role="activate",
+            value={"control": "next"},
+        )
+
+    async def async_previous_track(self) -> None:
+        """Go to the previous track."""
+        await self._set_data(
+            "player:player/control",
+            role="activate",
+            value={"control": "previous"},
+        )
+
+    async def async_select_source(self, source: str) -> None:
+        """Select the active source."""
+        if source != STATE_OFF:
+            self._last_active_source = source
+        await self._set_data(
+            PROBE_PATHS["source"],
+            role="value",
+            value={"type": "kefPhysicalSource", "kefPhysicalSource": source},
+        )
+
+    async def _get_optional_value(
+        self,
+        path: str,
+        *,
+        typed_key: str | None = None,
+    ) -> dict[str, Any] | Any | None:
+        """Get a value from an optional path."""
+        try:
+            return await self._get_value(path, typed_key=typed_key)
+        except KefError:
+            return None
+
+    async def _get_value(
+        self,
+        path: str,
+        *,
+        typed_key: str | None = None,
+    ) -> dict[str, Any] | Any:
+        """Get the current value for a path."""
+        payload = await self._request_json(
+            "GET",
+            GET_DATA_ENDPOINT,
+            params={"path": path, "roles": "value", "_nocache": "1"},
+        )
+        if not isinstance(payload, list) or not payload:
+            raise KefResponseError(f"Unexpected KEF payload for {path}")
+        value = payload[0]
+        if typed_key is None:
+            return value
+        if not isinstance(value, dict):
+            raise KefResponseError(f"Unexpected KEF value type for {path}")
+        return value.get(typed_key)
+
+    async def _set_data(self, path: str, *, role: str, value: Any) -> None:
+        """Set a value on the speaker."""
+        await self._request_json(
+            "POST",
+            SET_DATA_ENDPOINT,
+            json_payload={"path": path, "role": role, "value": value},
+        )
+
+    async def _request_json(
+        self,
+        method: str,
+        endpoint: str,
+        *,
+        params: Mapping[str, object] | None = None,
+        json_payload: Mapping[str, object] | None = None,
+    ) -> Any:
+        """Issue an HTTP request to the speaker."""
+        url = self._build_url(endpoint)
+        kwargs: dict[str, object] = {
+            "allow_redirects": False,
+            "timeout": aiohttp.ClientTimeout(total=self._request_timeout),
+        }
+        if params is not None:
+            kwargs["params"] = params
+        if json_payload is not None:
+            kwargs["json"] = json_payload
+
+        try:
+            async with self._session.request(method, url, **kwargs) as response:
+                text = await response.text()
+        except aiohttp.ClientError as err:
+            raise KefConnectionError(str(err)) from err
+        except TimeoutError as err:
+            raise KefConnectionError("Request to KEF speaker timed out") from err
+
+        if response.status >= 400:
+            raise KefResponseError(f"KEF speaker returned HTTP {response.status}")
+
+        if not text.strip():
+            return {}
+
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as err:
+            raise KefResponseError(
+                f"KEF speaker returned non-JSON data for {endpoint}"
+            ) from err
+
+        if isinstance(data, dict) and data.get("error"):
+            error = data["error"]
+            message = error.get("message") if isinstance(error, dict) else None
+            raise KefResponseError(message or "KEF API returned an error")
+
+        _LOGGER.debug("KEF modern %s %s -> %s", method, url, data)
+        return data
+
+    def _build_url(self, endpoint: str) -> str:
+        """Build the request URL."""
+        endpoint = endpoint if endpoint.startswith("/") else f"/{endpoint}"
+        return f"http://{self._host}:{self._port}{API_ROOT}{endpoint}"
+
+    @staticmethod
+    def _extract_string(value: dict[str, Any] | Any | None) -> str | None:
+        """Extract a string from a typed or raw value."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        if isinstance(value, dict):
+            for key in (
+                "string_",
+                "kefSpeakerStatus",
+                "kefPhysicalSource",
+                "playerPlayMode",
+            ):
+                raw = value.get(key)
+                if isinstance(raw, str):
+                    return raw
+        return None
+
+    @staticmethod
+    def _extract_int(value: dict[str, Any] | Any | None) -> int | None:
+        """Extract an integer from a typed or raw value."""
+        if isinstance(value, int):
+            return value
+        if isinstance(value, dict):
+            raw = value.get("i32_")
+            if isinstance(raw, int):
+                return raw
+        return None
+
+    @staticmethod
+    def _extract_bool(value: dict[str, Any] | Any | None) -> bool | None:
+        """Extract a boolean from a typed or raw value."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, dict):
+            raw = value.get("bool_")
+            if isinstance(raw, bool):
+                return raw
+        return None
+
+    def _parse_playback(
+        self,
+        player_data: dict[str, Any] | Any | None,
+        play_time: dict[str, Any] | Any | None,
+    ) -> KefPlaybackInfo | None:
+        """Parse the current playback object."""
+        if not isinstance(player_data, dict):
+            return None
+
+        track_roles = player_data.get("trackRoles", {})
+        metadata = track_roles.get("mediaData", {}).get("metaData", {})
+        status = player_data.get("status", {})
+        controls = player_data.get("controls", {})
+        position_ms = play_time if isinstance(play_time, int) else None
+        if position_ms == -1:
+            position_ms = None
+
+        normalized_controls: dict[str, bool] = {}
+        if isinstance(controls, dict):
+            for key, value in controls.items():
+                if isinstance(value, bool):
+                    normalized_controls[key.removesuffix("_")] = value
+
+        return KefPlaybackInfo(
+            state=player_data.get("state"),
+            title=track_roles.get("title"),
+            artist=metadata.get("artist"),
+            album=metadata.get("album"),
+            image_url=track_roles.get("icon"),
+            service_id=metadata.get("serviceID"),
+            duration_ms=status.get("duration") if isinstance(status, dict) else None,
+            position_ms=position_ms,
+            controls=normalized_controls,
+        )
+
+
+class LegacyBinaryClient(BaseKefClient):
+    """Minimal binary-protocol client for first-generation KEF speakers."""
+
+    backend = KefBackend.LEGACY
+
+    def __init__(
+        self,
+        host: str,
+        *,
+        port: int = DEFAULT_LEGACY_PORT,
+        request_timeout: float = 2.0,
+        standby_time: int | None = 20,
+    ) -> None:
+        """Initialize the legacy client."""
+        super().__init__(host)
+        self._port = port
+        self._request_timeout = request_timeout
+        self._standby_time = standby_time
+        self._last_active_source: str | None = None
+
+    async def async_identify(self) -> KefDeviceInfo:
+        """Probe the legacy speaker."""
+        await self._send_command(bytes([_LEGACY_GET_START, ord("0"), _LEGACY_GET_END]))
+        return KefDeviceInfo(
+            backend=self.backend,
+            unique_id=f"kef-legacy-{self._host}",
+            device_name="KEF",
+            model="KEF Legacy",
+            host=self._host,
+            port=self._port,
+        )
+
+    async def async_refresh(self) -> KefSnapshot:
+        """Fetch current state from the legacy speaker."""
+        device = await self.async_identify()
+        source_response = await self._send_command(
+            bytes([_LEGACY_GET_START, ord("0"), _LEGACY_GET_END])
+        )
+        volume_response = await self._send_command(
+            bytes([_LEGACY_GET_START, ord("%"), _LEGACY_GET_END])
+        )
+        play_pause_response = await self._send_command(
+            bytes([_LEGACY_GET_START, ord("1"), _LEGACY_GET_END])
+        )
+
+        is_on = source_response <= 128
+        source_code = source_response % 128
+        source = _INPUT_SOURCES_RESPONSE.get(source_code, ("Unknown", None, "L/R"))[0]
+        if source not in (None, "Unknown", STATE_OFF):
+            self._last_active_source = source
+        is_muted = volume_response >= 128
+        volume_raw = volume_response % 128
+
+        playback_state = None
+        if play_pause_response == 129:
+            playback_state = "playing"
+        elif play_pause_response == 128:
+            playback_state = "paused"
+
+        return KefSnapshot(
+            device=device,
+            speaker_status="powerOn" if is_on else STATE_OFF,
+            source=source,
+            volume_raw=volume_raw,
+            volume_level=volume_raw / 100.0,
+            is_muted=is_muted,
+            play_mode=None,
+            playback=KefPlaybackInfo(state=playback_state),
+            eq_profile=None,
+            source_list=LEGACY_SOURCE_LIST,
+        )
+
+    async def async_turn_on(self) -> None:
+        """Turn on the speaker."""
+        snapshot = await self.async_refresh()
+        target_source = self._last_active_source
+        if target_source in (None, STATE_OFF, "Unknown"):
+            current_source = snapshot.source
+            target_source = (
+                current_source if current_source not in (None, "Unknown") else "Wifi"
+            )
+        await self.async_select_source(target_source)
+
+    async def async_turn_off(self) -> None:
+        """Turn off the speaker."""
+        snapshot = await self.async_refresh()
+        state = snapshot.source or "Wifi"
+        await self._set_source(state, off=True)
+
+    async def async_set_volume_raw(self, volume: int) -> None:
+        """Set the raw volume level."""
+        clamped = max(0, min(100, volume))
+        await self._send_command(
+            bytes([_LEGACY_SET_START, ord("%"), _LEGACY_SET_MID, clamped])
+        )
+
+    async def async_toggle_play_pause(self) -> None:
+        """Toggle play/pause."""
+        await self._send_command(
+            bytes([_LEGACY_SET_START, ord("1"), _LEGACY_SET_MID, 129])
+        )
+
+    async def async_set_muted(self, muted: bool) -> None:
+        """Set the muted state."""
+        snapshot = await self.async_refresh()
+        if muted:
+            await self.async_set_volume_raw(0)
+            return
+
+        target_volume = snapshot.volume_raw or 15
+        if target_volume == 0:
+            target_volume = 15
+        await self.async_set_volume_raw(target_volume)
+
+    async def async_next_track(self) -> None:
+        """Skip to the next track."""
+        await self._send_command(
+            bytes([_LEGACY_SET_START, ord("1"), _LEGACY_SET_MID, 130])
+        )
+
+    async def async_previous_track(self) -> None:
+        """Go to the previous track."""
+        await self._send_command(
+            bytes([_LEGACY_SET_START, ord("1"), _LEGACY_SET_MID, 131])
+        )
+
+    async def async_select_source(self, source: str) -> None:
+        """Select the active source."""
+        if source not in (None, STATE_OFF):
+            self._last_active_source = source
+        await self._set_source(source)
+
+    async def _set_source(self, source: str, *, off: bool = False) -> None:
+        """Set the current source."""
+        if source not in _INPUT_SOURCES:
+            raise KefUnsupportedDeviceError(f"Unsupported legacy source: {source}")
+        source_code = _INPUT_SOURCES[source][self._standby_time][0] % 128
+        if off:
+            source_code += 128
+        await self._send_command(
+            bytes([_LEGACY_SET_START, ord("0"), _LEGACY_SET_MID, source_code])
+        )
+
+    async def _send_command(self, payload: bytes) -> int:
+        """Send a command over the legacy binary socket."""
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(self._host, self._port, family=socket.AF_INET),
+                timeout=self._request_timeout,
+            )
+        except OSError as err:
+            raise KefConnectionError(str(err)) from err
+
+        try:
+            writer.write(payload)
+            await writer.drain()
+            raw_reply = await asyncio.wait_for(
+                reader.read(100),
+                timeout=self._request_timeout,
+            )
+        except (OSError, TimeoutError) as err:
+            raise KefConnectionError(str(err)) from err
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+        response = self._parse_response(payload, raw_reply)
+        code = response[-2]
+        if payload[0] == _LEGACY_SET_START and code != _LEGACY_RESPONSE_OK:
+            raise KefResponseError(f"Legacy KEF command failed with code {code}")
+        return code
+
+    @staticmethod
+    def _parse_response(message: bytes, reply: bytes) -> bytes:
+        """Extract the matching response packet."""
+        responses = [b"R" + chunk for chunk in reply.split(b"R") if chunk]
+        if message[0] == _LEGACY_GET_START:
+            query_type = message[1]
+            for response in responses:
+                if len(response) > 1 and response[1] == query_type:
+                    return response
+            raise KefResponseError("Legacy KEF query type did not match the response")
+        if message[0] == _LEGACY_SET_START:
+            ok = bytes([82, 17, 255])
+            if ok in responses:
+                return ok
+            raise KefResponseError("Legacy KEF did not acknowledge the command")
+        raise KefResponseError("Legacy KEF returned an unknown response")
+
+
+async def async_create_client(
+    host: str,
+    session: aiohttp.ClientSession,
+    *,
+    backend: KefBackend | str | None = None,
+    port: int | None = None,
+    tcp_port: int | None = None,
+) -> BaseKefClient:
+    """Create the appropriate KEF backend client."""
+    normalized_backend = KefBackend(backend) if backend is not None else None
+
+    if normalized_backend is KefBackend.MODERN:
+        client = ModernKefClient(host, session, port=port or DEFAULT_PORT)
+        await client.async_identify()
+        return client
+
+    if normalized_backend is KefBackend.LEGACY:
+        client = LegacyBinaryClient(host, port=tcp_port or DEFAULT_LEGACY_PORT)
+        await client.async_identify()
+        return client
+
+    modern_client = ModernKefClient(host, session, port=port or DEFAULT_PORT)
+    try:
+        await modern_client.async_identify()
+    except KefError:
+        pass
+    else:
+        return modern_client
+
+    legacy_client = LegacyBinaryClient(host, port=tcp_port or DEFAULT_LEGACY_PORT)
+    try:
+        await legacy_client.async_identify()
+    except KefError as err:
+        raise KefUnsupportedDeviceError(
+            f"Unable to detect a supported KEF API on {host}"
+        ) from err
+    return legacy_client

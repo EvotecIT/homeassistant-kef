@@ -1,0 +1,161 @@
+"""API tests for KEF."""
+
+from __future__ import annotations
+
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from custom_components.kef.api import ModernKefClient
+from custom_components.kef.const import PROBE_PATHS
+from tests.conftest import (
+    DEVICE_NAME_VALUE,
+    EQ_PROFILE_VALUE,
+    MAC_VALUE,
+    MODEL_CODE_VALUE,
+    MUTE_VALUE,
+    PLAY_MODE_VALUE,
+    PLAY_TIME_VALUE,
+    PLAYER_DATA_VALUE,
+    RELEASE_TEXT_VALUE,
+    SOURCE_VALUE,
+    SPEAKER_STATUS_VALUE,
+    TEST_HOST,
+    VERSION_VALUE,
+    VOLUME_VALUE,
+)
+
+
+async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
+    """Modern client should parse a full LSX II snapshot."""
+    responses = {
+        PROBE_PATHS["device_name"]: DEVICE_NAME_VALUE,
+        PROBE_PATHS["version"]: VERSION_VALUE,
+        PROBE_PATHS["release_text"]: RELEASE_TEXT_VALUE,
+        PROBE_PATHS["mac"]: MAC_VALUE,
+        PROBE_PATHS["model_code"]: MODEL_CODE_VALUE,
+        PROBE_PATHS["speaker_status"]: SPEAKER_STATUS_VALUE["kefSpeakerStatus"],
+        PROBE_PATHS["source"]: SOURCE_VALUE["kefPhysicalSource"],
+        PROBE_PATHS["volume"]: VOLUME_VALUE["i32_"],
+        PROBE_PATHS["mute"]: MUTE_VALUE["bool_"],
+        PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
+        PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
+        PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
+        PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
+    }
+
+    async def fake_get_value(self, path, *, typed_key=None):
+        return responses[path]
+
+    async def fake_get_optional_value(self, path, *, typed_key=None):
+        return responses[path]
+
+    monkeypatch.setattr(ModernKefClient, "_get_value", fake_get_value)
+    monkeypatch.setattr(ModernKefClient, "_get_optional_value", fake_get_optional_value)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    snapshot = await client.async_refresh()
+
+    assert snapshot.device.device_name == "LSX II-04438c"
+    assert snapshot.device.model == "LSXII"
+    assert snapshot.source == "usb"
+    assert snapshot.volume_raw == 80
+    assert snapshot.is_muted is False
+    assert snapshot.playback is not None
+    assert snapshot.playback.state == "playing"
+    assert snapshot.playback.service_id == "usb"
+    assert snapshot.eq_profile is not None
+    assert snapshot.eq_profile.balance == 30
+
+
+async def test_modern_set_volume_posts_typed_payload(monkeypatch, hass) -> None:
+    """Modern client should post a typed payload when setting volume."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_volume_raw(42)
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "player:volume",
+            "role": "value",
+            "value": {"type": "i32_", "i32_": 42},
+        },
+    }
+
+
+async def test_modern_set_muted_posts_bool_payload(monkeypatch, hass) -> None:
+    """Modern client should post a bool payload when muting."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_muted(True)
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "settings:/mediaPlayer/mute",
+            "role": "value",
+            "value": {"type": "bool_", "bool_": True},
+        },
+    }
+
+
+async def test_modern_turn_on_prefers_last_active_source(monkeypatch, hass) -> None:
+    """Modern turn-on should reuse the last active source when known."""
+    selected = []
+
+    async def fake_refresh(self):
+        self._last_active_source = "usb"
+        return await ModernKefClient.async_refresh(self)
+
+    async def fake_get_value(self, path, *, typed_key=None):
+        mapping = {
+            PROBE_PATHS["device_name"]: DEVICE_NAME_VALUE,
+            PROBE_PATHS["version"]: VERSION_VALUE,
+            PROBE_PATHS["release_text"]: RELEASE_TEXT_VALUE,
+            PROBE_PATHS["mac"]: MAC_VALUE,
+            PROBE_PATHS["model_code"]: MODEL_CODE_VALUE,
+            PROBE_PATHS["speaker_status"]: "standby",
+            PROBE_PATHS["source"]: "standby",
+            PROBE_PATHS["volume"]: 80,
+            PROBE_PATHS["mute"]: False,
+            PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
+            PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
+            PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
+            PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
+        }
+        return mapping[path]
+
+    async def fake_get_optional_value(self, path, *, typed_key=None):
+        return await fake_get_value(self, path, typed_key=typed_key)
+
+    async def fake_select_source(self, source):
+        selected.append(source)
+
+    monkeypatch.setattr(ModernKefClient, "_get_value", fake_get_value)
+    monkeypatch.setattr(ModernKefClient, "_get_optional_value", fake_get_optional_value)
+    monkeypatch.setattr(ModernKefClient, "async_select_source", fake_select_source)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    client._last_active_source = "usb"
+    await client.async_turn_on()
+
+    assert selected == ["usb"]
