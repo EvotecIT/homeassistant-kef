@@ -3,16 +3,37 @@ name: Validate
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions: {}
 
 jobs:
-  validate:
+  validate-hacs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install .[test]
-      - run: ruff check .
-      - run: pytest
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[test]
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Pytest
+        run: pytest
