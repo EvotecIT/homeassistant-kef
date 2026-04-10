@@ -7,7 +7,11 @@ import copy
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from custom_components.kef.api import ModernKefClient
-from custom_components.kef.const import PROBE_PATHS
+from custom_components.kef.const import (
+    EVENT_MODIFY_QUEUE_ENDPOINT,
+    EVENT_POLL_QUEUE_ENDPOINT,
+    PROBE_PATHS,
+)
 from tests.conftest import (
     AUTO_SWITCH_HDMI_VALUE,
     CABLE_MODE_VALUE,
@@ -215,6 +219,75 @@ async def test_modern_set_muted_posts_bool_payload(monkeypatch, hass) -> None:
             "value": {"type": "bool_", "bool_": True},
         },
     }
+
+
+async def test_modern_poll_events_creates_queue_and_polls(monkeypatch, hass) -> None:
+    """Modern client should subscribe to the event queue before polling it."""
+    calls = []
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        calls.append(
+            {
+                "method": method,
+                "endpoint": endpoint,
+                "params": params,
+                "json_payload": json_payload,
+            }
+        )
+        if endpoint == EVENT_MODIFY_QUEUE_ENDPOINT:
+            return "{queue-123}"
+        if endpoint == EVENT_POLL_QUEUE_ENDPOINT:
+            return [
+                {
+                    "path": "player:volume",
+                    "itemValue": {"type": "i32_", "i32_": 79},
+                }
+            ]
+        raise AssertionError(f"Unexpected endpoint: {endpoint}")
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    events = await client.async_poll_events(timeout=2)
+
+    assert events == [
+        {"path": "player:volume", "itemValue": {"type": "i32_", "i32_": 79}}
+    ]
+    assert calls[0]["method"] == "POST"
+    assert calls[0]["endpoint"] == EVENT_MODIFY_QUEUE_ENDPOINT
+    assert calls[0]["json_payload"]["subscribe"]
+    assert calls[1] == {
+        "method": "GET",
+        "endpoint": EVENT_POLL_QUEUE_ENDPOINT,
+        "params": {"queueId": "{queue-123}", "timeout": 2},
+        "json_payload": None,
+    }
+
+
+async def test_modern_reset_event_queue_recreates_subscription(
+    monkeypatch,
+    hass,
+) -> None:
+    """Resetting the queue should force the next poll to subscribe again."""
+    queue_ids = iter(["{queue-a}", "{queue-b}"])
+    polled_with = []
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        if endpoint == EVENT_MODIFY_QUEUE_ENDPOINT:
+            return next(queue_ids)
+        if endpoint == EVENT_POLL_QUEUE_ENDPOINT:
+            polled_with.append(params["queueId"])
+            return []
+        raise AssertionError(f"Unexpected endpoint: {endpoint}")
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_poll_events(timeout=1)
+    await client.async_reset_event_queue()
+    await client.async_poll_events(timeout=1)
+
+    assert polled_with == ["{queue-a}", "{queue-b}"]
 
 
 async def test_modern_turn_on_prefers_last_active_source(monkeypatch, hass) -> None:

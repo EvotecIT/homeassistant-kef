@@ -42,11 +42,13 @@ async def async_setup_entry(hass, entry: KefConfigEntry) -> bool:
     await _async_cleanup_optional_entities(hass, entry, coordinator)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await coordinator.async_start_event_listener()
     return True
 
 
 async def async_unload_entry(hass, entry: KefConfigEntry) -> bool:
     """Unload a config entry."""
+    await entry.runtime_data.async_stop_event_listener()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 

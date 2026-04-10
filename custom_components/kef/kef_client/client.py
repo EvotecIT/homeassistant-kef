@@ -19,6 +19,9 @@ from .const import (
     DEFAULT_MODERN_SOURCE_LIST,
     DEFAULT_PORT,
     DEFAULT_VOLUME_SOURCE_SUFFIX,
+    EVENT_MODIFY_QUEUE_ENDPOINT,
+    EVENT_POLL_QUEUE_ENDPOINT,
+    EVENT_SUBSCRIPTIONS,
     GET_DATA_ENDPOINT,
     LEGACY_SOURCE_LIST,
     MODERN_MODEL_SOURCE_MAP,
@@ -248,6 +251,14 @@ class BaseKefClient(ABC):
     async def async_set_fixed_volume_level(self, volume: int) -> None:
         """Set the fixed-volume level."""
 
+    async def async_poll_events(self, timeout: int = 10) -> list[dict[str, Any]]:
+        """Poll live device events when supported."""
+        return []
+
+    async def async_reset_event_queue(self) -> None:
+        """Reset any live event queue state when supported."""
+        return None
+
 
 class ModernKefClient(BaseKefClient):
     """Modern HTTP client for LSX II-era KEF speakers."""
@@ -268,6 +279,7 @@ class ModernKefClient(BaseKefClient):
         self._port = port
         self._request_timeout = request_timeout
         self._last_active_source: str | None = None
+        self._event_queue_id: str | None = None
 
     async def async_identify(self) -> KefDeviceInfo:
         """Probe the modern HTTP API."""
@@ -790,6 +802,25 @@ class ModernKefClient(BaseKefClient):
             value={"type": "i32_", "i32_": max(0, min(100, volume))},
         )
 
+    async def async_poll_events(self, timeout: int = 10) -> list[dict[str, Any]]:
+        """Poll the KEF event queue and return any pending updates."""
+        queue_id = await self._async_ensure_event_queue()
+        payload = await self._request_json(
+            "GET",
+            EVENT_POLL_QUEUE_ENDPOINT,
+            params={
+                "queueId": queue_id,
+                "timeout": max(1, timeout),
+            },
+        )
+        if not isinstance(payload, list):
+            raise KefResponseError("Unexpected KEF event queue payload")
+        return [event for event in payload if isinstance(event, dict)]
+
+    async def async_reset_event_queue(self) -> None:
+        """Drop the cached event queue id so it will be recreated on next poll."""
+        self._event_queue_id = None
+
     async def _get_optional_path_value(
         self,
         path: str,
@@ -861,6 +892,24 @@ class ModernKefClient(BaseKefClient):
             SET_DATA_ENDPOINT,
             json_payload={"path": path, "role": role, "value": value},
         )
+
+    async def _async_ensure_event_queue(self) -> str:
+        """Create or reuse the KEF event queue."""
+        if self._event_queue_id is not None:
+            return self._event_queue_id
+
+        payload = await self._request_json(
+            "POST",
+            EVENT_MODIFY_QUEUE_ENDPOINT,
+            json_payload={
+                "subscribe": list(EVENT_SUBSCRIPTIONS),
+                "unsubscribe": [],
+            },
+        )
+        if not isinstance(payload, str) or not payload:
+            raise KefResponseError("Unexpected KEF queue id payload")
+        self._event_queue_id = payload
+        return payload
 
     async def _request_json(
         self,

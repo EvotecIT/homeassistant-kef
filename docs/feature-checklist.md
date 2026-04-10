@@ -39,10 +39,11 @@ This checklist tracks what the repository already covers and what still needs wo
 
 ## Runtime / Architecture Improvements
 
-- [ ] Use the KEF event queue API to reduce pure polling
-  - [ ] `event/modifyQueue`
-  - [ ] `event/pollQueue`
-  - [ ] coordinator refresh integration
+- [x] Use the KEF event queue API to reduce pure polling
+  - [x] `event/modifyQueue`
+  - [x] `event/pollQueue`
+  - [x] coordinator refresh integration
+  - [ ] broaden event subscriptions and error recovery for more KEF families
 - [ ] Make playback command support more source-aware in the UI
 - [ ] Improve capability detection per device family instead of relying only on model assumptions
 
