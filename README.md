@@ -71,6 +71,8 @@ Current live validation is strongest on LSX II, but broad KEF coverage is the go
 
 The current LSX II investigation notes are in `docs/kef-lsx2-investigation.md`.
 
+Feature tracking checklist: `docs/feature-checklist.md`
+
 ## 🧱 Reusable Python Package
 
 This repository now ships two usable layers:
@@ -98,10 +100,9 @@ That keeps the protocol layer reusable for scripts and apps while the integratio
 
 ## 🛣️ Roadmap
 
-- improve older KEF coverage and real-device validation
-- keep extending modern KEF settings safely
-- expose capabilities based on what the speaker really supports
-- continue cleaning up entity presentation for the best Home Assistant experience
+- next tracked work lives in `docs/feature-checklist.md`
+- top priorities are writable EQ/DSP controls, fixed-volume style settings, and better older-device validation
+- the long-term direction remains one integration with strong modern and legacy support
 
 ## 🛠️ Development
 
