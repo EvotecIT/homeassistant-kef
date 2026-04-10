@@ -10,7 +10,7 @@
       },
       "confirm": {
         "title": "Set up KEF speaker",
-        "description": "Do you want to set up {title}?"
+        "description": "Do you want to set up this KEF speaker?"
       },
       "reconfigure": {
         "title": "Reconfigure KEF",
