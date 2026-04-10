@@ -120,6 +120,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="confirm",
             errors=self._errors,
+            description_placeholders={"title": self._title},
             last_step=True,
         )
 
