@@ -52,6 +52,22 @@ MODERN_MODEL_SOURCE_MAP: dict[str, tuple[str, ...]] = {
     "XIO": ("wifi", "bluetooth", "tv", "optical"),
 }
 
+STANDBY_MODE_OPTIONS = {
+    "standby_none": "Never",
+    "standby_20mins": "20 minutes",
+    "standby_30mins": "30 minutes",
+    "standby_60mins": "60 minutes",
+}
+
+WAKE_SOURCE_OPTIONS = {
+    "wakeup_default": "Default",
+    "wifi": "Wi-Fi",
+    "bluetooth": "Bluetooth",
+    "usb": "USB",
+    "optical": "Optical",
+    "tv": "TV",
+}
+
 LEGACY_SOURCE_LIST = (
     "Wifi",
     "Bluetooth",
@@ -75,4 +91,10 @@ PROBE_PATHS = {
     "play_time": "player:player/data/playTime",
     "eq_profile": "kef:eqProfile",
     "network_info": "network:info",
+    "standby_mode": "settings:/kef/host/standbyMode",
+    "startup_tone": "settings:/kef/host/startupTone",
+    "auto_switch_hdmi": "settings:/kef/host/autoSwitchToHDMI",
+    "disable_front_standby_led": "settings:/kef/host/disableFrontStandbyLED",
+    "disable_top_panel": "settings:/kef/host/disableTopPanel",
+    "wake_up_source": "settings:/kef/host/wakeUpSource",
 }

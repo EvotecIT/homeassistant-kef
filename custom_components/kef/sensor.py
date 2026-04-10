@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -33,91 +34,108 @@ class KefSensorDescription(SensorEntityDescription):
 SENSORS: tuple[KefSensorDescription, ...] = (
     KefSensorDescription(
         key="backend",
-        translation_key="backend",
+        name="Backend",
         value_fn=lambda data: data.device.backend.value,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
     ),
     KefSensorDescription(
         key="speaker_status",
-        translation_key="speaker_status",
+        name="Speaker status",
         value_fn=lambda data: data.speaker_status,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
     ),
     KefSensorDescription(
         key="play_mode",
-        translation_key="play_mode",
+        name="Play mode",
         value_fn=lambda data: data.play_mode,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
     ),
     KefSensorDescription(
         key="service_id",
-        translation_key="service_id",
+        name="Service ID",
         value_fn=lambda data: data.playback.service_id if data.playback else None,
         diagnostics_only=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
     ),
     KefSensorDescription(
         key="wifi_signal_level",
-        translation_key="wifi_signal_level",
+        name="Wi-Fi signal level",
         native_unit_of_measurement="dBm",
         value_fn=lambda data: data.wifi_info.signal_level if data.wifi_info else None,
         diagnostics_only=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     KefSensorDescription(
         key="wifi_ssid",
-        translation_key="wifi_ssid",
+        name="Wi-Fi SSID",
         value_fn=lambda data: data.wifi_info.ssid if data.wifi_info else None,
         diagnostics_only=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     KefSensorDescription(
         key="wifi_frequency",
-        translation_key="wifi_frequency",
+        name="Wi-Fi frequency",
         native_unit_of_measurement="MHz",
         value_fn=lambda data: data.wifi_info.frequency if data.wifi_info else None,
         diagnostics_only=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     KefSensorDescription(
         key="wifi_bssid",
-        translation_key="wifi_bssid",
+        name="Wi-Fi BSSID",
         value_fn=lambda data: data.wifi_info.bssid if data.wifi_info else None,
         diagnostics_only=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     KefSensorDescription(
         key="balance",
-        translation_key="balance",
+        name="Balance",
         value_fn=lambda data: data.eq_profile.balance if data.eq_profile else None,
         requires_eq=True,
+        entity_category=EntityCategory.CONFIG,
     ),
     KefSensorDescription(
         key="bass_extension",
-        translation_key="bass_extension",
+        name="Bass extension",
         value_fn=lambda data: (
             data.eq_profile.bass_extension if data.eq_profile else None
         ),
         requires_eq=True,
+        entity_category=EntityCategory.CONFIG,
     ),
     KefSensorDescription(
         key="treble_amount",
-        translation_key="treble_amount",
+        name="Treble amount",
         native_unit_of_measurement="steps",
         value_fn=lambda data: (
             data.eq_profile.treble_amount if data.eq_profile else None
         ),
         requires_eq=True,
+        entity_category=EntityCategory.CONFIG,
     ),
     KefSensorDescription(
         key="subwoofer_gain",
-        translation_key="subwoofer_gain",
+        name="Subwoofer gain",
         native_unit_of_measurement="steps",
         value_fn=lambda data: (
             data.eq_profile.subwoofer_gain if data.eq_profile else None
         ),
         requires_eq=True,
+        entity_category=EntityCategory.CONFIG,
     ),
     KefSensorDescription(
         key="high_pass_frequency",
-        translation_key="high_pass_frequency",
+        name="High-pass frequency",
         native_unit_of_measurement="steps",
         value_fn=lambda data: (
             data.eq_profile.high_pass_frequency if data.eq_profile else None
         ),
         requires_eq=True,
+        entity_category=EntityCategory.CONFIG,
     ),
 )
 

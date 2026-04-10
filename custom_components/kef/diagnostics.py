@@ -26,5 +26,11 @@ async def async_get_config_entry_diagnostics(hass, entry: KefConfigEntry):
         "playback": asdict(snapshot.playback) if snapshot.playback else None,
         "eq_profile": asdict(snapshot.eq_profile) if snapshot.eq_profile else None,
         "wifi_info": asdict(snapshot.wifi_info) if snapshot.wifi_info else None,
+        "standby_mode": snapshot.standby_mode,
+        "startup_tone_enabled": snapshot.startup_tone_enabled,
+        "auto_switch_hdmi": snapshot.auto_switch_hdmi,
+        "standby_led_enabled": snapshot.standby_led_enabled,
+        "top_panel_enabled": snapshot.top_panel_enabled,
+        "wake_source": snapshot.wake_source,
     }
     return async_redact_data(data, TO_REDACT)

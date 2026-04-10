@@ -7,7 +7,10 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from custom_components.kef.api import ModernKefClient
 from custom_components.kef.const import PROBE_PATHS
 from tests.conftest import (
+    AUTO_SWITCH_HDMI_VALUE,
     DEVICE_NAME_VALUE,
+    DISABLE_FRONT_STANDBY_LED_VALUE,
+    DISABLE_TOP_PANEL_VALUE,
     EQ_PROFILE_VALUE,
     MAC_VALUE,
     MODEL_CODE_VALUE,
@@ -19,9 +22,12 @@ from tests.conftest import (
     RELEASE_TEXT_VALUE,
     SOURCE_VALUE,
     SPEAKER_STATUS_VALUE,
+    STANDBY_MODE_VALUE,
+    STARTUP_TONE_VALUE,
     TEST_HOST,
     VERSION_VALUE,
     VOLUME_VALUE,
+    WAKE_UP_SOURCE_VALUE,
 )
 
 
@@ -42,6 +48,14 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
         PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
         PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
         PROBE_PATHS["network_info"]: NETWORK_INFO_VALUE,
+        PROBE_PATHS["standby_mode"]: STANDBY_MODE_VALUE["kefStandbyMode"],
+        PROBE_PATHS["startup_tone"]: STARTUP_TONE_VALUE["bool_"],
+        PROBE_PATHS["auto_switch_hdmi"]: AUTO_SWITCH_HDMI_VALUE["bool_"],
+        PROBE_PATHS["disable_front_standby_led"]: (
+            DISABLE_FRONT_STANDBY_LED_VALUE["bool_"]
+        ),
+        PROBE_PATHS["disable_top_panel"]: DISABLE_TOP_PANEL_VALUE["bool_"],
+        PROBE_PATHS["wake_up_source"]: WAKE_UP_SOURCE_VALUE["kefWakeUpSource"],
     }
 
     async def fake_get_value(self, path, *, typed_key=None):
@@ -76,6 +90,12 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     assert snapshot.wifi_info is not None
     assert snapshot.wifi_info.ssid == "EvotecLab"
     assert snapshot.wifi_info.signal_level == -49
+    assert snapshot.standby_mode == "standby_none"
+    assert snapshot.startup_tone_enabled is True
+    assert snapshot.auto_switch_hdmi is False
+    assert snapshot.standby_led_enabled is True
+    assert snapshot.top_panel_enabled is True
+    assert snapshot.wake_source == "wakeup_default"
     assert snapshot.source_list == (
         "wifi",
         "bluetooth",
@@ -162,6 +182,14 @@ async def test_modern_turn_on_prefers_last_active_source(monkeypatch, hass) -> N
             PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
             PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
             PROBE_PATHS["network_info"]: NETWORK_INFO_VALUE,
+            PROBE_PATHS["standby_mode"]: STANDBY_MODE_VALUE["kefStandbyMode"],
+            PROBE_PATHS["startup_tone"]: STARTUP_TONE_VALUE["bool_"],
+            PROBE_PATHS["auto_switch_hdmi"]: AUTO_SWITCH_HDMI_VALUE["bool_"],
+            PROBE_PATHS["disable_front_standby_led"]: (
+                DISABLE_FRONT_STANDBY_LED_VALUE["bool_"]
+            ),
+            PROBE_PATHS["disable_top_panel"]: DISABLE_TOP_PANEL_VALUE["bool_"],
+            PROBE_PATHS["wake_up_source"]: WAKE_UP_SOURCE_VALUE["kefWakeUpSource"],
         }
         return mapping[path]
 
@@ -203,6 +231,14 @@ async def test_modern_unknown_model_uses_default_sources(monkeypatch, hass) -> N
         PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
         PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
         PROBE_PATHS["network_info"]: NETWORK_INFO_VALUE,
+        PROBE_PATHS["standby_mode"]: STANDBY_MODE_VALUE["kefStandbyMode"],
+        PROBE_PATHS["startup_tone"]: STARTUP_TONE_VALUE["bool_"],
+        PROBE_PATHS["auto_switch_hdmi"]: AUTO_SWITCH_HDMI_VALUE["bool_"],
+        PROBE_PATHS["disable_front_standby_led"]: (
+            DISABLE_FRONT_STANDBY_LED_VALUE["bool_"]
+        ),
+        PROBE_PATHS["disable_top_panel"]: DISABLE_TOP_PANEL_VALUE["bool_"],
+        PROBE_PATHS["wake_up_source"]: WAKE_UP_SOURCE_VALUE["kefWakeUpSource"],
     }
 
     async def fake_get_value(self, path, *, typed_key=None):
@@ -251,6 +287,14 @@ async def test_modern_optional_network_info_is_absent_when_unavailable(
         PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
         PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
         PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
+        PROBE_PATHS["standby_mode"]: STANDBY_MODE_VALUE["kefStandbyMode"],
+        PROBE_PATHS["startup_tone"]: STARTUP_TONE_VALUE["bool_"],
+        PROBE_PATHS["auto_switch_hdmi"]: AUTO_SWITCH_HDMI_VALUE["bool_"],
+        PROBE_PATHS["disable_front_standby_led"]: (
+            DISABLE_FRONT_STANDBY_LED_VALUE["bool_"]
+        ),
+        PROBE_PATHS["disable_top_panel"]: DISABLE_TOP_PANEL_VALUE["bool_"],
+        PROBE_PATHS["wake_up_source"]: WAKE_UP_SOURCE_VALUE["kefWakeUpSource"],
     }
 
     async def fake_get_value(self, path, *, typed_key=None):
@@ -272,3 +316,61 @@ async def test_modern_optional_network_info_is_absent_when_unavailable(
     snapshot = await client.async_refresh()
 
     assert snapshot.wifi_info is None
+
+
+async def test_modern_set_standby_mode_posts_typed_payload(monkeypatch, hass) -> None:
+    """Modern client should post a typed payload when setting standby mode."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_standby_mode("standby_20mins")
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "settings:/kef/host/standbyMode",
+            "role": "value",
+            "value": {
+                "type": "kefStandbyMode",
+                "kefStandbyMode": "standby_20mins",
+            },
+        },
+    }
+
+
+async def test_modern_set_wake_source_posts_typed_payload(monkeypatch, hass) -> None:
+    """Modern client should post a typed payload when setting wake source."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_wake_source("wifi")
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "settings:/kef/host/wakeUpSource",
+            "role": "value",
+            "value": {
+                "type": "kefWakeUpSource",
+                "kefWakeUpSource": "wifi",
+            },
+        },
+    }

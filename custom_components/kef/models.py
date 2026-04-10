@@ -129,6 +129,12 @@ class KefSnapshot:
     playback: KefPlaybackInfo | None
     eq_profile: KefEqProfile | None
     wifi_info: KefWifiInfo | None
+    standby_mode: str | None
+    startup_tone_enabled: bool | None
+    auto_switch_hdmi: bool | None
+    standby_led_enabled: bool | None
+    top_panel_enabled: bool | None
+    wake_source: str | None
     source_list: tuple[str, ...]
 
     @property

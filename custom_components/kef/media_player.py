@@ -174,6 +174,12 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
             "wifi_bssid": snapshot.wifi_info.bssid if snapshot.wifi_info else None,
             "eq_profile_name": eq_profile.profile_name if eq_profile else None,
             "eq_expert_mode": eq_profile.is_expert_mode if eq_profile else None,
+            "standby_mode": snapshot.standby_mode,
+            "startup_tone_enabled": snapshot.startup_tone_enabled,
+            "auto_switch_hdmi": snapshot.auto_switch_hdmi,
+            "standby_led_enabled": snapshot.standby_led_enabled,
+            "top_panel_enabled": snapshot.top_panel_enabled,
+            "wake_source": snapshot.wake_source,
         }
 
     async def async_turn_on(self) -> None:

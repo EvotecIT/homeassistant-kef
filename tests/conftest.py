@@ -24,6 +24,15 @@ SOURCE_VALUE = {"type": "kefPhysicalSource", "kefPhysicalSource": "usb"}
 VOLUME_VALUE = {"type": "i32_", "i32_": 80}
 MUTE_VALUE = {"type": "bool_", "bool_": False}
 PLAY_MODE_VALUE = {"type": "playerPlayMode", "playerPlayMode": "normal"}
+STANDBY_MODE_VALUE = {"type": "kefStandbyMode", "kefStandbyMode": "standby_none"}
+STARTUP_TONE_VALUE = {"type": "bool_", "bool_": True}
+AUTO_SWITCH_HDMI_VALUE = {"type": "bool_", "bool_": False}
+DISABLE_FRONT_STANDBY_LED_VALUE = {"type": "bool_", "bool_": False}
+DISABLE_TOP_PANEL_VALUE = {"type": "bool_", "bool_": False}
+WAKE_UP_SOURCE_VALUE = {
+    "type": "kefWakeUpSource",
+    "kefWakeUpSource": "wakeup_default",
+}
 PLAYER_DATA_VALUE = {
     "trackRoles": {
         "title": "usb",
@@ -120,5 +129,11 @@ TEST_SNAPSHOT = KefSnapshot(
     ),
     eq_profile=KefEqProfile.from_modern_value(EQ_PROFILE_VALUE),
     wifi_info=KefWifiInfo.from_modern_value(NETWORK_INFO_VALUE),
+    standby_mode="standby_none",
+    startup_tone_enabled=True,
+    auto_switch_hdmi=False,
+    standby_led_enabled=True,
+    top_panel_enabled=True,
+    wake_source="wakeup_default",
     source_list=("wifi", "bluetooth", "tv", "optical", "coaxial", "analog", "usb"),
 )

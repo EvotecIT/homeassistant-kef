@@ -127,6 +127,30 @@ class BaseKefClient(ABC):
     async def async_select_source(self, source: str) -> None:
         """Select the active source."""
 
+    @abstractmethod
+    async def async_set_standby_mode(self, mode: str) -> None:
+        """Set the automatic standby mode."""
+
+    @abstractmethod
+    async def async_set_startup_tone_enabled(self, enabled: bool) -> None:
+        """Enable or disable the startup tone."""
+
+    @abstractmethod
+    async def async_set_auto_switch_hdmi_enabled(self, enabled: bool) -> None:
+        """Enable or disable HDMI auto switching."""
+
+    @abstractmethod
+    async def async_set_standby_led_enabled(self, enabled: bool) -> None:
+        """Enable or disable the standby LED."""
+
+    @abstractmethod
+    async def async_set_top_panel_enabled(self, enabled: bool) -> None:
+        """Enable or disable the top touch panel."""
+
+    @abstractmethod
+    async def async_set_wake_source(self, source: str) -> None:
+        """Set the wake source."""
+
 
 class ModernKefClient(BaseKefClient):
     """Modern HTTP client for LSX II-era KEF speakers."""
@@ -214,6 +238,42 @@ class ModernKefClient(BaseKefClient):
         )
         eq_profile = await self._get_optional_path_value(PROBE_PATHS["eq_profile"])
         network_info = await self._get_optional_path_value(PROBE_PATHS["network_info"])
+        standby_mode = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["standby_mode"],
+                typed_key="kefStandbyMode",
+            )
+        )
+        startup_tone_enabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["startup_tone"],
+                typed_key="bool_",
+            )
+        )
+        auto_switch_hdmi = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["auto_switch_hdmi"],
+                typed_key="bool_",
+            )
+        )
+        standby_led_disabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["disable_front_standby_led"],
+                typed_key="bool_",
+            )
+        )
+        top_panel_disabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["disable_top_panel"],
+                typed_key="bool_",
+            )
+        )
+        wake_source = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["wake_up_source"],
+                typed_key="kefWakeUpSource",
+            )
+        )
         if source not in (None, STATE_OFF):
             self._last_active_source = source
 
@@ -236,6 +296,16 @@ class ModernKefClient(BaseKefClient):
                 if isinstance(network_info, dict)
                 else None
             ),
+            standby_mode=standby_mode,
+            startup_tone_enabled=startup_tone_enabled,
+            auto_switch_hdmi=auto_switch_hdmi,
+            standby_led_enabled=(
+                None if standby_led_disabled is None else not standby_led_disabled
+            ),
+            top_panel_enabled=(
+                None if top_panel_disabled is None else not top_panel_disabled
+            ),
+            wake_source=wake_source,
             source_list=self._source_list_for_model(device.model),
         )
 
@@ -306,6 +376,54 @@ class ModernKefClient(BaseKefClient):
             PROBE_PATHS["source"],
             role="value",
             value={"type": "kefPhysicalSource", "kefPhysicalSource": source},
+        )
+
+    async def async_set_standby_mode(self, mode: str) -> None:
+        """Set the automatic standby mode."""
+        await self._set_data(
+            PROBE_PATHS["standby_mode"],
+            role="value",
+            value={"type": "kefStandbyMode", "kefStandbyMode": mode},
+        )
+
+    async def async_set_startup_tone_enabled(self, enabled: bool) -> None:
+        """Enable or disable the startup tone."""
+        await self._set_data(
+            PROBE_PATHS["startup_tone"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
+        )
+
+    async def async_set_auto_switch_hdmi_enabled(self, enabled: bool) -> None:
+        """Enable or disable HDMI auto switching."""
+        await self._set_data(
+            PROBE_PATHS["auto_switch_hdmi"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
+        )
+
+    async def async_set_standby_led_enabled(self, enabled: bool) -> None:
+        """Enable or disable the standby LED."""
+        await self._set_data(
+            PROBE_PATHS["disable_front_standby_led"],
+            role="value",
+            value={"type": "bool_", "bool_": not enabled},
+        )
+
+    async def async_set_top_panel_enabled(self, enabled: bool) -> None:
+        """Enable or disable the top touch panel."""
+        await self._set_data(
+            PROBE_PATHS["disable_top_panel"],
+            role="value",
+            value={"type": "bool_", "bool_": not enabled},
+        )
+
+    async def async_set_wake_source(self, source: str) -> None:
+        """Set the wake source."""
+        await self._set_data(
+            PROBE_PATHS["wake_up_source"],
+            role="value",
+            value={"type": "kefWakeUpSource", "kefWakeUpSource": source},
         )
 
     async def _get_optional_path_value(
@@ -428,6 +546,8 @@ class ModernKefClient(BaseKefClient):
                 "kefSpeakerStatus",
                 "kefPhysicalSource",
                 "playerPlayMode",
+                "kefStandbyMode",
+                "kefWakeUpSource",
             ):
                 raw = value.get(key)
                 if isinstance(raw, str):
@@ -595,6 +715,12 @@ class LegacyBinaryClient(BaseKefClient):
             playback=KefPlaybackInfo(state=playback_state),
             eq_profile=None,
             wifi_info=None,
+            standby_mode=None,
+            startup_tone_enabled=None,
+            auto_switch_hdmi=None,
+            standby_led_enabled=None,
+            top_panel_enabled=None,
+            wake_source=None,
             source_list=LEGACY_SOURCE_LIST,
         )
 
@@ -657,6 +783,32 @@ class LegacyBinaryClient(BaseKefClient):
         if source not in (None, STATE_OFF):
             self._last_active_source = source
         await self._set_source(source)
+
+    async def async_set_standby_mode(self, mode: str) -> None:
+        """Legacy speakers do not expose standby mode settings."""
+        raise KefUnsupportedDeviceError("Standby mode is not supported for legacy KEF")
+
+    async def async_set_startup_tone_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose startup tone settings."""
+        raise KefUnsupportedDeviceError("Startup tone is not supported for legacy KEF")
+
+    async def async_set_auto_switch_hdmi_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose HDMI auto-switch settings."""
+        raise KefUnsupportedDeviceError(
+            "HDMI auto switching is not supported for legacy KEF"
+        )
+
+    async def async_set_standby_led_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose standby LED settings."""
+        raise KefUnsupportedDeviceError("Standby LED is not supported for legacy KEF")
+
+    async def async_set_top_panel_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose top-panel settings."""
+        raise KefUnsupportedDeviceError("Top panel is not supported for legacy KEF")
+
+    async def async_set_wake_source(self, source: str) -> None:
+        """Legacy speakers do not expose wake-source settings."""
+        raise KefUnsupportedDeviceError("Wake source is not supported for legacy KEF")
 
     async def _set_source(self, source: str, *, off: bool = False) -> None:
         """Set the current source."""

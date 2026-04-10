@@ -1,0 +1,156 @@
+"""Switch platform for KEF configuration controls."""
+
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
+from homeassistant.const import EntityCategory
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .coordinator import KefConfigEntry, KefCoordinator
+from .entity import KefEntity
+from .models import KefBackend, KefSnapshot
+
+
+async def _async_set_startup_tone(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set the startup tone state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_startup_tone_enabled(enabled)
+
+
+async def _async_set_auto_switch_hdmi(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set HDMI auto switching."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_auto_switch_hdmi_enabled(enabled)
+
+
+async def _async_set_standby_led(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set the standby LED state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_standby_led_enabled(enabled)
+
+
+async def _async_set_top_panel(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set the top-panel enabled state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_top_panel_enabled(enabled)
+
+
+@dataclass(frozen=True, kw_only=True)
+class KefSwitchDescription(SwitchEntityDescription):
+    """Describe a KEF configuration switch."""
+
+    value_fn: Callable[[KefSnapshot], bool | None]
+    async_set_fn: Callable[[KefCoordinator, bool], Awaitable[None]]
+
+
+SWITCHES: tuple[KefSwitchDescription, ...] = (
+    KefSwitchDescription(
+        key="startup_tone",
+        name="Startup tone",
+        icon="mdi:music-note",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.startup_tone_enabled,
+        async_set_fn=_async_set_startup_tone,
+    ),
+    KefSwitchDescription(
+        key="auto_switch_hdmi",
+        name="Auto-switch to HDMI",
+        icon="mdi:video-switch",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.auto_switch_hdmi,
+        async_set_fn=_async_set_auto_switch_hdmi,
+    ),
+    KefSwitchDescription(
+        key="standby_led",
+        name="Standby LED",
+        icon="mdi:led-outline",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.standby_led_enabled,
+        async_set_fn=_async_set_standby_led,
+    ),
+    KefSwitchDescription(
+        key="top_panel",
+        name="Top touch panel",
+        icon="mdi:gesture-tap-button",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.top_panel_enabled,
+        async_set_fn=_async_set_top_panel,
+    ),
+)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: KefConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up KEF configuration switches."""
+    coordinator = entry.runtime_data
+    if coordinator.data.device.backend is not KefBackend.MODERN:
+        return
+
+    entities = [
+        KefSwitch(coordinator, description)
+        for description in SWITCHES
+        if description.value_fn(coordinator.data) is not None
+    ]
+    async_add_entities(entities)
+
+
+class KefSwitch(KefEntity, CoordinatorEntity[KefCoordinator], SwitchEntity):
+    """Coordinator-backed KEF configuration switch."""
+
+    entity_description: KefSwitchDescription
+
+    def __init__(
+        self,
+        coordinator: KefCoordinator,
+        description: KefSwitchDescription,
+    ) -> None:
+        """Initialize the switch."""
+        CoordinatorEntity.__init__(self, coordinator)
+        KefEntity.__init__(self, coordinator)
+        self.entity_description = description
+        self._attr_unique_id = (
+            f"{coordinator.data.device.unique_id}_{description.key}"
+        )
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return whether the switch is on."""
+        return self.entity_description.value_fn(self.coordinator.data)
+
+    async def async_turn_on(self, **kwargs) -> None:
+        """Turn the switch on."""
+        await self.entity_description.async_set_fn(self.coordinator, True)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Turn the switch off."""
+        await self.entity_description.async_set_fn(self.coordinator, False)
+        await self.coordinator.async_request_refresh()
