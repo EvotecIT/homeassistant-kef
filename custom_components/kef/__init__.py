@@ -5,7 +5,12 @@ from __future__ import annotations
 from homeassistant.const import Platform
 from homeassistant.helpers import entity_registry as er
 
-from .const import CONF_ENABLE_EQ_SENSORS, DEFAULT_ENABLE_EQ_SENSORS
+from .const import (
+    CONF_ENABLE_DIAGNOSTICS,
+    CONF_ENABLE_EQ_SENSORS,
+    DEFAULT_ENABLE_DIAGNOSTICS,
+    DEFAULT_ENABLE_EQ_SENSORS,
+)
 from .coordinator import KefConfigEntry, KefCoordinator
 
 PLATFORMS = [
@@ -28,6 +33,19 @@ _EQ_ENTITY_KEYS = {
     "phase_correction",
     "high_pass_mode",
 }
+
+_ACTIVE_SENSOR_ENTITY_KEYS = {
+    "backend",
+    "speaker_status",
+    "play_mode",
+    "service_id",
+    "wifi_signal_level",
+    "wifi_ssid",
+    "wifi_frequency",
+    "wifi_bssid",
+}
+
+_ACTIVE_BINARY_SENSOR_ENTITY_KEYS: set[str] = set()
 
 
 async def async_setup_entry(hass, entry: KefConfigEntry) -> bool:
@@ -56,17 +74,50 @@ async def _async_cleanup_optional_entities(
     entry: KefConfigEntry,
     coordinator: KefCoordinator,
 ) -> None:
-    """Remove registry entries for optional entities that are now disabled."""
-    if entry.options.get(CONF_ENABLE_EQ_SENSORS, DEFAULT_ENABLE_EQ_SENSORS):
-        return
-
+    """Remove stale registry entries for optional or retired entities."""
     registry = er.async_get(hass)
     device_unique_id = coordinator.data.device.unique_id
+    eq_enabled = entry.options.get(CONF_ENABLE_EQ_SENSORS, DEFAULT_ENABLE_EQ_SENSORS)
+    diagnostics_enabled = entry.options.get(
+        CONF_ENABLE_DIAGNOSTICS,
+        DEFAULT_ENABLE_DIAGNOSTICS,
+    )
+    expected_sensor_keys = {"backend", "speaker_status", "play_mode"}
+    if diagnostics_enabled:
+        expected_sensor_keys.update(
+            {
+                "service_id",
+                "wifi_signal_level",
+                "wifi_ssid",
+                "wifi_frequency",
+                "wifi_bssid",
+            }
+        )
+    expected_binary_sensor_keys = set(_ACTIVE_BINARY_SENSOR_ENTITY_KEYS)
+    if eq_enabled:
+        expected_sensor_keys.update(
+            {
+                "balance",
+                "bass_extension",
+                "treble_amount",
+                "subwoofer_gain",
+                "high_pass_frequency",
+            }
+        )
+        expected_binary_sensor_keys.update(_EQ_ENTITY_KEYS - expected_sensor_keys)
+
     for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+        platform = entity_entry.entity_id.split(".", 1)[0]
         unique_id = entity_entry.unique_id
+        if platform not in {"sensor", "binary_sensor"}:
+            continue
+
         if not unique_id.startswith(f"{device_unique_id}_"):
+            registry.async_remove(entity_entry.entity_id)
             continue
 
         key = unique_id.removeprefix(f"{device_unique_id}_")
-        if key in _EQ_ENTITY_KEYS:
+        if platform == "sensor" and key not in expected_sensor_keys:
+            registry.async_remove(entity_entry.entity_id)
+        if platform == "binary_sensor" and key not in expected_binary_sensor_keys:
             registry.async_remove(entity_entry.entity_id)
