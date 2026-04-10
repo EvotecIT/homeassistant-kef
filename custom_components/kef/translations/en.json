@@ -36,7 +36,7 @@
         "data": {
           "scan_interval": "Polling interval (seconds)",
           "enable_diagnostics": "Expose diagnostic sensors",
-          "enable_eq_sensors": "Expose EQ read-only sensors"
+          "enable_eq_sensors": "Expose EQ read-only sensors (advanced)"
         }
       }
     }
