@@ -37,6 +37,15 @@ from tests.conftest import (
     WAKE_UP_SOURCE_VALUE,
 )
 
+SOURCE_VOLUME_RESPONSES = {
+    "settings:/kef/host/defaultVolumeWifi": 30,
+    "settings:/kef/host/defaultVolumeBluetooth": 30,
+    "settings:/kef/host/defaultVolumeTV": 30,
+    "settings:/kef/host/defaultVolumeOptical": 30,
+    "settings:/kef/host/defaultVolumeAnalogue": 30,
+    "settings:/kef/host/defaultVolumeUSB": 30,
+}
+
 
 async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     """Modern client should parse a full LSX II snapshot."""
@@ -74,13 +83,14 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
         PROBE_PATHS["maximum_volume"]: MAXIMUM_VOLUME_VALUE["i32_"],
         PROBE_PATHS["volume_step"]: VOLUME_STEP_SETTING_VALUE["i16_"],
         PROBE_PATHS["volume_limit"]: VOLUME_LIMIT_VALUE["bool_"],
+        **SOURCE_VOLUME_RESPONSES,
     }
 
     async def fake_get_value(self, path, *, typed_key=None):
         return responses[path]
 
     async def fake_get_optional_value(self, path, *, typed_key=None):
-        return responses[path]
+        return responses.get(path)
 
     monkeypatch.setattr(ModernKefClient, "_get_path_value", fake_get_value)
     monkeypatch.setattr(
@@ -118,6 +128,8 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     assert snapshot.startup_volume_enabled is False
     assert snapshot.per_input_startup_volume_enabled is False
     assert snapshot.default_volume_global == 30
+    assert snapshot.default_volume_by_source["wifi"] == 30
+    assert snapshot.default_volume_by_source["usb"] == 30
     assert snapshot.maximum_volume == 100
     assert snapshot.volume_step == 1
     assert snapshot.volume_limit_enabled is False
@@ -186,51 +198,50 @@ async def test_modern_set_muted_posts_bool_payload(monkeypatch, hass) -> None:
 async def test_modern_turn_on_prefers_last_active_source(monkeypatch, hass) -> None:
     """Modern turn-on should reuse the last active source when known."""
     selected = []
+    mapping = {
+        PROBE_PATHS["device_name"]: DEVICE_NAME_VALUE,
+        PROBE_PATHS["version"]: VERSION_VALUE,
+        PROBE_PATHS["release_text"]: RELEASE_TEXT_VALUE,
+        PROBE_PATHS["mac"]: MAC_VALUE,
+        PROBE_PATHS["model_code"]: MODEL_CODE_VALUE,
+        PROBE_PATHS["speaker_status"]: "standby",
+        PROBE_PATHS["source"]: "standby",
+        PROBE_PATHS["volume"]: 80,
+        PROBE_PATHS["mute"]: False,
+        PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
+        PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
+        PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
+        PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
+        PROBE_PATHS["network_info"]: NETWORK_INFO_VALUE,
+        PROBE_PATHS["standby_mode"]: STANDBY_MODE_VALUE["kefStandbyMode"],
+        PROBE_PATHS["startup_tone"]: STARTUP_TONE_VALUE["bool_"],
+        PROBE_PATHS["auto_switch_hdmi"]: AUTO_SWITCH_HDMI_VALUE["bool_"],
+        PROBE_PATHS["disable_front_standby_led"]: (
+            DISABLE_FRONT_STANDBY_LED_VALUE["bool_"]
+        ),
+        PROBE_PATHS["disable_top_panel"]: DISABLE_TOP_PANEL_VALUE["bool_"],
+        PROBE_PATHS["wake_up_source"]: WAKE_UP_SOURCE_VALUE["kefWakeUpSource"],
+        PROBE_PATHS["usb_charging"]: USB_CHARGING_VALUE["bool_"],
+        PROBE_PATHS["startup_volume_enabled"]: STARTUP_VOLUME_ENABLED_VALUE["bool_"],
+        PROBE_PATHS["per_input_startup_volume_enabled"]: (
+            PER_INPUT_STARTUP_VOLUME_ENABLED_VALUE["bool_"]
+        ),
+        PROBE_PATHS["default_volume_global"]: DEFAULT_VOLUME_GLOBAL_VALUE["i32_"],
+        PROBE_PATHS["maximum_volume"]: MAXIMUM_VOLUME_VALUE["i32_"],
+        PROBE_PATHS["volume_step"]: VOLUME_STEP_SETTING_VALUE["i16_"],
+        PROBE_PATHS["volume_limit"]: VOLUME_LIMIT_VALUE["bool_"],
+        **SOURCE_VOLUME_RESPONSES,
+    }
 
     async def fake_refresh(self):
         self._last_active_source = "usb"
         return await ModernKefClient.async_refresh(self)
 
     async def fake_get_value(self, path, *, typed_key=None):
-        mapping = {
-            PROBE_PATHS["device_name"]: DEVICE_NAME_VALUE,
-            PROBE_PATHS["version"]: VERSION_VALUE,
-            PROBE_PATHS["release_text"]: RELEASE_TEXT_VALUE,
-            PROBE_PATHS["mac"]: MAC_VALUE,
-            PROBE_PATHS["model_code"]: MODEL_CODE_VALUE,
-            PROBE_PATHS["speaker_status"]: "standby",
-            PROBE_PATHS["source"]: "standby",
-            PROBE_PATHS["volume"]: 80,
-            PROBE_PATHS["mute"]: False,
-            PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
-            PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
-            PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
-            PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
-            PROBE_PATHS["network_info"]: NETWORK_INFO_VALUE,
-            PROBE_PATHS["standby_mode"]: STANDBY_MODE_VALUE["kefStandbyMode"],
-            PROBE_PATHS["startup_tone"]: STARTUP_TONE_VALUE["bool_"],
-            PROBE_PATHS["auto_switch_hdmi"]: AUTO_SWITCH_HDMI_VALUE["bool_"],
-            PROBE_PATHS["disable_front_standby_led"]: (
-                DISABLE_FRONT_STANDBY_LED_VALUE["bool_"]
-            ),
-            PROBE_PATHS["disable_top_panel"]: DISABLE_TOP_PANEL_VALUE["bool_"],
-            PROBE_PATHS["wake_up_source"]: WAKE_UP_SOURCE_VALUE["kefWakeUpSource"],
-            PROBE_PATHS["usb_charging"]: USB_CHARGING_VALUE["bool_"],
-            PROBE_PATHS["startup_volume_enabled"]: (
-                STARTUP_VOLUME_ENABLED_VALUE["bool_"]
-            ),
-            PROBE_PATHS["per_input_startup_volume_enabled"]: (
-                PER_INPUT_STARTUP_VOLUME_ENABLED_VALUE["bool_"]
-            ),
-            PROBE_PATHS["default_volume_global"]: DEFAULT_VOLUME_GLOBAL_VALUE["i32_"],
-            PROBE_PATHS["maximum_volume"]: MAXIMUM_VOLUME_VALUE["i32_"],
-            PROBE_PATHS["volume_step"]: VOLUME_STEP_SETTING_VALUE["i16_"],
-            PROBE_PATHS["volume_limit"]: VOLUME_LIMIT_VALUE["bool_"],
-        }
         return mapping[path]
 
     async def fake_get_optional_value(self, path, *, typed_key=None):
-        return await fake_get_value(self, path, typed_key=typed_key)
+        return mapping.get(path)
 
     async def fake_select_source(self, source):
         selected.append(source)
@@ -286,13 +297,14 @@ async def test_modern_unknown_model_uses_default_sources(monkeypatch, hass) -> N
         PROBE_PATHS["maximum_volume"]: MAXIMUM_VOLUME_VALUE["i32_"],
         PROBE_PATHS["volume_step"]: VOLUME_STEP_SETTING_VALUE["i16_"],
         PROBE_PATHS["volume_limit"]: VOLUME_LIMIT_VALUE["bool_"],
+        **SOURCE_VOLUME_RESPONSES,
     }
 
     async def fake_get_value(self, path, *, typed_key=None):
         return responses[path]
 
     async def fake_get_optional_value(self, path, *, typed_key=None):
-        return responses[path]
+        return responses.get(path)
 
     monkeypatch.setattr(ModernKefClient, "_get_path_value", fake_get_value)
     monkeypatch.setattr(
@@ -353,6 +365,7 @@ async def test_modern_optional_network_info_is_absent_when_unavailable(
         PROBE_PATHS["maximum_volume"]: MAXIMUM_VOLUME_VALUE["i32_"],
         PROBE_PATHS["volume_step"]: VOLUME_STEP_SETTING_VALUE["i16_"],
         PROBE_PATHS["volume_limit"]: VOLUME_LIMIT_VALUE["bool_"],
+        **SOURCE_VOLUME_RESPONSES,
     }
 
     async def fake_get_value(self, path, *, typed_key=None):
@@ -361,7 +374,7 @@ async def test_modern_optional_network_info_is_absent_when_unavailable(
     async def fake_get_optional_value(self, path, *, typed_key=None):
         if path == PROBE_PATHS["network_info"]:
             return None
-        return responses[path]
+        return responses.get(path)
 
     monkeypatch.setattr(ModernKefClient, "_get_path_value", fake_get_value)
     monkeypatch.setattr(
@@ -484,5 +497,57 @@ async def test_modern_set_volume_step_posts_typed_payload(monkeypatch, hass) -> 
             "path": "settings:/kef/host/volumeStep",
             "role": "value",
             "value": {"type": "i16_", "i16_": 2},
+        },
+    }
+
+
+async def test_modern_set_volume_limit_posts_typed_payload(monkeypatch, hass) -> None:
+    """Modern client should post a typed payload when toggling volume limit."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_volume_limit_enabled(True)
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "settings:/kef/host/volumeLimit",
+            "role": "value",
+            "value": {"type": "bool_", "bool_": True},
+        },
+    }
+
+
+async def test_modern_set_source_volume_posts_typed_payload(monkeypatch, hass) -> None:
+    """Modern client should post a typed payload for source startup volume."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_default_volume_for_source("usb", 35)
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "settings:/kef/host/defaultVolumeUSB",
+            "role": "value",
+            "value": {"type": "i32_", "i32_": 35},
         },
     }

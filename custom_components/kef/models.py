@@ -143,6 +143,7 @@ class KefSnapshot:
     volume_step: int | None
     volume_limit_enabled: bool | None
     source_list: tuple[str, ...]
+    default_volume_by_source: dict[str, int] = field(default_factory=dict)
 
     @property
     def is_power_on(self) -> bool:

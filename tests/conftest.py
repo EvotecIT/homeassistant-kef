@@ -150,4 +150,12 @@ TEST_SNAPSHOT = KefSnapshot(
     volume_step=1,
     volume_limit_enabled=False,
     source_list=("wifi", "bluetooth", "tv", "optical", "coaxial", "analog", "usb"),
+    default_volume_by_source={
+        "wifi": 30,
+        "bluetooth": 30,
+        "tv": 30,
+        "optical": 30,
+        "usb": 30,
+        "analog": 30,
+    },
 )

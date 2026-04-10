@@ -17,6 +17,7 @@ from .const import (
     DEFAULT_LEGACY_PORT,
     DEFAULT_MODERN_SOURCE_LIST,
     DEFAULT_PORT,
+    DEFAULT_VOLUME_SOURCE_SUFFIX,
     GET_DATA_ENDPOINT,
     LEGACY_SOURCE_LIST,
     MODERN_MODEL_SOURCE_MAP,
@@ -182,6 +183,14 @@ class BaseKefClient(ABC):
     async def async_set_volume_limit_enabled(self, enabled: bool) -> None:
         """Enable or disable the volume limiter."""
 
+    @abstractmethod
+    async def async_set_default_volume_for_source(
+        self,
+        source: str,
+        volume: int,
+    ) -> None:
+        """Set the startup volume for a specific source."""
+
 
 class ModernKefClient(BaseKefClient):
     """Modern HTTP client for LSX II-era KEF speakers."""
@@ -323,11 +332,15 @@ class ModernKefClient(BaseKefClient):
                 typed_key="bool_",
             )
         )
+        source_list = self._source_list_for_model(device.model)
         default_volume_global = self._extract_int(
             await self._get_optional_path_value(
                 PROBE_PATHS["default_volume_global"],
                 typed_key="i32_",
             )
+        )
+        default_volume_by_source = await self._async_get_default_volume_by_source(
+            source_list
         )
         maximum_volume = self._extract_int(
             await self._get_optional_path_value(
@@ -386,7 +399,8 @@ class ModernKefClient(BaseKefClient):
             maximum_volume=maximum_volume,
             volume_step=volume_step,
             volume_limit_enabled=volume_limit_enabled,
-            source_list=self._source_list_for_model(device.model),
+            source_list=source_list,
+            default_volume_by_source=default_volume_by_source,
         )
 
     async def async_turn_on(self) -> None:
@@ -565,6 +579,18 @@ class ModernKefClient(BaseKefClient):
             value={"type": "bool_", "bool_": enabled},
         )
 
+    async def async_set_default_volume_for_source(
+        self,
+        source: str,
+        volume: int,
+    ) -> None:
+        """Set the startup volume for a specific source."""
+        await self._set_data(
+            self._default_volume_path_for_source(source),
+            role="value",
+            value={"type": "i32_", "i32_": max(0, min(100, volume))},
+        )
+
     async def _get_optional_path_value(
         self,
         path: str,
@@ -667,10 +693,40 @@ class ModernKefClient(BaseKefClient):
         _LOGGER.debug("KEF modern %s %s -> %s", method, url, data)
         return data
 
+    async def _async_get_default_volume_by_source(
+        self,
+        source_list: tuple[str, ...],
+    ) -> dict[str, int]:
+        """Fetch startup-volume values for each supported source."""
+        values: dict[str, int] = {}
+        for source in source_list:
+            try:
+                value = self._extract_int(
+                    await self._get_optional_path_value(
+                        self._default_volume_path_for_source(source),
+                        typed_key="i32_",
+                    )
+                )
+            except KefError:
+                value = None
+            if value is not None:
+                values[source] = value
+        return values
+
     def _build_url(self, endpoint: str) -> str:
         """Build the request URL."""
         endpoint = endpoint if endpoint.startswith("/") else f"/{endpoint}"
         return f"http://{self._host}:{self._port}{API_ROOT}{endpoint}"
+
+    @staticmethod
+    def _default_volume_path_for_source(source: str) -> str:
+        """Return the API path for a source-specific startup volume."""
+        suffix = DEFAULT_VOLUME_SOURCE_SUFFIX.get(source)
+        if suffix is None:
+            raise KefUnsupportedDeviceError(
+                f"Unsupported startup-volume source: {source}"
+            )
+        return f"settings:/kef/host/defaultVolume{suffix}"
 
     @staticmethod
     def _extract_string(value: dict[str, Any] | Any | None) -> str | None:
@@ -869,6 +925,7 @@ class LegacyBinaryClient(BaseKefClient):
             volume_step=None,
             volume_limit_enabled=None,
             source_list=LEGACY_SOURCE_LIST,
+            default_volume_by_source={},
         )
 
     async def async_turn_on(self) -> None:
@@ -996,6 +1053,16 @@ class LegacyBinaryClient(BaseKefClient):
         """Legacy speakers do not expose volume-limiter settings."""
         raise KefUnsupportedDeviceError(
             "Volume limiter is not supported for legacy KEF"
+        )
+
+    async def async_set_default_volume_for_source(
+        self,
+        source: str,
+        volume: int,
+    ) -> None:
+        """Legacy speakers do not expose per-source startup-volume settings."""
+        raise KefUnsupportedDeviceError(
+            "Per-source startup volume is not supported for legacy KEF"
         )
 
     async def _set_source(self, source: str, *, off: bool = False) -> None:

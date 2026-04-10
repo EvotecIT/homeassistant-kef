@@ -82,6 +82,28 @@ async def _async_set_startup_volume(
     await client.async_set_startup_volume_enabled(enabled)
 
 
+async def _async_set_per_input_startup_volume(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set whether per-input startup volume is enabled."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_per_input_startup_volume_enabled(enabled)
+
+
+async def _async_set_volume_limit(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set whether the volume limiter is enabled."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_volume_limit_enabled(enabled)
+
+
 @dataclass(frozen=True, kw_only=True)
 class KefSwitchDescription(SwitchEntityDescription):
     """Describe a KEF configuration switch."""
@@ -138,6 +160,22 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.startup_volume_enabled,
         async_set_fn=_async_set_startup_volume,
+    ),
+    KefSwitchDescription(
+        key="per_input_startup_volume",
+        name="Per-input startup volumes",
+        icon="mdi:tune-variant",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.per_input_startup_volume_enabled,
+        async_set_fn=_async_set_per_input_startup_volume,
+    ),
+    KefSwitchDescription(
+        key="volume_limit",
+        name="Volume limiter",
+        icon="mdi:volume-off",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.volume_limit_enabled,
+        async_set_fn=_async_set_volume_limit,
     ),
 )
 

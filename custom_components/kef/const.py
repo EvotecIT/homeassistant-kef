@@ -68,6 +68,16 @@ WAKE_SOURCE_OPTIONS = {
     "tv": "TV",
 }
 
+DEFAULT_VOLUME_SOURCE_SUFFIX = {
+    "wifi": "Wifi",
+    "bluetooth": "Bluetooth",
+    "optical": "Optical",
+    "coaxial": "Coaxial",
+    "usb": "USB",
+    "analog": "Analogue",
+    "tv": "TV",
+}
+
 LEGACY_SOURCE_LIST = (
     "Wifi",
     "Bluetooth",

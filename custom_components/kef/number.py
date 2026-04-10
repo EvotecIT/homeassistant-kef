@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import WAKE_SOURCE_OPTIONS
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend, KefSnapshot
@@ -47,6 +48,11 @@ async def _async_set_volume_step(
     if client is None:
         return
     await client.async_set_volume_step(round(value))
+
+
+def _friendly_source_name(source: str) -> str:
+    """Return a UI-friendly source label."""
+    return WAKE_SOURCE_OPTIONS.get(source, source.replace("_", " ").title())
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -104,11 +110,19 @@ async def async_setup_entry(
     if coordinator.data.device.backend is not KefBackend.MODERN:
         return
 
-    entities = [
+    entities: list[KefNumber] = [
         KefNumber(coordinator, description)
         for description in NUMBERS
         if description.value_fn(coordinator.data) is not None
     ]
+    for source, value in coordinator.data.default_volume_by_source.items():
+        entities.append(
+            KefSourceVolumeNumber(
+                coordinator,
+                source,
+                value,
+            )
+        )
     async_add_entities(entities)
 
 
@@ -139,4 +153,55 @@ class KefNumber(KefEntity, CoordinatorEntity[KefCoordinator], NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set the number value."""
         await self.entity_description.async_set_fn(self.coordinator, value)
+        await self.coordinator.async_request_refresh()
+
+
+class KefSourceVolumeNumber(KefEntity, CoordinatorEntity[KefCoordinator], NumberEntity):
+    """Coordinator-backed source-specific KEF startup volume number."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_native_min_value = 0
+    _attr_native_max_value = 100
+    _attr_native_step = 1
+    _attr_icon = "mdi:volume-medium"
+
+    def __init__(
+        self,
+        coordinator: KefCoordinator,
+        source: str,
+        initial_value: int,
+    ) -> None:
+        """Initialize the source startup volume number."""
+        CoordinatorEntity.__init__(self, coordinator)
+        KefEntity.__init__(self, coordinator)
+        self._source = source
+        self._initial_value = initial_value
+        self._attr_unique_id = (
+            f"{coordinator.data.device.unique_id}_default_volume_{source}"
+        )
+        self._attr_name = f"{_friendly_source_name(source)} startup volume"
+
+    @property
+    def available(self) -> bool:
+        """Return whether the number is available."""
+        return (
+            self.coordinator.last_update_success
+            and self._source in self.coordinator.data.default_volume_by_source
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current source-specific startup volume."""
+        value = self.coordinator.data.default_volume_by_source.get(
+            self._source,
+            self._initial_value,
+        )
+        return None if value is None else float(value)
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the source-specific startup volume."""
+        client = self.coordinator.client
+        if client is None:
+            return
+        await client.async_set_default_volume_for_source(self._source, round(value))
         await self.coordinator.async_request_refresh()

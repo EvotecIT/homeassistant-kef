@@ -186,6 +186,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
                 snapshot.per_input_startup_volume_enabled
             ),
             "default_volume_global": snapshot.default_volume_global,
+            "default_volume_by_source": snapshot.default_volume_by_source,
             "maximum_volume": snapshot.maximum_volume,
             "volume_step": snapshot.volume_step,
             "volume_limit_enabled": snapshot.volume_limit_enabled,
