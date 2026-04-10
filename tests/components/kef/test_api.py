@@ -64,6 +64,14 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     assert snapshot.playback.service_id == "usb"
     assert snapshot.eq_profile is not None
     assert snapshot.eq_profile.balance == 30
+    assert snapshot.source_list == (
+        "wifi",
+        "bluetooth",
+        "tv",
+        "optical",
+        "analog",
+        "usb",
+    )
 
 
 async def test_modern_set_volume_posts_typed_payload(monkeypatch, hass) -> None:
@@ -159,3 +167,45 @@ async def test_modern_turn_on_prefers_last_active_source(monkeypatch, hass) -> N
     await client.async_turn_on()
 
     assert selected == ["usb"]
+
+
+async def test_modern_unknown_model_uses_default_sources(monkeypatch, hass) -> None:
+    """Unknown modern models should fall back to the full source set."""
+    responses = {
+        PROBE_PATHS["device_name"]: DEVICE_NAME_VALUE,
+        PROBE_PATHS["version"]: VERSION_VALUE,
+        PROBE_PATHS["release_text"]: {"type": "string_", "string_": "MYSTERY_V1"},
+        PROBE_PATHS["mac"]: MAC_VALUE,
+        PROBE_PATHS["model_code"]: MODEL_CODE_VALUE,
+        PROBE_PATHS["speaker_status"]: SPEAKER_STATUS_VALUE["kefSpeakerStatus"],
+        PROBE_PATHS["source"]: SOURCE_VALUE["kefPhysicalSource"],
+        PROBE_PATHS["volume"]: VOLUME_VALUE["i32_"],
+        PROBE_PATHS["mute"]: MUTE_VALUE["bool_"],
+        PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
+        PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
+        PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
+        PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
+    }
+
+    async def fake_get_value(self, path, *, typed_key=None):
+        return responses[path]
+
+    async def fake_get_optional_value(self, path, *, typed_key=None):
+        return responses[path]
+
+    monkeypatch.setattr(ModernKefClient, "_get_value", fake_get_value)
+    monkeypatch.setattr(ModernKefClient, "_get_optional_value", fake_get_optional_value)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    snapshot = await client.async_refresh()
+
+    assert snapshot.device.model == "MYSTERY"
+    assert snapshot.source_list == (
+        "wifi",
+        "bluetooth",
+        "tv",
+        "optical",
+        "coaxial",
+        "analog",
+        "usb",
+    )

@@ -32,7 +32,7 @@ EVENT_POLL_QUEUE_ENDPOINT = "/event/pollQueue"
 STATE_ON = "powerOn"
 STATE_OFF = "standby"
 
-MODERN_SOURCE_LIST = (
+DEFAULT_MODERN_SOURCE_LIST = (
     "wifi",
     "bluetooth",
     "tv",
@@ -41,6 +41,16 @@ MODERN_SOURCE_LIST = (
     "analog",
     "usb",
 )
+
+MODERN_MODEL_SOURCE_MAP: dict[str, tuple[str, ...]] = {
+    "LSX2": ("wifi", "bluetooth", "tv", "optical", "analog", "usb"),
+    "LSX2LT": ("wifi", "bluetooth", "tv", "optical", "usb"),
+    "LSXII": ("wifi", "bluetooth", "tv", "optical", "analog", "usb"),
+    "LS50W2": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
+    "LS50WII": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
+    "LS60": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
+    "XIO": ("wifi", "bluetooth", "tv", "optical"),
+}
 
 LEGACY_SOURCE_LIST = (
     "Wifi",

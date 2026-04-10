@@ -15,10 +15,11 @@ import aiohttp
 from .const import (
     API_ROOT,
     DEFAULT_LEGACY_PORT,
+    DEFAULT_MODERN_SOURCE_LIST,
     DEFAULT_PORT,
     GET_DATA_ENDPOINT,
     LEGACY_SOURCE_LIST,
-    MODERN_SOURCE_LIST,
+    MODERN_MODEL_SOURCE_MAP,
     PROBE_PATHS,
     SET_DATA_ENDPOINT,
     STATE_OFF,
@@ -222,7 +223,7 @@ class ModernKefClient(BaseKefClient):
                 if isinstance(eq_profile, dict)
                 else None
             ),
-            source_list=MODERN_SOURCE_LIST,
+            source_list=self._source_list_for_model(device.model),
         )
 
     async def async_turn_on(self) -> None:
@@ -463,6 +464,12 @@ class ModernKefClient(BaseKefClient):
             position_ms=position_ms,
             controls=normalized_controls,
         )
+
+    @staticmethod
+    def _source_list_for_model(model: str) -> tuple[str, ...]:
+        """Return the supported sources for a modern KEF model."""
+        normalized = model.upper()
+        return MODERN_MODEL_SOURCE_MAP.get(normalized, DEFAULT_MODERN_SOURCE_LIST)
 
 
 class LegacyBinaryClient(BaseKefClient):
