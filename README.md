@@ -78,6 +78,10 @@ This repository now ships two usable layers:
 - `kef_client` for direct Python access to KEF local APIs
 - the Home Assistant integration in `custom_components/kef`
 
+Library docs: `docs/python-library.md`
+
+Runnable example: `examples/python_client.py`
+
 Example:
 
 ```python
@@ -104,7 +108,7 @@ That keeps the protocol layer reusable for scripts and apps while the integratio
 ```bash
 python -m pip install -e .[test]
 ruff check .
-python -m compileall custom_components tests
+python -m compileall kef_client custom_components tests examples
 pytest
 ```
 
