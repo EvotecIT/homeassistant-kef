@@ -71,14 +71,26 @@ Current live validation is strongest on LSX II, but broad KEF coverage is the go
 
 The current LSX II investigation notes are in `docs/kef-lsx2-investigation.md`.
 
-## 🧱 Project Structure
+## 🧱 Reusable Python Package
 
-This repo is intentionally split into two layers:
+This repository now ships two usable layers:
 
-- a reusable Python protocol/client layer for KEF local APIs
-- the Home Assistant integration layer built on top of it
+- `kef_client` for direct Python access to KEF local APIs
+- the Home Assistant integration in `custom_components/kef`
 
-That makes it easier to support both modern and older KEF devices and leaves room to extract a standalone Python library later if the protocol layer matures enough.
+Example:
+
+```python
+from aiohttp import ClientSession
+from kef_client import ModernKefClient
+
+async with ClientSession() as session:
+    client = ModernKefClient("192.168.1.20", session)
+    snapshot = await client.async_refresh()
+    print(snapshot.device.device_name, snapshot.source)
+```
+
+That keeps the protocol layer reusable for scripts and apps while the integration stays focused on Home Assistant setup and entities.
 
 ## 🛣️ Roadmap
 
