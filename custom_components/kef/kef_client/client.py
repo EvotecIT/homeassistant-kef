@@ -203,6 +203,14 @@ class BaseKefClient(ABC):
     ) -> None:
         """Set the startup volume for a specific source."""
 
+    @abstractmethod
+    async def async_set_master_channel(self, channel: str) -> None:
+        """Set the master channel assignment."""
+
+    @abstractmethod
+    async def async_set_fixed_volume_level(self, volume: int) -> None:
+        """Set the fixed-volume level."""
+
 
 class ModernKefClient(BaseKefClient):
     """Modern HTTP client for LSX II-era KEF speakers."""
@@ -671,6 +679,22 @@ class ModernKefClient(BaseKefClient):
         """Set the startup volume for a specific source."""
         await self._set_data(
             self._default_volume_path_for_source(source),
+            role="value",
+            value={"type": "i32_", "i32_": max(0, min(100, volume))},
+        )
+
+    async def async_set_master_channel(self, channel: str) -> None:
+        """Set the master channel assignment."""
+        await self._set_data(
+            PROBE_PATHS["master_channel"],
+            role="value",
+            value={"type": "kefMasterChannelMode", "kefMasterChannelMode": channel},
+        )
+
+    async def async_set_fixed_volume_level(self, volume: int) -> None:
+        """Set the fixed-volume level."""
+        await self._set_data(
+            PROBE_PATHS["fixed_volume_level"],
             role="value",
             value={"type": "i32_", "i32_": max(0, min(100, volume))},
         )
@@ -1171,6 +1195,18 @@ class LegacyBinaryClient(BaseKefClient):
         """Legacy speakers do not expose per-source startup-volume settings."""
         raise KefUnsupportedDeviceError(
             "Per-source startup volume is not supported for legacy KEF"
+        )
+
+    async def async_set_master_channel(self, channel: str) -> None:
+        """Legacy speakers do not expose master-channel configuration."""
+        raise KefUnsupportedDeviceError(
+            "Master channel is not supported for legacy KEF"
+        )
+
+    async def async_set_fixed_volume_level(self, volume: int) -> None:
+        """Legacy speakers do not expose fixed-volume configuration."""
+        raise KefUnsupportedDeviceError(
+            "Fixed volume is not supported for legacy KEF"
         )
 
     async def _set_source(self, source: str, *, off: bool = False) -> None:

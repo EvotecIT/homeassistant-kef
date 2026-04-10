@@ -675,3 +675,60 @@ async def test_modern_set_source_volume_posts_typed_payload(monkeypatch, hass) -
             "value": {"type": "i32_", "i32_": 35},
         },
     }
+
+
+async def test_modern_set_master_channel_posts_typed_payload(monkeypatch, hass) -> None:
+    """Modern client should post a typed payload for master channel."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_master_channel("left")
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "settings:/kef/host/masterChannelMode",
+            "role": "value",
+            "value": {
+                "type": "kefMasterChannelMode",
+                "kefMasterChannelMode": "left",
+            },
+        },
+    }
+
+
+async def test_modern_set_fixed_volume_level_posts_typed_payload(
+    monkeypatch, hass
+) -> None:
+    """Modern client should post a typed payload for fixed volume."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_fixed_volume_level(29)
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "settings:/kef/host/remote/userFixedVolume",
+            "role": "value",
+            "value": {"type": "i32_", "i32_": 29},
+        },
+    }

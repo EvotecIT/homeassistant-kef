@@ -68,6 +68,11 @@ WAKE_SOURCE_OPTIONS = {
     "tv": "TV",
 }
 
+MASTER_CHANNEL_OPTIONS = {
+    "left": "Left",
+    "right": "Right",
+}
+
 DEFAULT_VOLUME_SOURCE_SUFFIX = {
     "wifi": "Wifi",
     "bluetooth": "Bluetooth",

@@ -50,6 +50,17 @@ async def _async_set_volume_step(
     await client.async_set_volume_step(round(value))
 
 
+async def _async_set_fixed_volume_level(
+    coordinator: KefCoordinator,
+    value: float,
+) -> None:
+    """Set the fixed volume level."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_fixed_volume_level(round(value))
+
+
 def _friendly_source_name(source: str) -> str:
     """Return a UI-friendly source label."""
     return WAKE_SOURCE_OPTIONS.get(source, source.replace("_", " ").title())
@@ -96,6 +107,17 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
         native_step=1,
         value_fn=lambda data: data.volume_step,
         async_set_fn=_async_set_volume_step,
+    ),
+    KefNumberDescription(
+        key="fixed_volume_level",
+        name="Fixed volume level",
+        icon="mdi:volume-equal",
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=0,
+        native_max_value=100,
+        native_step=1,
+        value_fn=lambda data: data.fixed_volume_level,
+        async_set_fn=_async_set_fixed_volume_level,
     ),
 )
 

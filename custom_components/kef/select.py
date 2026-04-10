@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import STANDBY_MODE_OPTIONS, WAKE_SOURCE_OPTIONS
+from .const import MASTER_CHANNEL_OPTIONS, STANDBY_MODE_OPTIONS, WAKE_SOURCE_OPTIONS
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend, KefSnapshot
@@ -37,6 +37,17 @@ async def _async_set_wake_source(
     if client is None:
         return
     await client.async_set_wake_source(value)
+
+
+async def _async_set_master_channel(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the master channel assignment."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_master_channel(value)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -66,6 +77,15 @@ SELECTS: tuple[KefSelectDescription, ...] = (
         value_fn=lambda data: data.wake_source,
         async_set_fn=_async_set_wake_source,
         options_map=WAKE_SOURCE_OPTIONS,
+    ),
+    KefSelectDescription(
+        key="master_channel",
+        name="Master channel",
+        icon="mdi:speaker",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.master_channel,
+        async_set_fn=_async_set_master_channel,
+        options_map=MASTER_CHANNEL_OPTIONS,
     ),
 )
 

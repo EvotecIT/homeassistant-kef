@@ -33,9 +33,9 @@ This checklist tracks what the repository already covers and what still needs wo
   - [ ] phase correction
   - [ ] high-pass mode
   - [ ] high-pass frequency
-- [ ] Writable fixed-volume control
+- [x] Writable fixed-volume control
 - [ ] Writable cable mode
-- [ ] Writable master-channel control
+- [x] Writable master-channel control
 
 ## Runtime / Architecture Improvements
 
