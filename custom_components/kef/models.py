@@ -122,6 +122,8 @@ class KefSnapshot:
     device: KefDeviceInfo
     speaker_status: str | None
     source: str | None
+    cable_mode: str | None
+    master_channel: str | None
     volume_raw: int | None
     volume_level: float | None
     is_muted: bool | None
@@ -132,9 +134,12 @@ class KefSnapshot:
     standby_mode: str | None
     startup_tone_enabled: bool | None
     auto_switch_hdmi: bool | None
+    front_led_enabled: bool | None
     standby_led_enabled: bool | None
     top_panel_enabled: bool | None
     wake_source: str | None
+    subwoofer_wake_enabled: bool | None
+    kw1_wake_enabled: bool | None
     usb_charging_enabled: bool | None
     startup_volume_enabled: bool | None
     per_input_startup_volume_enabled: bool | None
@@ -142,6 +147,7 @@ class KefSnapshot:
     maximum_volume: int | None
     volume_step: int | None
     volume_limit_enabled: bool | None
+    fixed_volume_level: int | None
     source_list: tuple[str, ...]
     default_volume_by_source: dict[str, int] = field(default_factory=dict)
 

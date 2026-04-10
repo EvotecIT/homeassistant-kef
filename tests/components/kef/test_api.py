@@ -8,12 +8,16 @@ from custom_components.kef.api import ModernKefClient
 from custom_components.kef.const import PROBE_PATHS
 from tests.conftest import (
     AUTO_SWITCH_HDMI_VALUE,
+    CABLE_MODE_VALUE,
     DEFAULT_VOLUME_GLOBAL_VALUE,
     DEVICE_NAME_VALUE,
+    DISABLE_FRONT_LED_VALUE,
     DISABLE_FRONT_STANDBY_LED_VALUE,
     DISABLE_TOP_PANEL_VALUE,
     EQ_PROFILE_VALUE,
+    FIXED_VOLUME_LEVEL_VALUE,
     MAC_VALUE,
+    MASTER_CHANNEL_VALUE,
     MAXIMUM_VOLUME_VALUE,
     MODEL_CODE_VALUE,
     MUTE_VALUE,
@@ -28,6 +32,8 @@ from tests.conftest import (
     STANDBY_MODE_VALUE,
     STARTUP_TONE_VALUE,
     STARTUP_VOLUME_ENABLED_VALUE,
+    SUBWOOFER_FORCE_ON_KW1_VALUE,
+    SUBWOOFER_FORCE_ON_VALUE,
     TEST_HOST,
     USB_CHARGING_VALUE,
     VERSION_VALUE,
@@ -57,6 +63,8 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
         PROBE_PATHS["model_code"]: MODEL_CODE_VALUE,
         PROBE_PATHS["speaker_status"]: SPEAKER_STATUS_VALUE["kefSpeakerStatus"],
         PROBE_PATHS["source"]: SOURCE_VALUE["kefPhysicalSource"],
+        PROBE_PATHS["cable_mode"]: CABLE_MODE_VALUE["kefCableMode"],
+        PROBE_PATHS["master_channel"]: MASTER_CHANNEL_VALUE["kefMasterChannelMode"],
         PROBE_PATHS["volume"]: VOLUME_VALUE["i32_"],
         PROBE_PATHS["mute"]: MUTE_VALUE["bool_"],
         PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
@@ -67,11 +75,16 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
         PROBE_PATHS["standby_mode"]: STANDBY_MODE_VALUE["kefStandbyMode"],
         PROBE_PATHS["startup_tone"]: STARTUP_TONE_VALUE["bool_"],
         PROBE_PATHS["auto_switch_hdmi"]: AUTO_SWITCH_HDMI_VALUE["bool_"],
+        PROBE_PATHS["disable_front_led"]: DISABLE_FRONT_LED_VALUE["bool_"],
         PROBE_PATHS["disable_front_standby_led"]: (
             DISABLE_FRONT_STANDBY_LED_VALUE["bool_"]
         ),
         PROBE_PATHS["disable_top_panel"]: DISABLE_TOP_PANEL_VALUE["bool_"],
         PROBE_PATHS["wake_up_source"]: WAKE_UP_SOURCE_VALUE["kefWakeUpSource"],
+        PROBE_PATHS["subwoofer_force_on"]: SUBWOOFER_FORCE_ON_VALUE["bool_"],
+        PROBE_PATHS["subwoofer_force_on_kw1"]: (
+            SUBWOOFER_FORCE_ON_KW1_VALUE["bool_"]
+        ),
         PROBE_PATHS["usb_charging"]: USB_CHARGING_VALUE["bool_"],
         PROBE_PATHS["startup_volume_enabled"]: (
             STARTUP_VOLUME_ENABLED_VALUE["bool_"]
@@ -83,6 +96,7 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
         PROBE_PATHS["maximum_volume"]: MAXIMUM_VOLUME_VALUE["i32_"],
         PROBE_PATHS["volume_step"]: VOLUME_STEP_SETTING_VALUE["i16_"],
         PROBE_PATHS["volume_limit"]: VOLUME_LIMIT_VALUE["bool_"],
+        PROBE_PATHS["fixed_volume_level"]: FIXED_VOLUME_LEVEL_VALUE["i32_"],
         **SOURCE_VOLUME_RESPONSES,
     }
 
@@ -105,6 +119,8 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     assert snapshot.device.device_name == "LSX II-04438c"
     assert snapshot.device.model == "LSXII"
     assert snapshot.source == "usb"
+    assert snapshot.cable_mode == "wired"
+    assert snapshot.master_channel == "right"
     assert snapshot.volume_raw == 80
     assert snapshot.is_muted is False
     assert snapshot.playback is not None
@@ -121,9 +137,12 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     assert snapshot.standby_mode == "standby_none"
     assert snapshot.startup_tone_enabled is True
     assert snapshot.auto_switch_hdmi is False
+    assert snapshot.front_led_enabled is False
     assert snapshot.standby_led_enabled is True
     assert snapshot.top_panel_enabled is True
     assert snapshot.wake_source == "wakeup_default"
+    assert snapshot.subwoofer_wake_enabled is False
+    assert snapshot.kw1_wake_enabled is False
     assert snapshot.usb_charging_enabled is False
     assert snapshot.startup_volume_enabled is False
     assert snapshot.per_input_startup_volume_enabled is False
@@ -133,6 +152,7 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     assert snapshot.maximum_volume == 100
     assert snapshot.volume_step == 1
     assert snapshot.volume_limit_enabled is False
+    assert snapshot.fixed_volume_level == 30
     assert snapshot.source_list == (
         "wifi",
         "bluetooth",
@@ -206,6 +226,8 @@ async def test_modern_turn_on_prefers_last_active_source(monkeypatch, hass) -> N
         PROBE_PATHS["model_code"]: MODEL_CODE_VALUE,
         PROBE_PATHS["speaker_status"]: "standby",
         PROBE_PATHS["source"]: "standby",
+        PROBE_PATHS["cable_mode"]: CABLE_MODE_VALUE["kefCableMode"],
+        PROBE_PATHS["master_channel"]: MASTER_CHANNEL_VALUE["kefMasterChannelMode"],
         PROBE_PATHS["volume"]: 80,
         PROBE_PATHS["mute"]: False,
         PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
@@ -216,11 +238,16 @@ async def test_modern_turn_on_prefers_last_active_source(monkeypatch, hass) -> N
         PROBE_PATHS["standby_mode"]: STANDBY_MODE_VALUE["kefStandbyMode"],
         PROBE_PATHS["startup_tone"]: STARTUP_TONE_VALUE["bool_"],
         PROBE_PATHS["auto_switch_hdmi"]: AUTO_SWITCH_HDMI_VALUE["bool_"],
+        PROBE_PATHS["disable_front_led"]: DISABLE_FRONT_LED_VALUE["bool_"],
         PROBE_PATHS["disable_front_standby_led"]: (
             DISABLE_FRONT_STANDBY_LED_VALUE["bool_"]
         ),
         PROBE_PATHS["disable_top_panel"]: DISABLE_TOP_PANEL_VALUE["bool_"],
         PROBE_PATHS["wake_up_source"]: WAKE_UP_SOURCE_VALUE["kefWakeUpSource"],
+        PROBE_PATHS["subwoofer_force_on"]: SUBWOOFER_FORCE_ON_VALUE["bool_"],
+        PROBE_PATHS["subwoofer_force_on_kw1"]: (
+            SUBWOOFER_FORCE_ON_KW1_VALUE["bool_"]
+        ),
         PROBE_PATHS["usb_charging"]: USB_CHARGING_VALUE["bool_"],
         PROBE_PATHS["startup_volume_enabled"]: STARTUP_VOLUME_ENABLED_VALUE["bool_"],
         PROBE_PATHS["per_input_startup_volume_enabled"]: (
@@ -230,6 +257,7 @@ async def test_modern_turn_on_prefers_last_active_source(monkeypatch, hass) -> N
         PROBE_PATHS["maximum_volume"]: MAXIMUM_VOLUME_VALUE["i32_"],
         PROBE_PATHS["volume_step"]: VOLUME_STEP_SETTING_VALUE["i16_"],
         PROBE_PATHS["volume_limit"]: VOLUME_LIMIT_VALUE["bool_"],
+        PROBE_PATHS["fixed_volume_level"]: FIXED_VOLUME_LEVEL_VALUE["i32_"],
         **SOURCE_VOLUME_RESPONSES,
     }
 
@@ -271,6 +299,8 @@ async def test_modern_unknown_model_uses_default_sources(monkeypatch, hass) -> N
         PROBE_PATHS["model_code"]: MODEL_CODE_VALUE,
         PROBE_PATHS["speaker_status"]: SPEAKER_STATUS_VALUE["kefSpeakerStatus"],
         PROBE_PATHS["source"]: SOURCE_VALUE["kefPhysicalSource"],
+        PROBE_PATHS["cable_mode"]: CABLE_MODE_VALUE["kefCableMode"],
+        PROBE_PATHS["master_channel"]: MASTER_CHANNEL_VALUE["kefMasterChannelMode"],
         PROBE_PATHS["volume"]: VOLUME_VALUE["i32_"],
         PROBE_PATHS["mute"]: MUTE_VALUE["bool_"],
         PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
@@ -281,11 +311,16 @@ async def test_modern_unknown_model_uses_default_sources(monkeypatch, hass) -> N
         PROBE_PATHS["standby_mode"]: STANDBY_MODE_VALUE["kefStandbyMode"],
         PROBE_PATHS["startup_tone"]: STARTUP_TONE_VALUE["bool_"],
         PROBE_PATHS["auto_switch_hdmi"]: AUTO_SWITCH_HDMI_VALUE["bool_"],
+        PROBE_PATHS["disable_front_led"]: DISABLE_FRONT_LED_VALUE["bool_"],
         PROBE_PATHS["disable_front_standby_led"]: (
             DISABLE_FRONT_STANDBY_LED_VALUE["bool_"]
         ),
         PROBE_PATHS["disable_top_panel"]: DISABLE_TOP_PANEL_VALUE["bool_"],
         PROBE_PATHS["wake_up_source"]: WAKE_UP_SOURCE_VALUE["kefWakeUpSource"],
+        PROBE_PATHS["subwoofer_force_on"]: SUBWOOFER_FORCE_ON_VALUE["bool_"],
+        PROBE_PATHS["subwoofer_force_on_kw1"]: (
+            SUBWOOFER_FORCE_ON_KW1_VALUE["bool_"]
+        ),
         PROBE_PATHS["usb_charging"]: USB_CHARGING_VALUE["bool_"],
         PROBE_PATHS["startup_volume_enabled"]: (
             STARTUP_VOLUME_ENABLED_VALUE["bool_"]
@@ -297,6 +332,7 @@ async def test_modern_unknown_model_uses_default_sources(monkeypatch, hass) -> N
         PROBE_PATHS["maximum_volume"]: MAXIMUM_VOLUME_VALUE["i32_"],
         PROBE_PATHS["volume_step"]: VOLUME_STEP_SETTING_VALUE["i16_"],
         PROBE_PATHS["volume_limit"]: VOLUME_LIMIT_VALUE["bool_"],
+        PROBE_PATHS["fixed_volume_level"]: FIXED_VOLUME_LEVEL_VALUE["i32_"],
         **SOURCE_VOLUME_RESPONSES,
     }
 
@@ -340,6 +376,8 @@ async def test_modern_optional_network_info_is_absent_when_unavailable(
         PROBE_PATHS["model_code"]: MODEL_CODE_VALUE,
         PROBE_PATHS["speaker_status"]: SPEAKER_STATUS_VALUE["kefSpeakerStatus"],
         PROBE_PATHS["source"]: SOURCE_VALUE["kefPhysicalSource"],
+        PROBE_PATHS["cable_mode"]: CABLE_MODE_VALUE["kefCableMode"],
+        PROBE_PATHS["master_channel"]: MASTER_CHANNEL_VALUE["kefMasterChannelMode"],
         PROBE_PATHS["volume"]: VOLUME_VALUE["i32_"],
         PROBE_PATHS["mute"]: MUTE_VALUE["bool_"],
         PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
@@ -349,11 +387,16 @@ async def test_modern_optional_network_info_is_absent_when_unavailable(
         PROBE_PATHS["standby_mode"]: STANDBY_MODE_VALUE["kefStandbyMode"],
         PROBE_PATHS["startup_tone"]: STARTUP_TONE_VALUE["bool_"],
         PROBE_PATHS["auto_switch_hdmi"]: AUTO_SWITCH_HDMI_VALUE["bool_"],
+        PROBE_PATHS["disable_front_led"]: DISABLE_FRONT_LED_VALUE["bool_"],
         PROBE_PATHS["disable_front_standby_led"]: (
             DISABLE_FRONT_STANDBY_LED_VALUE["bool_"]
         ),
         PROBE_PATHS["disable_top_panel"]: DISABLE_TOP_PANEL_VALUE["bool_"],
         PROBE_PATHS["wake_up_source"]: WAKE_UP_SOURCE_VALUE["kefWakeUpSource"],
+        PROBE_PATHS["subwoofer_force_on"]: SUBWOOFER_FORCE_ON_VALUE["bool_"],
+        PROBE_PATHS["subwoofer_force_on_kw1"]: (
+            SUBWOOFER_FORCE_ON_KW1_VALUE["bool_"]
+        ),
         PROBE_PATHS["usb_charging"]: USB_CHARGING_VALUE["bool_"],
         PROBE_PATHS["startup_volume_enabled"]: (
             STARTUP_VOLUME_ENABLED_VALUE["bool_"]
@@ -365,6 +408,7 @@ async def test_modern_optional_network_info_is_absent_when_unavailable(
         PROBE_PATHS["maximum_volume"]: MAXIMUM_VOLUME_VALUE["i32_"],
         PROBE_PATHS["volume_step"]: VOLUME_STEP_SETTING_VALUE["i16_"],
         PROBE_PATHS["volume_limit"]: VOLUME_LIMIT_VALUE["bool_"],
+        PROBE_PATHS["fixed_volume_level"]: FIXED_VOLUME_LEVEL_VALUE["i32_"],
         **SOURCE_VOLUME_RESPONSES,
     }
 
@@ -443,6 +487,86 @@ async def test_modern_set_wake_source_posts_typed_payload(monkeypatch, hass) -> 
                 "type": "kefWakeUpSource",
                 "kefWakeUpSource": "wifi",
             },
+        },
+    }
+
+
+async def test_modern_set_front_led_posts_typed_payload(monkeypatch, hass) -> None:
+    """Modern client should post an inverted bool payload when setting front LED."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_front_led_enabled(True)
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "settings:/kef/host/disableFrontLED",
+            "role": "value",
+            "value": {"type": "bool_", "bool_": False},
+        },
+    }
+
+
+async def test_modern_set_subwoofer_wake_posts_typed_payload(
+    monkeypatch, hass
+) -> None:
+    """Modern client should post a bool payload for wired subwoofer wake."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_subwoofer_wake_enabled(True)
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "settings:/kef/host/subwooferForceOn",
+            "role": "value",
+            "value": {"type": "bool_", "bool_": True},
+        },
+    }
+
+
+async def test_modern_set_kw1_wake_posts_typed_payload(monkeypatch, hass) -> None:
+    """Modern client should post a bool payload for KW1 wake."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_kw1_wake_enabled(True)
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "settings:/kef/host/subwooferForceOnKW1",
+            "role": "value",
+            "value": {"type": "bool_", "bool_": True},
         },
     }
 

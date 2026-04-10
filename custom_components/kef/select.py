@@ -106,6 +106,7 @@ class KefSelect(KefEntity, CoordinatorEntity[KefCoordinator], SelectEntity):
             f"{coordinator.data.device.unique_id}_{description.key}"
         )
         self._attr_options = list(description.options_map.values())
+        self._attr_name = description.name
 
     @property
     def current_option(self) -> str | None:

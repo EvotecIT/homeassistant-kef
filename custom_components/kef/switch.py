@@ -49,6 +49,17 @@ async def _async_set_standby_led(
     await client.async_set_standby_led_enabled(enabled)
 
 
+async def _async_set_front_led(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set the front LED state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_front_led_enabled(enabled)
+
+
 async def _async_set_top_panel(
     coordinator: KefCoordinator,
     enabled: bool,
@@ -104,6 +115,28 @@ async def _async_set_volume_limit(
     await client.async_set_volume_limit_enabled(enabled)
 
 
+async def _async_set_subwoofer_wake(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set wired subwoofer wake-on-startup."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_subwoofer_wake_enabled(enabled)
+
+
+async def _async_set_kw1_wake(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set KW1 subwoofer wake-on-startup."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_kw1_wake_enabled(enabled)
+
+
 @dataclass(frozen=True, kw_only=True)
 class KefSwitchDescription(SwitchEntityDescription):
     """Describe a KEF configuration switch."""
@@ -128,6 +161,14 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.auto_switch_hdmi,
         async_set_fn=_async_set_auto_switch_hdmi,
+    ),
+    KefSwitchDescription(
+        key="front_led",
+        name="Front LED",
+        icon="mdi:led-strip-variant",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.front_led_enabled,
+        async_set_fn=_async_set_front_led,
     ),
     KefSwitchDescription(
         key="standby_led",
@@ -177,6 +218,22 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         value_fn=lambda data: data.volume_limit_enabled,
         async_set_fn=_async_set_volume_limit,
     ),
+    KefSwitchDescription(
+        key="subwoofer_wake",
+        name="Wake subwoofer on startup",
+        icon="mdi:speaker-wireless",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.subwoofer_wake_enabled,
+        async_set_fn=_async_set_subwoofer_wake,
+    ),
+    KefSwitchDescription(
+        key="kw1_wake",
+        name="Wake KW1 subwoofer on startup",
+        icon="mdi:speaker-wireless",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.kw1_wake_enabled,
+        async_set_fn=_async_set_kw1_wake,
+    ),
 )
 
 
@@ -215,6 +272,7 @@ class KefSwitch(KefEntity, CoordinatorEntity[KefCoordinator], SwitchEntity):
         self._attr_unique_id = (
             f"{coordinator.data.device.unique_id}_{description.key}"
         )
+        self._attr_name = description.name
 
     @property
     def is_on(self) -> bool | None:

@@ -143,6 +143,7 @@ class KefNumber(KefEntity, CoordinatorEntity[KefCoordinator], NumberEntity):
         self._attr_unique_id = (
             f"{coordinator.data.device.unique_id}_{description.key}"
         )
+        self._attr_name = description.name
 
     @property
     def native_value(self) -> float | None:

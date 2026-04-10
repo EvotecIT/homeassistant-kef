@@ -141,6 +141,10 @@ class BaseKefClient(ABC):
         """Enable or disable HDMI auto switching."""
 
     @abstractmethod
+    async def async_set_front_led_enabled(self, enabled: bool) -> None:
+        """Enable or disable the front LED."""
+
+    @abstractmethod
     async def async_set_standby_led_enabled(self, enabled: bool) -> None:
         """Enable or disable the standby LED."""
 
@@ -151,6 +155,14 @@ class BaseKefClient(ABC):
     @abstractmethod
     async def async_set_wake_source(self, source: str) -> None:
         """Set the wake source."""
+
+    @abstractmethod
+    async def async_set_subwoofer_wake_enabled(self, enabled: bool) -> None:
+        """Enable or disable wired subwoofer wake on startup."""
+
+    @abstractmethod
+    async def async_set_kw1_wake_enabled(self, enabled: bool) -> None:
+        """Enable or disable KW1 subwoofer wake on startup."""
 
     @abstractmethod
     async def async_set_usb_charging_enabled(self, enabled: bool) -> None:
@@ -259,6 +271,18 @@ class ModernKefClient(BaseKefClient):
                 typed_key="kefPhysicalSource",
             )
         )
+        cable_mode = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["cable_mode"],
+                typed_key="kefCableMode",
+            )
+        )
+        master_channel = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["master_channel"],
+                typed_key="kefMasterChannelMode",
+            )
+        )
         volume_raw = self._extract_int(
             await self._get_path_value(PROBE_PATHS["volume"], typed_key="i32_")
         )
@@ -296,6 +320,12 @@ class ModernKefClient(BaseKefClient):
                 typed_key="bool_",
             )
         )
+        front_led_disabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["disable_front_led"],
+                typed_key="bool_",
+            )
+        )
         standby_led_disabled = self._extract_bool(
             await self._get_optional_path_value(
                 PROBE_PATHS["disable_front_standby_led"],
@@ -312,6 +342,18 @@ class ModernKefClient(BaseKefClient):
             await self._get_optional_path_value(
                 PROBE_PATHS["wake_up_source"],
                 typed_key="kefWakeUpSource",
+            )
+        )
+        subwoofer_wake_enabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["subwoofer_force_on"],
+                typed_key="bool_",
+            )
+        )
+        kw1_wake_enabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["subwoofer_force_on_kw1"],
+                typed_key="bool_",
             )
         )
         usb_charging_enabled = self._extract_bool(
@@ -360,6 +402,12 @@ class ModernKefClient(BaseKefClient):
                 typed_key="bool_",
             )
         )
+        fixed_volume_level = self._extract_int(
+            await self._get_optional_path_value(
+                PROBE_PATHS["fixed_volume_level"],
+                typed_key="i32_",
+            )
+        )
         if source not in (None, STATE_OFF):
             self._last_active_source = source
 
@@ -367,6 +415,8 @@ class ModernKefClient(BaseKefClient):
             device=device,
             speaker_status=speaker_status or STATE_OFF,
             source=source,
+            cable_mode=cable_mode,
+            master_channel=master_channel,
             volume_raw=volume_raw,
             volume_level=None if volume_raw is None else volume_raw / 100.0,
             is_muted=is_muted,
@@ -385,6 +435,9 @@ class ModernKefClient(BaseKefClient):
             standby_mode=standby_mode,
             startup_tone_enabled=startup_tone_enabled,
             auto_switch_hdmi=auto_switch_hdmi,
+            front_led_enabled=(
+                None if front_led_disabled is None else not front_led_disabled
+            ),
             standby_led_enabled=(
                 None if standby_led_disabled is None else not standby_led_disabled
             ),
@@ -392,6 +445,8 @@ class ModernKefClient(BaseKefClient):
                 None if top_panel_disabled is None else not top_panel_disabled
             ),
             wake_source=wake_source,
+            subwoofer_wake_enabled=subwoofer_wake_enabled,
+            kw1_wake_enabled=kw1_wake_enabled,
             usb_charging_enabled=usb_charging_enabled,
             startup_volume_enabled=startup_volume_enabled,
             per_input_startup_volume_enabled=per_input_startup_volume_enabled,
@@ -399,6 +454,11 @@ class ModernKefClient(BaseKefClient):
             maximum_volume=maximum_volume,
             volume_step=volume_step,
             volume_limit_enabled=volume_limit_enabled,
+            fixed_volume_level=(
+                None
+                if fixed_volume_level is None or fixed_volume_level < 0
+                else fixed_volume_level
+            ),
             source_list=source_list,
             default_volume_by_source=default_volume_by_source,
         )
@@ -496,6 +556,14 @@ class ModernKefClient(BaseKefClient):
             value={"type": "bool_", "bool_": enabled},
         )
 
+    async def async_set_front_led_enabled(self, enabled: bool) -> None:
+        """Enable or disable the front LED."""
+        await self._set_data(
+            PROBE_PATHS["disable_front_led"],
+            role="value",
+            value={"type": "bool_", "bool_": not enabled},
+        )
+
     async def async_set_standby_led_enabled(self, enabled: bool) -> None:
         """Enable or disable the standby LED."""
         await self._set_data(
@@ -518,6 +586,22 @@ class ModernKefClient(BaseKefClient):
             PROBE_PATHS["wake_up_source"],
             role="value",
             value={"type": "kefWakeUpSource", "kefWakeUpSource": source},
+        )
+
+    async def async_set_subwoofer_wake_enabled(self, enabled: bool) -> None:
+        """Enable or disable wired subwoofer wake on startup."""
+        await self._set_data(
+            PROBE_PATHS["subwoofer_force_on"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
+        )
+
+    async def async_set_kw1_wake_enabled(self, enabled: bool) -> None:
+        """Enable or disable KW1 subwoofer wake on startup."""
+        await self._set_data(
+            PROBE_PATHS["subwoofer_force_on_kw1"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
         )
 
     async def async_set_usb_charging_enabled(self, enabled: bool) -> None:
@@ -743,6 +827,8 @@ class ModernKefClient(BaseKefClient):
                 "playerPlayMode",
                 "kefStandbyMode",
                 "kefWakeUpSource",
+                "kefCableMode",
+                "kefMasterChannelMode",
             ):
                 raw = value.get(key)
                 if isinstance(raw, str):
@@ -904,6 +990,8 @@ class LegacyBinaryClient(BaseKefClient):
             device=device,
             speaker_status="powerOn" if is_on else STATE_OFF,
             source=source,
+            cable_mode=None,
+            master_channel=None,
             volume_raw=volume_raw,
             volume_level=volume_raw / 100.0,
             is_muted=is_muted,
@@ -914,9 +1002,12 @@ class LegacyBinaryClient(BaseKefClient):
             standby_mode=None,
             startup_tone_enabled=None,
             auto_switch_hdmi=None,
+            front_led_enabled=None,
             standby_led_enabled=None,
             top_panel_enabled=None,
             wake_source=None,
+            subwoofer_wake_enabled=None,
+            kw1_wake_enabled=None,
             usb_charging_enabled=None,
             startup_volume_enabled=None,
             per_input_startup_volume_enabled=None,
@@ -924,6 +1015,7 @@ class LegacyBinaryClient(BaseKefClient):
             maximum_volume=None,
             volume_step=None,
             volume_limit_enabled=None,
+            fixed_volume_level=None,
             source_list=LEGACY_SOURCE_LIST,
             default_volume_by_source={},
         )
@@ -1002,6 +1094,10 @@ class LegacyBinaryClient(BaseKefClient):
             "HDMI auto switching is not supported for legacy KEF"
         )
 
+    async def async_set_front_led_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose front LED settings."""
+        raise KefUnsupportedDeviceError("Front LED is not supported for legacy KEF")
+
     async def async_set_standby_led_enabled(self, enabled: bool) -> None:
         """Legacy speakers do not expose standby LED settings."""
         raise KefUnsupportedDeviceError("Standby LED is not supported for legacy KEF")
@@ -1013,6 +1109,18 @@ class LegacyBinaryClient(BaseKefClient):
     async def async_set_wake_source(self, source: str) -> None:
         """Legacy speakers do not expose wake-source settings."""
         raise KefUnsupportedDeviceError("Wake source is not supported for legacy KEF")
+
+    async def async_set_subwoofer_wake_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose wired subwoofer wake settings."""
+        raise KefUnsupportedDeviceError(
+            "Subwoofer wake on startup is not supported for legacy KEF"
+        )
+
+    async def async_set_kw1_wake_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose KW1 subwoofer wake settings."""
+        raise KefUnsupportedDeviceError(
+            "KW1 wake on startup is not supported for legacy KEF"
+        )
 
     async def async_set_usb_charging_enabled(self, enabled: bool) -> None:
         """Legacy speakers do not expose USB charging settings."""

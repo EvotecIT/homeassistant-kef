@@ -21,18 +21,26 @@ MAC_VALUE = {"type": "string_", "string_": "84:17:15:04:43:8C"}
 MODEL_CODE_VALUE = {"type": "string_", "string_": "SP4041"}
 SPEAKER_STATUS_VALUE = {"type": "kefSpeakerStatus", "kefSpeakerStatus": "powerOn"}
 SOURCE_VALUE = {"type": "kefPhysicalSource", "kefPhysicalSource": "usb"}
+CABLE_MODE_VALUE = {"type": "kefCableMode", "kefCableMode": "wired"}
+MASTER_CHANNEL_VALUE = {
+    "type": "kefMasterChannelMode",
+    "kefMasterChannelMode": "right",
+}
 VOLUME_VALUE = {"type": "i32_", "i32_": 80}
 MUTE_VALUE = {"type": "bool_", "bool_": False}
 PLAY_MODE_VALUE = {"type": "playerPlayMode", "playerPlayMode": "normal"}
 STANDBY_MODE_VALUE = {"type": "kefStandbyMode", "kefStandbyMode": "standby_none"}
 STARTUP_TONE_VALUE = {"type": "bool_", "bool_": True}
 AUTO_SWITCH_HDMI_VALUE = {"type": "bool_", "bool_": False}
+DISABLE_FRONT_LED_VALUE = {"type": "bool_", "bool_": True}
 DISABLE_FRONT_STANDBY_LED_VALUE = {"type": "bool_", "bool_": False}
 DISABLE_TOP_PANEL_VALUE = {"type": "bool_", "bool_": False}
 WAKE_UP_SOURCE_VALUE = {
     "type": "kefWakeUpSource",
     "kefWakeUpSource": "wakeup_default",
 }
+SUBWOOFER_FORCE_ON_VALUE = {"type": "bool_", "bool_": False}
+SUBWOOFER_FORCE_ON_KW1_VALUE = {"type": "bool_", "bool_": False}
 USB_CHARGING_VALUE = {"type": "bool_", "bool_": False}
 STARTUP_VOLUME_ENABLED_VALUE = {"type": "bool_", "bool_": False}
 PER_INPUT_STARTUP_VOLUME_ENABLED_VALUE = {"type": "bool_", "bool_": False}
@@ -40,6 +48,7 @@ DEFAULT_VOLUME_GLOBAL_VALUE = {"type": "i32_", "i32_": 30}
 MAXIMUM_VOLUME_VALUE = {"type": "i32_", "i32_": 100}
 VOLUME_STEP_SETTING_VALUE = {"type": "i16_", "i16_": 1}
 VOLUME_LIMIT_VALUE = {"type": "bool_", "bool_": False}
+FIXED_VOLUME_LEVEL_VALUE = {"type": "i32_", "i32_": 30}
 PLAYER_DATA_VALUE = {
     "trackRoles": {
         "title": "usb",
@@ -117,6 +126,8 @@ TEST_SNAPSHOT = KefSnapshot(
     device=TEST_DEVICE_INFO,
     speaker_status="powerOn",
     source="usb",
+    cable_mode="wired",
+    master_channel="right",
     volume_raw=80,
     volume_level=0.8,
     is_muted=False,
@@ -139,9 +150,12 @@ TEST_SNAPSHOT = KefSnapshot(
     standby_mode="standby_none",
     startup_tone_enabled=True,
     auto_switch_hdmi=False,
+    front_led_enabled=False,
     standby_led_enabled=True,
     top_panel_enabled=True,
     wake_source="wakeup_default",
+    subwoofer_wake_enabled=False,
+    kw1_wake_enabled=False,
     usb_charging_enabled=False,
     startup_volume_enabled=False,
     per_input_startup_volume_enabled=False,
@@ -149,6 +163,7 @@ TEST_SNAPSHOT = KefSnapshot(
     maximum_volume=100,
     volume_step=1,
     volume_limit_enabled=False,
+    fixed_volume_level=30,
     source_list=("wifi", "bluetooth", "tv", "optical", "coaxial", "analog", "usb"),
     default_volume_by_source={
         "wifi": 30,
