@@ -1,7 +1,7 @@
 {
   "domain": "kef",
   "name": "KEF",
-  "version": "0.5.0",
+  "after_dependencies": ["zeroconf"],
   "codeowners": ["@EvotecIT", "@PrzemyslawKlys"],
   "config_flow": true,
   "documentation": "https://github.com/EvotecIT/homeassistant-kef",
@@ -9,7 +9,7 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/EvotecIT/homeassistant-kef/issues",
   "loggers": ["custom_components.kef"],
-  "after_dependencies": ["zeroconf"],
-  "zeroconf": ["_airplay._tcp.local."],
-  "quality_scale": "bronze"
+  "quality_scale": "bronze",
+  "version": "0.5.0",
+  "zeroconf": ["_airplay._tcp.local."]
 }

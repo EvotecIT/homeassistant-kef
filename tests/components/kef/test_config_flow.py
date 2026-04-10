@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
-from tests.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef.const import (
     AIRPLAY_ZEROCONF_TYPE,
@@ -50,7 +51,7 @@ async def test_user_flow_creates_modern_entry(monkeypatch, hass) -> None:
         data={CONF_HOST: TEST_HOST},
     )
 
-    assert result["type"] is config_entries.FlowResultType.CREATE_ENTRY
+    assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "LSX II-04438c"
     assert result["data"] == {
         CONF_HOST: TEST_HOST,
@@ -84,7 +85,7 @@ async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) ->
         data=discovery_info,
     )
 
-    assert result["type"] is config_entries.FlowResultType.FORM
+    assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "confirm"
     assert result["description_placeholders"] == {"title": "Living Room LSX II"}
 
@@ -127,6 +128,6 @@ async def test_zeroconf_updates_existing_entry_using_deviceid(hass) -> None:
         data=discovery_info,
     )
 
-    assert result["type"] is config_entries.FlowResultType.ABORT
+    assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
     assert entry.data[CONF_HOST] == "192.0.2.11"
