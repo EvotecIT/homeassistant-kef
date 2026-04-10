@@ -12,6 +12,7 @@ from tests.conftest import (
     MAC_VALUE,
     MODEL_CODE_VALUE,
     MUTE_VALUE,
+    NETWORK_INFO_VALUE,
     PLAY_MODE_VALUE,
     PLAY_TIME_VALUE,
     PLAYER_DATA_VALUE,
@@ -40,6 +41,7 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
         PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
         PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
         PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
+        PROBE_PATHS["network_info"]: NETWORK_INFO_VALUE,
     }
 
     async def fake_get_value(self, path, *, typed_key=None):
@@ -48,8 +50,12 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     async def fake_get_optional_value(self, path, *, typed_key=None):
         return responses[path]
 
-    monkeypatch.setattr(ModernKefClient, "_get_value", fake_get_value)
-    monkeypatch.setattr(ModernKefClient, "_get_optional_value", fake_get_optional_value)
+    monkeypatch.setattr(ModernKefClient, "_get_path_value", fake_get_value)
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_value",
+        fake_get_optional_value,
+    )
 
     client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
     snapshot = await client.async_refresh()
@@ -61,9 +67,15 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     assert snapshot.is_muted is False
     assert snapshot.playback is not None
     assert snapshot.playback.state == "playing"
+    assert snapshot.playback.album_artist == "KEF Artists"
     assert snapshot.playback.service_id == "usb"
+    assert snapshot.playback.codec == "pcm"
+    assert snapshot.playback.stream_channels == "2.0"
     assert snapshot.eq_profile is not None
     assert snapshot.eq_profile.balance == 30
+    assert snapshot.wifi_info is not None
+    assert snapshot.wifi_info.ssid == "EvotecLab"
+    assert snapshot.wifi_info.signal_level == -49
     assert snapshot.source_list == (
         "wifi",
         "bluetooth",
@@ -149,6 +161,7 @@ async def test_modern_turn_on_prefers_last_active_source(monkeypatch, hass) -> N
             PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
             PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
             PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
+            PROBE_PATHS["network_info"]: NETWORK_INFO_VALUE,
         }
         return mapping[path]
 
@@ -158,8 +171,12 @@ async def test_modern_turn_on_prefers_last_active_source(monkeypatch, hass) -> N
     async def fake_select_source(self, source):
         selected.append(source)
 
-    monkeypatch.setattr(ModernKefClient, "_get_value", fake_get_value)
-    monkeypatch.setattr(ModernKefClient, "_get_optional_value", fake_get_optional_value)
+    monkeypatch.setattr(ModernKefClient, "_get_path_value", fake_get_value)
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_value",
+        fake_get_optional_value,
+    )
     monkeypatch.setattr(ModernKefClient, "async_select_source", fake_select_source)
 
     client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
@@ -185,6 +202,7 @@ async def test_modern_unknown_model_uses_default_sources(monkeypatch, hass) -> N
         PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
         PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
         PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
+        PROBE_PATHS["network_info"]: NETWORK_INFO_VALUE,
     }
 
     async def fake_get_value(self, path, *, typed_key=None):
@@ -193,8 +211,12 @@ async def test_modern_unknown_model_uses_default_sources(monkeypatch, hass) -> N
     async def fake_get_optional_value(self, path, *, typed_key=None):
         return responses[path]
 
-    monkeypatch.setattr(ModernKefClient, "_get_value", fake_get_value)
-    monkeypatch.setattr(ModernKefClient, "_get_optional_value", fake_get_optional_value)
+    monkeypatch.setattr(ModernKefClient, "_get_path_value", fake_get_value)
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_value",
+        fake_get_optional_value,
+    )
 
     client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
     snapshot = await client.async_refresh()
@@ -209,3 +231,44 @@ async def test_modern_unknown_model_uses_default_sources(monkeypatch, hass) -> N
         "analog",
         "usb",
     )
+
+
+async def test_modern_optional_network_info_is_absent_when_unavailable(
+    monkeypatch, hass
+) -> None:
+    """Missing network info should not break refreshes."""
+    responses = {
+        PROBE_PATHS["device_name"]: DEVICE_NAME_VALUE,
+        PROBE_PATHS["version"]: VERSION_VALUE,
+        PROBE_PATHS["release_text"]: RELEASE_TEXT_VALUE,
+        PROBE_PATHS["mac"]: MAC_VALUE,
+        PROBE_PATHS["model_code"]: MODEL_CODE_VALUE,
+        PROBE_PATHS["speaker_status"]: SPEAKER_STATUS_VALUE["kefSpeakerStatus"],
+        PROBE_PATHS["source"]: SOURCE_VALUE["kefPhysicalSource"],
+        PROBE_PATHS["volume"]: VOLUME_VALUE["i32_"],
+        PROBE_PATHS["mute"]: MUTE_VALUE["bool_"],
+        PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
+        PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
+        PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
+        PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
+    }
+
+    async def fake_get_value(self, path, *, typed_key=None):
+        return responses[path]
+
+    async def fake_get_optional_value(self, path, *, typed_key=None):
+        if path == PROBE_PATHS["network_info"]:
+            return None
+        return responses[path]
+
+    monkeypatch.setattr(ModernKefClient, "_get_path_value", fake_get_value)
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_value",
+        fake_get_optional_value,
+    )
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    snapshot = await client.async_refresh()
+
+    assert snapshot.wifi_info is None

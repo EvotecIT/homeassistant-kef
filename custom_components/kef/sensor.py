@@ -53,6 +53,32 @@ SENSORS: tuple[KefSensorDescription, ...] = (
         diagnostics_only=True,
     ),
     KefSensorDescription(
+        key="wifi_signal_level",
+        translation_key="wifi_signal_level",
+        native_unit_of_measurement="dBm",
+        value_fn=lambda data: data.wifi_info.signal_level if data.wifi_info else None,
+        diagnostics_only=True,
+    ),
+    KefSensorDescription(
+        key="wifi_ssid",
+        translation_key="wifi_ssid",
+        value_fn=lambda data: data.wifi_info.ssid if data.wifi_info else None,
+        diagnostics_only=True,
+    ),
+    KefSensorDescription(
+        key="wifi_frequency",
+        translation_key="wifi_frequency",
+        native_unit_of_measurement="MHz",
+        value_fn=lambda data: data.wifi_info.frequency if data.wifi_info else None,
+        diagnostics_only=True,
+    ),
+    KefSensorDescription(
+        key="wifi_bssid",
+        translation_key="wifi_bssid",
+        value_fn=lambda data: data.wifi_info.bssid if data.wifi_info else None,
+        diagnostics_only=True,
+    ),
+    KefSensorDescription(
         key="balance",
         translation_key="balance",
         value_fn=lambda data: data.eq_profile.balance if data.eq_profile else None,

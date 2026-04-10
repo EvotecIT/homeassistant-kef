@@ -36,6 +36,7 @@ from .models import (
     KefEqProfile,
     KefPlaybackInfo,
     KefSnapshot,
+    KefWifiInfo,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -149,11 +150,11 @@ class ModernKefClient(BaseKefClient):
 
     async def async_identify(self) -> KefDeviceInfo:
         """Probe the modern HTTP API."""
-        device_name = await self._get_value(PROBE_PATHS["device_name"])
-        firmware_version = await self._get_value(PROBE_PATHS["version"])
-        release_text = await self._get_value(PROBE_PATHS["release_text"])
-        mac_address = await self._get_value(PROBE_PATHS["mac"])
-        model_code = await self._get_value(PROBE_PATHS["model_code"])
+        device_name = await self._get_path_value(PROBE_PATHS["device_name"])
+        firmware_version = await self._get_path_value(PROBE_PATHS["version"])
+        release_text = await self._get_path_value(PROBE_PATHS["release_text"])
+        mac_address = await self._get_path_value(PROBE_PATHS["mac"])
+        model_code = await self._get_path_value(PROBE_PATHS["model_code"])
 
         release_value = self._extract_string(release_text)
         model = (
@@ -183,29 +184,36 @@ class ModernKefClient(BaseKefClient):
         """Fetch the current state from the speaker."""
         device = await self.async_identify()
         speaker_status = self._extract_string(
-            await self._get_value(
+            await self._get_path_value(
                 PROBE_PATHS["speaker_status"],
                 typed_key="kefSpeakerStatus",
             )
         )
         source = self._extract_string(
-            await self._get_value(PROBE_PATHS["source"], typed_key="kefPhysicalSource")
+            await self._get_path_value(
+                PROBE_PATHS["source"],
+                typed_key="kefPhysicalSource",
+            )
         )
         volume_raw = self._extract_int(
-            await self._get_value(PROBE_PATHS["volume"], typed_key="i32_")
+            await self._get_path_value(PROBE_PATHS["volume"], typed_key="i32_")
         )
         is_muted = self._extract_bool(
-            await self._get_value(PROBE_PATHS["mute"], typed_key="bool_")
+            await self._get_path_value(PROBE_PATHS["mute"], typed_key="bool_")
         )
         play_mode = self._extract_string(
-            await self._get_value(PROBE_PATHS["play_mode"], typed_key="playerPlayMode")
+            await self._get_path_value(
+                PROBE_PATHS["play_mode"],
+                typed_key="playerPlayMode",
+            )
         )
-        player_data = await self._get_optional_value(PROBE_PATHS["player_data"])
-        play_time = await self._get_optional_value(
+        player_data = await self._get_optional_path_value(PROBE_PATHS["player_data"])
+        play_time = await self._get_optional_path_value(
             PROBE_PATHS["play_time"],
             typed_key="i64_",
         )
-        eq_profile = await self._get_optional_value(PROBE_PATHS["eq_profile"])
+        eq_profile = await self._get_optional_path_value(PROBE_PATHS["eq_profile"])
+        network_info = await self._get_optional_path_value(PROBE_PATHS["network_info"])
         if source not in (None, STATE_OFF):
             self._last_active_source = source
 
@@ -221,6 +229,11 @@ class ModernKefClient(BaseKefClient):
             eq_profile=(
                 KefEqProfile.from_modern_value(eq_profile)
                 if isinstance(eq_profile, dict)
+                else None
+            ),
+            wifi_info=(
+                KefWifiInfo.from_modern_value(network_info)
+                if isinstance(network_info, dict)
                 else None
             ),
             source_list=self._source_list_for_model(device.model),
@@ -295,7 +308,7 @@ class ModernKefClient(BaseKefClient):
             value={"type": "kefPhysicalSource", "kefPhysicalSource": source},
         )
 
-    async def _get_optional_value(
+    async def _get_optional_path_value(
         self,
         path: str,
         *,
@@ -303,7 +316,7 @@ class ModernKefClient(BaseKefClient):
     ) -> dict[str, Any] | Any | None:
         """Get a value from an optional path."""
         try:
-            return await self._get_value(path, typed_key=typed_key)
+            return await self._get_path_value(path, typed_key=typed_key)
         except KefError:
             return None
 
@@ -313,20 +326,33 @@ class ModernKefClient(BaseKefClient):
         *,
         typed_key: str | None = None,
     ) -> dict[str, Any] | Any:
+        """Backward-compatible wrapper for tests and call sites."""
+        return await self._get_path_value(path, typed_key=typed_key)
+
+    async def _get_path_value(
+        self,
+        path: str,
+        *,
+        typed_key: str | None = None,
+    ) -> dict[str, Any] | Any:
         """Get the current value for a path."""
-        payload = await self._request_json(
-            "GET",
-            GET_DATA_ENDPOINT,
-            params={"path": path, "roles": "value", "_nocache": "1"},
-        )
-        if not isinstance(payload, list) or not payload:
-            raise KefResponseError(f"Unexpected KEF payload for {path}")
-        value = payload[0]
+        value = await self._get_path_item(path, roles="value")
         if typed_key is None:
             return value
         if not isinstance(value, dict):
             raise KefResponseError(f"Unexpected KEF value type for {path}")
         return value.get(typed_key)
+
+    async def _get_path_item(self, path: str, *, roles: str = "value") -> Any:
+        """Fetch a raw item from a KEF API path."""
+        payload = await self._request_json(
+            "GET",
+            GET_DATA_ENDPOINT,
+            params={"path": path, "roles": roles, "_nocache": "1"},
+        )
+        if not isinstance(payload, list) or not payload:
+            raise KefResponseError(f"Unexpected KEF payload for {path}")
+        return payload[0]
 
     async def _set_data(self, path: str, *, role: str, value: Any) -> None:
         """Set a value on the speaker."""
@@ -441,6 +467,7 @@ class ModernKefClient(BaseKefClient):
 
         track_roles = player_data.get("trackRoles", {})
         metadata = track_roles.get("mediaData", {}).get("metaData", {})
+        active_resource = track_roles.get("mediaData", {}).get("activeResource", {})
         status = player_data.get("status", {})
         controls = player_data.get("controls", {})
         position_ms = play_time if isinstance(play_time, int) else None
@@ -457,9 +484,35 @@ class ModernKefClient(BaseKefClient):
             state=player_data.get("state"),
             title=track_roles.get("title"),
             artist=metadata.get("artist"),
+            album_artist=metadata.get("albumArtist") or metadata.get("artist"),
             album=metadata.get("album"),
             image_url=track_roles.get("icon"),
             service_id=metadata.get("serviceID"),
+            codec=(
+                active_resource.get("codec")
+                if isinstance(active_resource, dict)
+                else None
+            ),
+            sample_frequency=(
+                active_resource.get("sampleFrequency")
+                if isinstance(active_resource, dict)
+                else None
+            ),
+            stream_sample_rate=(
+                active_resource.get("streamSampleRate")
+                if isinstance(active_resource, dict)
+                else None
+            ),
+            stream_channels=(
+                active_resource.get("streamChannels")
+                if isinstance(active_resource, dict)
+                else None
+            ),
+            audio_channels=(
+                active_resource.get("nrAudioChannels")
+                if isinstance(active_resource, dict)
+                else None
+            ),
             duration_ms=status.get("duration") if isinstance(status, dict) else None,
             position_ms=position_ms,
             controls=normalized_controls,
@@ -541,6 +594,7 @@ class LegacyBinaryClient(BaseKefClient):
             play_mode=None,
             playback=KefPlaybackInfo(state=playback_state),
             eq_profile=None,
+            wifi_info=None,
             source_list=LEGACY_SOURCE_LIST,
         )
 

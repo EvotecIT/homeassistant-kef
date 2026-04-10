@@ -25,5 +25,6 @@ async def async_get_config_entry_diagnostics(hass, entry: KefConfigEntry):
         "play_mode": snapshot.play_mode,
         "playback": asdict(snapshot.playback) if snapshot.playback else None,
         "eq_profile": asdict(snapshot.eq_profile) if snapshot.eq_profile else None,
+        "wifi_info": asdict(snapshot.wifi_info) if snapshot.wifi_info else None,
     }
     return async_redact_data(data, TO_REDACT)

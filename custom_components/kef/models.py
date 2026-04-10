@@ -21,12 +21,44 @@ class KefPlaybackInfo:
     state: str | None = None
     title: str | None = None
     artist: str | None = None
+    album_artist: str | None = None
     album: str | None = None
     image_url: str | None = None
     service_id: str | None = None
+    codec: str | None = None
+    sample_frequency: int | None = None
+    stream_sample_rate: int | None = None
+    stream_channels: str | None = None
+    audio_channels: int | None = None
     duration_ms: int | None = None
     position_ms: int | None = None
     controls: dict[str, bool] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class KefWifiInfo:
+    """Flattened KEF Wi-Fi information."""
+
+    signal_level: int | None = None
+    ssid: str | None = None
+    frequency: int | None = None
+    bssid: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_modern_value(cls, value: dict[str, Any]) -> KefWifiInfo | None:
+        """Build a Wi-Fi info object from the modern API payload."""
+        network_info = value.get("networkInfo", {})
+        wireless = network_info.get("wireless", {})
+        if not isinstance(wireless, dict) or not wireless:
+            return None
+        return cls(
+            signal_level=wireless.get("signalLevel"),
+            ssid=wireless.get("ssid"),
+            frequency=wireless.get("frequency"),
+            bssid=wireless.get("bssid"),
+            raw=wireless,
+        )
 
 
 @dataclass(slots=True)
@@ -96,6 +128,7 @@ class KefSnapshot:
     play_mode: str | None
     playback: KefPlaybackInfo | None
     eq_profile: KefEqProfile | None
+    wifi_info: KefWifiInfo | None
     source_list: tuple[str, ...]
 
     @property

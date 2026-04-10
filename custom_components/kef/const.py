@@ -74,4 +74,5 @@ PROBE_PATHS = {
     "player_data": "player:player/data",
     "play_time": "player:player/data/playTime",
     "eq_profile": "kef:eqProfile",
+    "network_info": "network:info",
 }

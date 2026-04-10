@@ -8,6 +8,7 @@ from custom_components.kef.models import (
     KefEqProfile,
     KefPlaybackInfo,
     KefSnapshot,
+    KefWifiInfo,
 )
 
 TEST_HOST = "192.0.2.10"
@@ -26,7 +27,21 @@ PLAY_MODE_VALUE = {"type": "playerPlayMode", "playerPlayMode": "normal"}
 PLAYER_DATA_VALUE = {
     "trackRoles": {
         "title": "usb",
-        "mediaData": {"metaData": {"serviceID": "usb"}},
+        "mediaData": {
+            "metaData": {
+                "artist": "KEF",
+                "album": "USB Demo",
+                "albumArtist": "KEF Artists",
+                "serviceID": "usb",
+            },
+            "activeResource": {
+                "codec": "pcm",
+                "sampleFrequency": 48000,
+                "streamSampleRate": 48000,
+                "streamChannels": "2.0",
+                "nrAudioChannels": 2,
+            },
+        },
         "audioType": "audioBroadcast",
         "type": "audio",
         "path": "kef:/playlogic/usb",
@@ -58,6 +73,16 @@ EQ_PROFILE_VALUE = {
         },
     },
 }
+NETWORK_INFO_VALUE = {
+    "networkInfo": {
+        "wireless": {
+            "signalLevel": -49,
+            "ssid": "EvotecLab",
+            "frequency": 5180,
+            "bssid": "AA:BB:CC:DD:EE:FF",
+        }
+    }
+}
 
 TEST_DEVICE_INFO = KefDeviceInfo(
     backend=KefBackend.MODERN,
@@ -80,7 +105,20 @@ TEST_SNAPSHOT = KefSnapshot(
     volume_level=0.8,
     is_muted=False,
     play_mode="normal",
-    playback=KefPlaybackInfo(state="playing", title="usb", service_id="usb"),
+    playback=KefPlaybackInfo(
+        state="playing",
+        title="usb",
+        artist="KEF",
+        album="USB Demo",
+        album_artist="KEF Artists",
+        service_id="usb",
+        codec="pcm",
+        sample_frequency=48000,
+        stream_sample_rate=48000,
+        stream_channels="2.0",
+        audio_channels=2,
+    ),
     eq_profile=KefEqProfile.from_modern_value(EQ_PROFILE_VALUE),
+    wifi_info=KefWifiInfo.from_modern_value(NETWORK_INFO_VALUE),
     source_list=("wifi", "bluetooth", "tv", "optical", "coaxial", "analog", "usb"),
 )

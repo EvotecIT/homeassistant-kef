@@ -153,11 +153,25 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
             "speaker_status": snapshot.speaker_status,
             "play_mode": snapshot.play_mode,
             "service_id": playback.service_id if playback else None,
+            "album_artist": playback.album_artist if playback else None,
+            "codec": playback.codec if playback else None,
+            "sample_frequency": playback.sample_frequency if playback else None,
+            "stream_sample_rate": playback.stream_sample_rate if playback else None,
+            "stream_channels": playback.stream_channels if playback else None,
+            "audio_channels": playback.audio_channels if playback else None,
             "controls": playback.controls if playback else {},
             "firmware_version": snapshot.device.firmware_version,
             "release_text": snapshot.device.release_text,
             "model_code": snapshot.device.model_code,
             "mac_address": snapshot.device.mac_address,
+            "wifi_signal_level": (
+                snapshot.wifi_info.signal_level if snapshot.wifi_info else None
+            ),
+            "wifi_ssid": snapshot.wifi_info.ssid if snapshot.wifi_info else None,
+            "wifi_frequency": (
+                snapshot.wifi_info.frequency if snapshot.wifi_info else None
+            ),
+            "wifi_bssid": snapshot.wifi_info.bssid if snapshot.wifi_info else None,
             "eq_profile_name": eq_profile.profile_name if eq_profile else None,
             "eq_expert_mode": eq_profile.is_expert_mode if eq_profile else None,
         }
