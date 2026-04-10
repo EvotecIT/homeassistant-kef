@@ -93,7 +93,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
 
         manufacturer = str(discovery_info.properties.get("manufacturer", ""))
         model = str(discovery_info.properties.get("model", ""))
-        serial = str(discovery_info.properties.get("serialNumber", ""))
+        discovery_unique_id = self._discovery_unique_id(discovery_info)
 
         if "KEF" not in manufacturer and "LS" not in model:
             return self.async_abort(reason="unsupported")
@@ -101,12 +101,22 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         self._host = discovery_info.host
         self._title = discovery_info.name.removesuffix(f".{discovery_info.type}")
 
-        if serial:
-            await self.async_set_unique_id(serial)
+        if discovery_unique_id:
+            await self.async_set_unique_id(discovery_unique_id)
             self._abort_if_unique_id_configured(updates={CONF_HOST: self._host})
 
         self.context["title_placeholders"] = {"title": self._title}
         return await self.async_step_confirm()
+
+    @staticmethod
+    def _discovery_unique_id(discovery_info: ZeroconfServiceInfo) -> str | None:
+        """Return the configured-entry unique ID for a zeroconf discovery."""
+        device_id = str(discovery_info.properties.get("deviceid", "")).strip()
+        if device_id:
+            return f"kef-{device_id.lower()}"
+
+        serial = str(discovery_info.properties.get("serialNumber", "")).strip()
+        return serial or None
 
     async def async_step_confirm(self, user_input: dict[str, Any] | None = None):
         """Confirm a discovered speaker."""

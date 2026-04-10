@@ -5,6 +5,7 @@ from __future__ import annotations
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
+from tests.common import MockConfigEntry
 
 from custom_components.kef.const import (
     AIRPLAY_ZEROCONF_TYPE,
@@ -86,3 +87,46 @@ async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) ->
     assert result["type"] is config_entries.FlowResultType.FORM
     assert result["step_id"] == "confirm"
     assert result["description_placeholders"] == {"title": "Living Room LSX II"}
+
+
+async def test_zeroconf_updates_existing_entry_using_deviceid(hass) -> None:
+    """Discovered speakers should match the configured MAC-based unique ID."""
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_DEVICE_INFO.unique_id,
+        data={
+            CONF_HOST: TEST_HOST,
+            CONF_PORT: 80,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: "modern",
+            CONF_DEVICE_ID: TEST_DEVICE_INFO.unique_id,
+        },
+        title=TEST_DEVICE_INFO.device_name,
+    )
+    entry.add_to_hass(hass)
+
+    discovery_info = ZeroconfServiceInfo(
+        ip_address="192.0.2.11",
+        ip_addresses=["192.0.2.11"],
+        hostname="lsxii.local.",
+        type=AIRPLAY_ZEROCONF_TYPE,
+        name="Living Room LSX II._airplay._tcp.local.",
+        port=7000,
+        properties={
+            "manufacturer": "KEF",
+            "model": "LSX II",
+            "deviceid": "84:17:15:04:43:8C",
+            "serialNumber": "AA-BB-CC",
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_ZEROCONF},
+        data=discovery_info,
+    )
+
+    assert result["type"] is config_entries.FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert entry.data[CONF_HOST] == "192.0.2.11"
