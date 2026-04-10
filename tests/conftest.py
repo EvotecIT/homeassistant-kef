@@ -33,6 +33,13 @@ WAKE_UP_SOURCE_VALUE = {
     "type": "kefWakeUpSource",
     "kefWakeUpSource": "wakeup_default",
 }
+USB_CHARGING_VALUE = {"type": "bool_", "bool_": False}
+STARTUP_VOLUME_ENABLED_VALUE = {"type": "bool_", "bool_": False}
+PER_INPUT_STARTUP_VOLUME_ENABLED_VALUE = {"type": "bool_", "bool_": False}
+DEFAULT_VOLUME_GLOBAL_VALUE = {"type": "i32_", "i32_": 30}
+MAXIMUM_VOLUME_VALUE = {"type": "i32_", "i32_": 100}
+VOLUME_STEP_SETTING_VALUE = {"type": "i16_", "i16_": 1}
+VOLUME_LIMIT_VALUE = {"type": "bool_", "bool_": False}
 PLAYER_DATA_VALUE = {
     "trackRoles": {
         "title": "usb",
@@ -135,5 +142,12 @@ TEST_SNAPSHOT = KefSnapshot(
     standby_led_enabled=True,
     top_panel_enabled=True,
     wake_source="wakeup_default",
+    usb_charging_enabled=False,
+    startup_volume_enabled=False,
+    per_input_startup_volume_enabled=False,
+    default_volume_global=30,
+    maximum_volume=100,
+    volume_step=1,
+    volume_limit_enabled=False,
     source_list=("wifi", "bluetooth", "tv", "optical", "coaxial", "analog", "usb"),
 )

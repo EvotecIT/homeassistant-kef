@@ -151,6 +151,37 @@ class BaseKefClient(ABC):
     async def async_set_wake_source(self, source: str) -> None:
         """Set the wake source."""
 
+    @abstractmethod
+    async def async_set_usb_charging_enabled(self, enabled: bool) -> None:
+        """Enable or disable USB charging."""
+
+    @abstractmethod
+    async def async_set_startup_volume_enabled(self, enabled: bool) -> None:
+        """Enable or disable startup volume mode."""
+
+    @abstractmethod
+    async def async_set_per_input_startup_volume_enabled(
+        self,
+        enabled: bool,
+    ) -> None:
+        """Enable or disable per-input startup volumes."""
+
+    @abstractmethod
+    async def async_set_default_volume_global(self, volume: int) -> None:
+        """Set the global startup volume."""
+
+    @abstractmethod
+    async def async_set_maximum_volume(self, volume: int) -> None:
+        """Set the maximum allowed volume."""
+
+    @abstractmethod
+    async def async_set_volume_step(self, step: int) -> None:
+        """Set the volume step size."""
+
+    @abstractmethod
+    async def async_set_volume_limit_enabled(self, enabled: bool) -> None:
+        """Enable or disable the volume limiter."""
+
 
 class ModernKefClient(BaseKefClient):
     """Modern HTTP client for LSX II-era KEF speakers."""
@@ -274,6 +305,48 @@ class ModernKefClient(BaseKefClient):
                 typed_key="kefWakeUpSource",
             )
         )
+        usb_charging_enabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["usb_charging"],
+                typed_key="bool_",
+            )
+        )
+        startup_volume_enabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["startup_volume_enabled"],
+                typed_key="bool_",
+            )
+        )
+        per_input_startup_volume_enabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["per_input_startup_volume_enabled"],
+                typed_key="bool_",
+            )
+        )
+        default_volume_global = self._extract_int(
+            await self._get_optional_path_value(
+                PROBE_PATHS["default_volume_global"],
+                typed_key="i32_",
+            )
+        )
+        maximum_volume = self._extract_int(
+            await self._get_optional_path_value(
+                PROBE_PATHS["maximum_volume"],
+                typed_key="i32_",
+            )
+        )
+        volume_step = self._extract_int(
+            await self._get_optional_path_value(
+                PROBE_PATHS["volume_step"],
+                typed_key="i16_",
+            )
+        )
+        volume_limit_enabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["volume_limit"],
+                typed_key="bool_",
+            )
+        )
         if source not in (None, STATE_OFF):
             self._last_active_source = source
 
@@ -306,6 +379,13 @@ class ModernKefClient(BaseKefClient):
                 None if top_panel_disabled is None else not top_panel_disabled
             ),
             wake_source=wake_source,
+            usb_charging_enabled=usb_charging_enabled,
+            startup_volume_enabled=startup_volume_enabled,
+            per_input_startup_volume_enabled=per_input_startup_volume_enabled,
+            default_volume_global=default_volume_global,
+            maximum_volume=maximum_volume,
+            volume_step=volume_step,
+            volume_limit_enabled=volume_limit_enabled,
             source_list=self._source_list_for_model(device.model),
         )
 
@@ -424,6 +504,65 @@ class ModernKefClient(BaseKefClient):
             PROBE_PATHS["wake_up_source"],
             role="value",
             value={"type": "kefWakeUpSource", "kefWakeUpSource": source},
+        )
+
+    async def async_set_usb_charging_enabled(self, enabled: bool) -> None:
+        """Enable or disable USB charging."""
+        await self._set_data(
+            PROBE_PATHS["usb_charging"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
+        )
+
+    async def async_set_startup_volume_enabled(self, enabled: bool) -> None:
+        """Enable or disable startup volume mode."""
+        await self._set_data(
+            PROBE_PATHS["startup_volume_enabled"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
+        )
+
+    async def async_set_per_input_startup_volume_enabled(
+        self,
+        enabled: bool,
+    ) -> None:
+        """Enable or disable per-input startup volumes."""
+        await self._set_data(
+            PROBE_PATHS["per_input_startup_volume_enabled"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
+        )
+
+    async def async_set_default_volume_global(self, volume: int) -> None:
+        """Set the global startup volume."""
+        await self._set_data(
+            PROBE_PATHS["default_volume_global"],
+            role="value",
+            value={"type": "i32_", "i32_": max(0, min(100, volume))},
+        )
+
+    async def async_set_maximum_volume(self, volume: int) -> None:
+        """Set the maximum allowed volume."""
+        await self._set_data(
+            PROBE_PATHS["maximum_volume"],
+            role="value",
+            value={"type": "i32_", "i32_": max(0, min(100, volume))},
+        )
+
+    async def async_set_volume_step(self, step: int) -> None:
+        """Set the volume step size."""
+        await self._set_data(
+            PROBE_PATHS["volume_step"],
+            role="value",
+            value={"type": "i16_", "i16_": max(1, min(10, step))},
+        )
+
+    async def async_set_volume_limit_enabled(self, enabled: bool) -> None:
+        """Enable or disable the volume limiter."""
+        await self._set_data(
+            PROBE_PATHS["volume_limit"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
         )
 
     async def _get_optional_path_value(
@@ -560,9 +699,10 @@ class ModernKefClient(BaseKefClient):
         if isinstance(value, int):
             return value
         if isinstance(value, dict):
-            raw = value.get("i32_")
-            if isinstance(raw, int):
-                return raw
+            for key in ("i32_", "i16_"):
+                raw = value.get(key)
+                if isinstance(raw, int):
+                    return raw
         return None
 
     @staticmethod
@@ -721,6 +861,13 @@ class LegacyBinaryClient(BaseKefClient):
             standby_led_enabled=None,
             top_panel_enabled=None,
             wake_source=None,
+            usb_charging_enabled=None,
+            startup_volume_enabled=None,
+            per_input_startup_volume_enabled=None,
+            default_volume_global=None,
+            maximum_volume=None,
+            volume_step=None,
+            volume_limit_enabled=None,
             source_list=LEGACY_SOURCE_LIST,
         )
 
@@ -809,6 +956,47 @@ class LegacyBinaryClient(BaseKefClient):
     async def async_set_wake_source(self, source: str) -> None:
         """Legacy speakers do not expose wake-source settings."""
         raise KefUnsupportedDeviceError("Wake source is not supported for legacy KEF")
+
+    async def async_set_usb_charging_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose USB charging settings."""
+        raise KefUnsupportedDeviceError("USB charging is not supported for legacy KEF")
+
+    async def async_set_startup_volume_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose startup-volume settings."""
+        raise KefUnsupportedDeviceError(
+            "Startup volume is not supported for legacy KEF"
+        )
+
+    async def async_set_per_input_startup_volume_enabled(
+        self,
+        enabled: bool,
+    ) -> None:
+        """Legacy speakers do not expose per-input startup-volume settings."""
+        raise KefUnsupportedDeviceError(
+            "Per-input startup volume is not supported for legacy KEF"
+        )
+
+    async def async_set_default_volume_global(self, volume: int) -> None:
+        """Legacy speakers do not expose global startup-volume settings."""
+        raise KefUnsupportedDeviceError(
+            "Global startup volume is not supported for legacy KEF"
+        )
+
+    async def async_set_maximum_volume(self, volume: int) -> None:
+        """Legacy speakers do not expose maximum-volume settings."""
+        raise KefUnsupportedDeviceError(
+            "Maximum volume is not supported for legacy KEF"
+        )
+
+    async def async_set_volume_step(self, step: int) -> None:
+        """Legacy speakers do not expose volume-step settings."""
+        raise KefUnsupportedDeviceError("Volume step is not supported for legacy KEF")
+
+    async def async_set_volume_limit_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose volume-limiter settings."""
+        raise KefUnsupportedDeviceError(
+            "Volume limiter is not supported for legacy KEF"
+        )
 
     async def _set_source(self, source: str, *, off: bool = False) -> None:
         """Set the current source."""

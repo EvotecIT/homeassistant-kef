@@ -180,6 +180,15 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
             "standby_led_enabled": snapshot.standby_led_enabled,
             "top_panel_enabled": snapshot.top_panel_enabled,
             "wake_source": snapshot.wake_source,
+            "usb_charging_enabled": snapshot.usb_charging_enabled,
+            "startup_volume_enabled": snapshot.startup_volume_enabled,
+            "per_input_startup_volume_enabled": (
+                snapshot.per_input_startup_volume_enabled
+            ),
+            "default_volume_global": snapshot.default_volume_global,
+            "maximum_volume": snapshot.maximum_volume,
+            "volume_step": snapshot.volume_step,
+            "volume_limit_enabled": snapshot.volume_limit_enabled,
         }
 
     async def async_turn_on(self) -> None:

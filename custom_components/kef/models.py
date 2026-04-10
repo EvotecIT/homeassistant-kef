@@ -135,6 +135,13 @@ class KefSnapshot:
     standby_led_enabled: bool | None
     top_panel_enabled: bool | None
     wake_source: str | None
+    usb_charging_enabled: bool | None
+    startup_volume_enabled: bool | None
+    per_input_startup_volume_enabled: bool | None
+    default_volume_global: int | None
+    maximum_volume: int | None
+    volume_step: int | None
+    volume_limit_enabled: bool | None
     source_list: tuple[str, ...]
 
     @property

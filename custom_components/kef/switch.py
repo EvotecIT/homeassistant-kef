@@ -60,6 +60,28 @@ async def _async_set_top_panel(
     await client.async_set_top_panel_enabled(enabled)
 
 
+async def _async_set_usb_charging(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set the USB charging state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_usb_charging_enabled(enabled)
+
+
+async def _async_set_startup_volume(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set whether startup volume is enabled."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_startup_volume_enabled(enabled)
+
+
 @dataclass(frozen=True, kw_only=True)
 class KefSwitchDescription(SwitchEntityDescription):
     """Describe a KEF configuration switch."""
@@ -100,6 +122,22 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_enabled,
         async_set_fn=_async_set_top_panel,
+    ),
+    KefSwitchDescription(
+        key="usb_charging",
+        name="USB charging",
+        icon="mdi:usb-port",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.usb_charging_enabled,
+        async_set_fn=_async_set_usb_charging,
+    ),
+    KefSwitchDescription(
+        key="startup_volume",
+        name="Use startup volume",
+        icon="mdi:volume-source",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.startup_volume_enabled,
+        async_set_fn=_async_set_startup_volume,
     ),
 )
 

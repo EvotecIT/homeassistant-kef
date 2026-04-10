@@ -97,4 +97,11 @@ PROBE_PATHS = {
     "disable_front_standby_led": "settings:/kef/host/disableFrontStandbyLED",
     "disable_top_panel": "settings:/kef/host/disableTopPanel",
     "wake_up_source": "settings:/kef/host/wakeUpSource",
+    "usb_charging": "settings:/kef/host/usbCharging",
+    "startup_volume_enabled": "settings:/kef/host/standbyDefaultVol",
+    "per_input_startup_volume_enabled": "settings:/kef/host/advancedStandbyDefaultVol",
+    "default_volume_global": "settings:/kef/host/defaultVolumeGlobal",
+    "maximum_volume": "settings:/kef/host/maximumVolume",
+    "volume_step": "settings:/kef/host/volumeStep",
+    "volume_limit": "settings:/kef/host/volumeLimit",
 }
