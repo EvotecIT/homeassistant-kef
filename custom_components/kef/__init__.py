@@ -7,9 +7,7 @@ from homeassistant.helpers import entity_registry as er
 
 from .const import (
     CONF_ENABLE_DIAGNOSTICS,
-    CONF_ENABLE_EQ_SENSORS,
     DEFAULT_ENABLE_DIAGNOSTICS,
-    DEFAULT_ENABLE_EQ_SENSORS,
 )
 from .coordinator import KefConfigEntry, KefCoordinator
 
@@ -21,18 +19,6 @@ PLATFORMS = [
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
 ]
-
-_EQ_ENTITY_KEYS = {
-    "balance",
-    "bass_extension",
-    "treble_amount",
-    "subwoofer_gain",
-    "high_pass_frequency",
-    "desk_mode",
-    "wall_mode",
-    "phase_correction",
-    "high_pass_mode",
-}
 
 _ACTIVE_SENSOR_ENTITY_KEYS = {
     "backend",
@@ -77,7 +63,6 @@ async def _async_cleanup_optional_entities(
     """Remove stale registry entries for optional or retired entities."""
     registry = er.async_get(hass)
     device_unique_id = coordinator.data.device.unique_id
-    eq_enabled = entry.options.get(CONF_ENABLE_EQ_SENSORS, DEFAULT_ENABLE_EQ_SENSORS)
     diagnostics_enabled = entry.options.get(
         CONF_ENABLE_DIAGNOSTICS,
         DEFAULT_ENABLE_DIAGNOSTICS,
@@ -94,17 +79,6 @@ async def _async_cleanup_optional_entities(
             }
         )
     expected_binary_sensor_keys = set(_ACTIVE_BINARY_SENSOR_ENTITY_KEYS)
-    if eq_enabled:
-        expected_sensor_keys.update(
-            {
-                "balance",
-                "bass_extension",
-                "treble_amount",
-                "subwoofer_gain",
-                "high_pass_frequency",
-            }
-        )
-        expected_binary_sensor_keys.update(_EQ_ENTITY_KEYS - expected_sensor_keys)
 
     for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
         platform = entity_entry.entity_id.split(".", 1)[0]

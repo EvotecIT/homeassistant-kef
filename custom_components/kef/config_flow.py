@@ -16,11 +16,9 @@ from .const import (
     CONF_BACKEND,
     CONF_DEVICE_ID,
     CONF_ENABLE_DIAGNOSTICS,
-    CONF_ENABLE_EQ_SENSORS,
     CONF_SCAN_INTERVAL,
     CONF_TCP_PORT,
     DEFAULT_ENABLE_DIAGNOSTICS,
-    DEFAULT_ENABLE_EQ_SENSORS,
     DEFAULT_LEGACY_PORT,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL_SECONDS,
@@ -195,13 +193,6 @@ class KefOptionsFlow(OptionsFlow):
                         default=self.config_entry.options.get(
                             CONF_ENABLE_DIAGNOSTICS,
                             DEFAULT_ENABLE_DIAGNOSTICS,
-                        ),
-                    ): bool,
-                    vol.Optional(
-                        CONF_ENABLE_EQ_SENSORS,
-                        default=self.config_entry.options.get(
-                            CONF_ENABLE_EQ_SENSORS,
-                            DEFAULT_ENABLE_EQ_SENSORS,
                         ),
                     ): bool,
                 }

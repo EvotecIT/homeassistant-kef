@@ -23,16 +23,16 @@ This checklist tracks what the repository already covers and what still needs wo
 
 ## High-Priority Next
 
-- [ ] Writable EQ / DSP entities for modern KEF
-  - [ ] balance
-  - [ ] bass extension
-  - [ ] treble amount
-  - [ ] subwoofer gain
-  - [ ] desk mode
-  - [ ] wall mode
-  - [ ] phase correction
-  - [ ] high-pass mode
-  - [ ] high-pass frequency
+- [x] Writable EQ / DSP entities for modern KEF
+  - [x] balance
+  - [x] bass extension
+  - [x] treble amount
+  - [x] subwoofer gain
+  - [x] desk mode
+  - [x] wall mode
+  - [x] phase correction
+  - [x] high-pass mode
+  - [x] high-pass frequency
 - [x] Writable fixed-volume control
 - [ ] Writable cable mode
 - [x] Writable master-channel control

@@ -61,6 +61,50 @@ async def _async_set_fixed_volume_level(
     await client.async_set_fixed_volume_level(round(value))
 
 
+async def _async_set_balance(
+    coordinator: KefCoordinator,
+    value: float,
+) -> None:
+    """Set EQ balance."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_balance(round(value))
+
+
+async def _async_set_treble_amount(
+    coordinator: KefCoordinator,
+    value: float,
+) -> None:
+    """Set EQ treble amount."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_treble_amount(round(value))
+
+
+async def _async_set_subwoofer_gain(
+    coordinator: KefCoordinator,
+    value: float,
+) -> None:
+    """Set EQ subwoofer gain."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_subwoofer_gain(round(value))
+
+
+async def _async_set_high_pass_frequency(
+    coordinator: KefCoordinator,
+    value: float,
+) -> None:
+    """Set EQ high-pass frequency."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_high_pass_frequency(round(value))
+
+
 def _friendly_source_name(source: str) -> str:
     """Return a UI-friendly source label."""
     return WAKE_SOURCE_OPTIONS.get(source, source.replace("_", " ").title())
@@ -118,6 +162,56 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
         native_step=1,
         value_fn=lambda data: data.fixed_volume_level,
         async_set_fn=_async_set_fixed_volume_level,
+    ),
+    KefNumberDescription(
+        key="balance",
+        name="Balance",
+        icon="mdi:arrow-left-right",
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=0,
+        native_max_value=60,
+        native_step=1,
+        value_fn=lambda data: data.eq_profile.balance if data.eq_profile else None,
+        async_set_fn=_async_set_balance,
+    ),
+    KefNumberDescription(
+        key="treble_amount",
+        name="Treble amount",
+        icon="mdi:tune-vertical",
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=0,
+        native_max_value=16,
+        native_step=1,
+        value_fn=lambda data: (
+            data.eq_profile.treble_amount if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_treble_amount,
+    ),
+    KefNumberDescription(
+        key="subwoofer_gain",
+        name="Subwoofer gain",
+        icon="mdi:speaker-wireless",
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=0,
+        native_max_value=20,
+        native_step=1,
+        value_fn=lambda data: (
+            data.eq_profile.subwoofer_gain if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_subwoofer_gain,
+    ),
+    KefNumberDescription(
+        key="high_pass_frequency",
+        name="High-pass frequency",
+        icon="mdi:sine-wave",
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=0,
+        native_max_value=10,
+        native_step=1,
+        value_fn=lambda data: (
+            data.eq_profile.high_pass_frequency if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_high_pass_frequency,
     ),
 )
 

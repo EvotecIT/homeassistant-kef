@@ -12,12 +12,10 @@ MAX_SCAN_INTERVAL_SECONDS = 120
 CONF_BACKEND = "backend"
 CONF_DEVICE_ID = "device_id"
 CONF_ENABLE_DIAGNOSTICS = "enable_diagnostics"
-CONF_ENABLE_EQ_SENSORS = "enable_eq_sensors"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_TCP_PORT = "tcp_port"
 
 DEFAULT_ENABLE_DIAGNOSTICS = False
-DEFAULT_ENABLE_EQ_SENSORS = False
 
 AIRPLAY_ZEROCONF_TYPE = "_airplay._tcp.local."
 DEFAULT_LEGACY_PORT = 50001
@@ -66,6 +64,12 @@ WAKE_SOURCE_OPTIONS = {
     "usb": "USB",
     "optical": "Optical",
     "tv": "TV",
+}
+
+BASS_EXTENSION_OPTIONS = {
+    "less": "Less",
+    "standard": "Standard",
+    "extra": "Extra",
 }
 
 MASTER_CHANNEL_OPTIONS = {

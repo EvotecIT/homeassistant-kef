@@ -137,6 +137,50 @@ async def _async_set_kw1_wake(
     await client.async_set_kw1_wake_enabled(enabled)
 
 
+async def _async_set_desk_mode(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set the desk mode state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_desk_mode_enabled(enabled)
+
+
+async def _async_set_wall_mode(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set the wall mode state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_wall_mode_enabled(enabled)
+
+
+async def _async_set_phase_correction(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set the phase correction state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_phase_correction_enabled(enabled)
+
+
+async def _async_set_high_pass_mode(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set the high-pass mode state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_high_pass_mode_enabled(enabled)
+
+
 @dataclass(frozen=True, kw_only=True)
 class KefSwitchDescription(SwitchEntityDescription):
     """Describe a KEF configuration switch."""
@@ -233,6 +277,42 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.kw1_wake_enabled,
         async_set_fn=_async_set_kw1_wake,
+    ),
+    KefSwitchDescription(
+        key="desk_mode",
+        name="Desk mode",
+        icon="mdi:desk",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.eq_profile.desk_mode if data.eq_profile else None,
+        async_set_fn=_async_set_desk_mode,
+    ),
+    KefSwitchDescription(
+        key="wall_mode",
+        name="Wall mode",
+        icon="mdi:wall",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.eq_profile.wall_mode if data.eq_profile else None,
+        async_set_fn=_async_set_wall_mode,
+    ),
+    KefSwitchDescription(
+        key="phase_correction",
+        name="Phase correction",
+        icon="mdi:waveform",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: (
+            data.eq_profile.phase_correction if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_phase_correction,
+    ),
+    KefSwitchDescription(
+        key="high_pass_mode",
+        name="High-pass mode",
+        icon="mdi:chart-bell-curve-cumulative",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: (
+            data.eq_profile.high_pass_mode if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_high_pass_mode,
     ),
 )
 

@@ -9,12 +9,10 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_ENABLE_EQ_SENSORS
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefSnapshot
@@ -28,32 +26,6 @@ class KefBinarySensorDescription(BinarySensorEntityDescription):
 
 
 BINARY_SENSORS: tuple[KefBinarySensorDescription, ...] = (
-    KefBinarySensorDescription(
-        key="desk_mode",
-        name="Desk mode",
-        value_fn=lambda data: bool(data.eq_profile and data.eq_profile.desk_mode),
-        entity_category=EntityCategory.CONFIG,
-    ),
-    KefBinarySensorDescription(
-        key="wall_mode",
-        name="Wall mode",
-        value_fn=lambda data: bool(data.eq_profile and data.eq_profile.wall_mode),
-        entity_category=EntityCategory.CONFIG,
-    ),
-    KefBinarySensorDescription(
-        key="phase_correction",
-        name="Phase correction",
-        value_fn=lambda data: bool(
-            data.eq_profile and data.eq_profile.phase_correction
-        ),
-        entity_category=EntityCategory.CONFIG,
-    ),
-    KefBinarySensorDescription(
-        key="high_pass_mode",
-        name="High-pass mode",
-        value_fn=lambda data: bool(data.eq_profile and data.eq_profile.high_pass_mode),
-        entity_category=EntityCategory.CONFIG,
-    ),
 )
 
 
@@ -63,7 +35,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up KEF binary sensors."""
-    if not entry.options.get(CONF_ENABLE_EQ_SENSORS, True):
+    if not BINARY_SENSORS:
         return
 
     coordinator = entry.runtime_data

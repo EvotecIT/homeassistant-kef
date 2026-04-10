@@ -11,7 +11,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import MASTER_CHANNEL_OPTIONS, STANDBY_MODE_OPTIONS, WAKE_SOURCE_OPTIONS
+from .const import (
+    BASS_EXTENSION_OPTIONS,
+    MASTER_CHANNEL_OPTIONS,
+    STANDBY_MODE_OPTIONS,
+    WAKE_SOURCE_OPTIONS,
+)
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend, KefSnapshot
@@ -50,6 +55,17 @@ async def _async_set_master_channel(
     await client.async_set_master_channel(value)
 
 
+async def _async_set_bass_extension(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the EQ bass extension."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_bass_extension(value)
+
+
 @dataclass(frozen=True, kw_only=True)
 class KefSelectDescription(SelectEntityDescription):
     """Describe a KEF configuration select."""
@@ -86,6 +102,17 @@ SELECTS: tuple[KefSelectDescription, ...] = (
         value_fn=lambda data: data.master_channel,
         async_set_fn=_async_set_master_channel,
         options_map=MASTER_CHANNEL_OPTIONS,
+    ),
+    KefSelectDescription(
+        key="bass_extension",
+        name="Bass extension",
+        icon="mdi:waveform",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: (
+            data.eq_profile.bass_extension if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_bass_extension,
+        options_map=BASS_EXTENSION_OPTIONS,
     ),
 )
 

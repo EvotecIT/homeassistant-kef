@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from custom_components.kef.api import ModernKefClient
@@ -732,3 +734,83 @@ async def test_modern_set_fixed_volume_level_posts_typed_payload(
             "value": {"type": "i32_", "i32_": 29},
         },
     }
+
+
+async def test_modern_set_desk_mode_posts_typed_eq_wrapper(monkeypatch, hass) -> None:
+    """Desk mode writes should round-trip through the typed EQ wrapper."""
+    captured = {}
+
+    async def fake_get_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile"]
+        return {
+            "type": "kefEqProfile",
+            "kefEqProfile": copy.deepcopy(EQ_PROFILE_VALUE["kefEqProfile"]),
+        }
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["path"] = path
+        captured["role"] = role
+        captured["value"] = value
+
+    monkeypatch.setattr(ModernKefClient, "_get_path_item", fake_get_path_item)
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_desk_mode_enabled(True)
+
+    assert captured["path"] == PROBE_PATHS["eq_profile"]
+    assert captured["role"] == "value"
+    assert captured["value"]["type"] == "kefEqProfile"
+    assert captured["value"]["kefEqProfile"]["dspInfo"]["deskMode"] is True
+
+
+async def test_modern_set_balance_posts_typed_eq_wrapper(monkeypatch, hass) -> None:
+    """Balance writes should update the typed EQ wrapper."""
+    captured = {}
+
+    async def fake_get_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile"]
+        return {
+            "type": "kefEqProfile",
+            "kefEqProfile": copy.deepcopy(EQ_PROFILE_VALUE["kefEqProfile"]),
+        }
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["path"] = path
+        captured["role"] = role
+        captured["value"] = value
+
+    monkeypatch.setattr(ModernKefClient, "_get_path_item", fake_get_path_item)
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_balance(15)
+
+    assert captured["value"]["kefEqProfile"]["dspInfo"]["balance"] == 15
+
+
+async def test_modern_set_bass_extension_posts_typed_eq_wrapper(
+    monkeypatch, hass
+) -> None:
+    """Bass-extension writes should update the typed EQ wrapper."""
+    captured = {}
+
+    async def fake_get_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile"]
+        return {
+            "type": "kefEqProfile",
+            "kefEqProfile": copy.deepcopy(EQ_PROFILE_VALUE["kefEqProfile"]),
+        }
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["path"] = path
+        captured["role"] = role
+        captured["value"] = value
+
+    monkeypatch.setattr(ModernKefClient, "_get_path_item", fake_get_path_item)
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_bass_extension("extra")
+
+    assert captured["value"]["kefEqProfile"]["dspInfo"]["bassExtension"] == "extra"

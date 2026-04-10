@@ -14,7 +14,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CONF_ENABLE_DIAGNOSTICS,
-    CONF_ENABLE_EQ_SENSORS,
     DEFAULT_ENABLE_DIAGNOSTICS,
 )
 from .coordinator import KefConfigEntry, KefCoordinator
@@ -27,7 +26,6 @@ class KefSensorDescription(SensorEntityDescription):
     """Describe a KEF sensor."""
 
     value_fn: Callable[[KefSnapshot], Any]
-    requires_eq: bool = False
     diagnostics_only: bool = False
 
 
@@ -91,52 +89,6 @@ SENSORS: tuple[KefSensorDescription, ...] = (
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    KefSensorDescription(
-        key="balance",
-        name="Balance",
-        value_fn=lambda data: data.eq_profile.balance if data.eq_profile else None,
-        requires_eq=True,
-        entity_category=EntityCategory.CONFIG,
-    ),
-    KefSensorDescription(
-        key="bass_extension",
-        name="Bass extension",
-        value_fn=lambda data: (
-            data.eq_profile.bass_extension if data.eq_profile else None
-        ),
-        requires_eq=True,
-        entity_category=EntityCategory.CONFIG,
-    ),
-    KefSensorDescription(
-        key="treble_amount",
-        name="Treble amount",
-        native_unit_of_measurement="steps",
-        value_fn=lambda data: (
-            data.eq_profile.treble_amount if data.eq_profile else None
-        ),
-        requires_eq=True,
-        entity_category=EntityCategory.CONFIG,
-    ),
-    KefSensorDescription(
-        key="subwoofer_gain",
-        name="Subwoofer gain",
-        native_unit_of_measurement="steps",
-        value_fn=lambda data: (
-            data.eq_profile.subwoofer_gain if data.eq_profile else None
-        ),
-        requires_eq=True,
-        entity_category=EntityCategory.CONFIG,
-    ),
-    KefSensorDescription(
-        key="high_pass_frequency",
-        name="High-pass frequency",
-        native_unit_of_measurement="steps",
-        value_fn=lambda data: (
-            data.eq_profile.high_pass_frequency if data.eq_profile else None
-        ),
-        requires_eq=True,
-        entity_category=EntityCategory.CONFIG,
-    ),
 )
 
 
@@ -151,13 +103,10 @@ async def async_setup_entry(
         CONF_ENABLE_DIAGNOSTICS,
         DEFAULT_ENABLE_DIAGNOSTICS,
     )
-    enable_eq_sensors = entry.options.get(CONF_ENABLE_EQ_SENSORS, True)
 
     entities = []
     for description in SENSORS:
         if description.diagnostics_only and not enable_diagnostics:
-            continue
-        if description.requires_eq and not enable_eq_sensors:
             continue
         entities.append(KefSensor(coordinator, description))
     async_add_entities(entities)

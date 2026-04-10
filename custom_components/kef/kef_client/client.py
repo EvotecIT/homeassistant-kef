@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 import socket
@@ -202,6 +203,42 @@ class BaseKefClient(ABC):
         volume: int,
     ) -> None:
         """Set the startup volume for a specific source."""
+
+    @abstractmethod
+    async def async_set_balance(self, value: int) -> None:
+        """Set the EQ balance."""
+
+    @abstractmethod
+    async def async_set_bass_extension(self, value: str) -> None:
+        """Set the EQ bass extension."""
+
+    @abstractmethod
+    async def async_set_treble_amount(self, value: int) -> None:
+        """Set the EQ treble amount."""
+
+    @abstractmethod
+    async def async_set_subwoofer_gain(self, value: int) -> None:
+        """Set the EQ subwoofer gain."""
+
+    @abstractmethod
+    async def async_set_desk_mode_enabled(self, enabled: bool) -> None:
+        """Enable or disable desk mode."""
+
+    @abstractmethod
+    async def async_set_wall_mode_enabled(self, enabled: bool) -> None:
+        """Enable or disable wall mode."""
+
+    @abstractmethod
+    async def async_set_phase_correction_enabled(self, enabled: bool) -> None:
+        """Enable or disable phase correction."""
+
+    @abstractmethod
+    async def async_set_high_pass_mode_enabled(self, enabled: bool) -> None:
+        """Enable or disable high-pass mode."""
+
+    @abstractmethod
+    async def async_set_high_pass_frequency(self, value: int) -> None:
+        """Set the high-pass frequency step."""
 
     @abstractmethod
     async def async_set_master_channel(self, channel: str) -> None:
@@ -683,6 +720,60 @@ class ModernKefClient(BaseKefClient):
             value={"type": "i32_", "i32_": max(0, min(100, volume))},
         )
 
+    async def async_set_balance(self, value: int) -> None:
+        """Set the EQ balance."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("balance", max(0, min(60, value)))
+        )
+
+    async def async_set_bass_extension(self, value: str) -> None:
+        """Set the EQ bass extension."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("bassExtension", value)
+        )
+
+    async def async_set_treble_amount(self, value: int) -> None:
+        """Set the EQ treble amount."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("trebleAmount", max(0, min(16, value)))
+        )
+
+    async def async_set_subwoofer_gain(self, value: int) -> None:
+        """Set the EQ subwoofer gain."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("subwooferGain", max(0, min(20, value)))
+        )
+
+    async def async_set_desk_mode_enabled(self, enabled: bool) -> None:
+        """Enable or disable desk mode."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("deskMode", enabled)
+        )
+
+    async def async_set_wall_mode_enabled(self, enabled: bool) -> None:
+        """Enable or disable wall mode."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("wallMode", enabled)
+        )
+
+    async def async_set_phase_correction_enabled(self, enabled: bool) -> None:
+        """Enable or disable phase correction."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("phaseCorrection", enabled)
+        )
+
+    async def async_set_high_pass_mode_enabled(self, enabled: bool) -> None:
+        """Enable or disable high-pass mode."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("highPassMode", enabled)
+        )
+
+    async def async_set_high_pass_frequency(self, value: int) -> None:
+        """Set the high-pass frequency step."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("highPassModeFreq", max(0, min(10, value)))
+        )
+
     async def async_set_master_channel(self, channel: str) -> None:
         """Set the master channel assignment."""
         await self._set_data(
@@ -744,6 +835,24 @@ class ModernKefClient(BaseKefClient):
         if not isinstance(payload, list) or not payload:
             raise KefResponseError(f"Unexpected KEF payload for {path}")
         return payload[0]
+
+    async def _update_eq_profile(self, mutator) -> None:
+        """Fetch, mutate, and write back the typed EQ profile wrapper."""
+        payload = await self._get_path_item(PROBE_PATHS["eq_profile"], roles="value")
+        if not isinstance(payload, dict) or payload.get("type") != "kefEqProfile":
+            raise KefResponseError("Unexpected KEF EQ profile payload")
+
+        wrapper = copy.deepcopy(payload)
+        profile = wrapper.get("kefEqProfile")
+        if not isinstance(profile, dict):
+            raise KefResponseError("Unexpected KEF EQ profile wrapper")
+
+        dsp_info = profile.get("dspInfo")
+        if not isinstance(dsp_info, dict):
+            raise KefResponseError("Unexpected KEF EQ dspInfo payload")
+
+        mutator(dsp_info)
+        await self._set_data(PROBE_PATHS["eq_profile"], role="value", value=wrapper)
 
     async def _set_data(self, path: str, *, role: str, value: Any) -> None:
         """Set a value on the speaker."""
@@ -1195,6 +1304,54 @@ class LegacyBinaryClient(BaseKefClient):
         """Legacy speakers do not expose per-source startup-volume settings."""
         raise KefUnsupportedDeviceError(
             "Per-source startup volume is not supported for legacy KEF"
+        )
+
+    async def async_set_balance(self, value: int) -> None:
+        """Legacy speakers do not expose EQ balance configuration."""
+        raise KefUnsupportedDeviceError("EQ balance is not supported for legacy KEF")
+
+    async def async_set_bass_extension(self, value: str) -> None:
+        """Legacy speakers do not expose bass-extension configuration."""
+        raise KefUnsupportedDeviceError(
+            "Bass extension is not supported for legacy KEF"
+        )
+
+    async def async_set_treble_amount(self, value: int) -> None:
+        """Legacy speakers do not expose treble configuration."""
+        raise KefUnsupportedDeviceError(
+            "Treble amount is not supported for legacy KEF"
+        )
+
+    async def async_set_subwoofer_gain(self, value: int) -> None:
+        """Legacy speakers do not expose subwoofer-gain configuration."""
+        raise KefUnsupportedDeviceError(
+            "Subwoofer gain is not supported for legacy KEF"
+        )
+
+    async def async_set_desk_mode_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose desk-mode configuration."""
+        raise KefUnsupportedDeviceError("Desk mode is not supported for legacy KEF")
+
+    async def async_set_wall_mode_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose wall-mode configuration."""
+        raise KefUnsupportedDeviceError("Wall mode is not supported for legacy KEF")
+
+    async def async_set_phase_correction_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose phase-correction configuration."""
+        raise KefUnsupportedDeviceError(
+            "Phase correction is not supported for legacy KEF"
+        )
+
+    async def async_set_high_pass_mode_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose high-pass configuration."""
+        raise KefUnsupportedDeviceError(
+            "High-pass mode is not supported for legacy KEF"
+        )
+
+    async def async_set_high_pass_frequency(self, value: int) -> None:
+        """Legacy speakers do not expose high-pass-frequency configuration."""
+        raise KefUnsupportedDeviceError(
+            "High-pass frequency is not supported for legacy KEF"
         )
 
     async def async_set_master_channel(self, channel: str) -> None:
