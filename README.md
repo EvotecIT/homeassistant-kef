@@ -4,37 +4,24 @@
 [![Validate](https://img.shields.io/github/actions/workflow/status/EvotecIT/homeassistant-kef/validate.yml?branch=main&style=for-the-badge&label=Validate)](https://github.com/EvotecIT/homeassistant-kef/actions/workflows/validate.yml)
 [![Hassfest](https://img.shields.io/github/actions/workflow/status/EvotecIT/homeassistant-kef/hassfest.yml?branch=main&style=for-the-badge&label=Hassfest)](https://github.com/EvotecIT/homeassistant-kef/actions/workflows/hassfest.yml)
 
-Modern, local-first KEF support for Home Assistant. The integration is built to support both modern HTTP-based KEF speakers such as LSX II and older first-generation models through separate transports in one codebase.
+Local-first KEF support for Home Assistant, built to support both newer KEF speakers and older generations in one integration.
 
-## Highlights
+![KEF integration overview](assets/kef-overview.png)
 
-- HACS-ready custom integration with config flow and zeroconf discovery
-- Local control without depending on `aiokef` or `pykefcontrol`
-- Modern LSX II-era backend plus an in-repo legacy transport
-- Rich Home Assistant entities for playback, startup-volume behavior, standby settings, LEDs, and diagnostics
-- Designed so the protocol layer can later be extracted into a reusable Python package
+## 🎯 What This Is
 
-## Installation
+This project is a custom KEF integration for Home Assistant with a strong bias toward:
 
-### HACS
+- local control
+- clean Home Assistant setup
+- no dependency on external KEF transport libraries
+- one codebase for modern and legacy KEF families
 
-1. Open HACS.
-2. Add `https://github.com/EvotecIT/homeassistant-kef` as a custom repository of type `Integration`.
-3. Install `KEF`.
-4. Restart Home Assistant.
-5. Add the integration from `Settings -> Devices & services`.
-
-### Manual
-
-1. Copy [custom_components/kef](C:/Support/GitHub/homeassistant-kef/custom_components/kef) into your Home Assistant `config/custom_components` directory.
-2. Restart Home Assistant.
-3. Add the integration from `Settings -> Devices & services`.
-
-## Supported Direction
+## 🔊 Device Support Direction
 
 ### Modern KEF family
 
-The main focus today is the local HTTP API used by speakers such as:
+The most mature support today is for speakers using KEF's newer local HTTP API, including:
 
 - LSX II
 - LSX II LT
@@ -42,70 +29,68 @@ The main focus today is the local HTTP API used by speakers such as:
 - LS60
 - XIO
 
-### Legacy KEF family
+### Older KEF family
 
-The repo also contains an in-repo legacy binary transport for older KEF speakers. That path is intentionally kept separate so we do not have to depend on external transport libraries to support first-generation hardware.
+Older first-generation KEF speakers matter too. This repo already includes a separate legacy transport path so the integration can support earlier LSX / LS50 Wireless-style devices without forcing them through the newer API model.
 
-## What It Exposes
+Current live validation is strongest on LSX II, but broad KEF coverage is the goal, not just the newest models.
 
-- `media_player` for playback, source selection, power, volume, mute
-- configuration `switch`, `select`, and `number` entities for supported modern-speaker settings
-- optional diagnostic and EQ read-only entities
+## ✨ What You Get
 
-## Repository Layout
+- zeroconf discovery and UI setup
+- media player controls
+- source selection
+- volume and mute
+- startup-volume controls
+- standby and wake-source settings
+- LED and hardware behavior controls where supported
+- optional diagnostics
 
-### Reusable Python protocol layer
+## 🏠 Installation
 
-The reusable KEF client layer currently lives inside the integration and is written to be extractable later:
+### HACS
 
-- [api.py](C:/Support/GitHub/homeassistant-kef/custom_components/kef/api.py)
-- [models.py](C:/Support/GitHub/homeassistant-kef/custom_components/kef/models.py)
-- [exceptions.py](C:/Support/GitHub/homeassistant-kef/custom_components/kef/exceptions.py)
+1. Open HACS.
+2. Add `https://github.com/EvotecIT/homeassistant-kef` as a custom repository of type `Integration`.
+3. Install `KEF`.
+4. Restart Home Assistant.
+5. Go to `Settings -> Devices & services` and add `KEF`.
 
-This layer is responsible for:
+### Manual
 
-- backend detection
-- modern HTTP transport
-- legacy binary transport
-- payload parsing and capability normalization
+1. Copy the `custom_components/kef` folder into your Home Assistant `config/custom_components` directory.
+2. Restart Home Assistant.
+3. Add the integration from `Settings -> Devices & services`.
 
-### Home Assistant integration layer
+## ✅ Current Status
 
-The Home Assistant integration lives in:
+- strongest real-device validation today: LSX II
+- modern KEF support is already practical and expanding
+- legacy KEF support is part of the design, not an afterthought
+- compatibility is handled by transport and capability detection, not just hardcoded firmware guesses
 
-- [config_flow.py](C:/Support/GitHub/homeassistant-kef/custom_components/kef/config_flow.py)
-- [coordinator.py](C:/Support/GitHub/homeassistant-kef/custom_components/kef/coordinator.py)
-- [media_player.py](C:/Support/GitHub/homeassistant-kef/custom_components/kef/media_player.py)
-- [switch.py](C:/Support/GitHub/homeassistant-kef/custom_components/kef/switch.py)
-- [select.py](C:/Support/GitHub/homeassistant-kef/custom_components/kef/select.py)
-- [number.py](C:/Support/GitHub/homeassistant-kef/custom_components/kef/number.py)
-- [sensor.py](C:/Support/GitHub/homeassistant-kef/custom_components/kef/sensor.py)
-- [binary_sensor.py](C:/Support/GitHub/homeassistant-kef/custom_components/kef/binary_sensor.py)
+The current LSX II investigation notes are in `docs/kef-lsx2-investigation.md`.
 
-## Live Investigation Notes
+## 🧱 Project Structure
 
-The modern LSX II API work and live validation notes are documented here:
+This repo is intentionally split into two layers:
 
-- [kef-lsx2-investigation.md](C:/Support/GitHub/homeassistant-kef/docs/kef-lsx2-investigation.md)
+- a reusable Python protocol/client layer for KEF local APIs
+- the Home Assistant integration layer built on top of it
 
-## Current Direction
+That makes it easier to support both modern and older KEF devices and leaves room to extract a standalone Python library later if the protocol layer matures enough.
 
-- keep the transport layer dependency-free
-- add capability-based entity exposure instead of firmware-only assumptions
-- improve parity for both modern and legacy families
-- keep a clean future path to a standalone `python-kef-local` style library
+## 🛣️ Roadmap
 
-## Development
+- improve older KEF coverage and real-device validation
+- keep extending modern KEF settings safely
+- expose capabilities based on what the speaker really supports
+- continue cleaning up entity presentation for the best Home Assistant experience
 
-Install test dependencies:
+## 🛠️ Development
 
 ```bash
 python -m pip install -e .[test]
-```
-
-Run checks:
-
-```bash
 ruff check .
 python -m compileall custom_components tests
 pytest
@@ -113,10 +98,10 @@ pytest
 
 Note:
 
-- the full Home Assistant pytest stack is expected to run in Ubuntu CI
-- on Windows, `pytest-homeassistant-custom-component` imports `fcntl`, which blocks complete local HA pytest runs
+- the full Home Assistant pytest stack runs best in Linux CI
+- on Windows, `pytest-homeassistant-custom-component` imports `fcntl`, so complete local HA pytest runs are limited
 
-## Support
+## ❤️ Support
 
 - Issues: [GitHub Issues](https://github.com/EvotecIT/homeassistant-kef/issues)
 - Source: [GitHub Repository](https://github.com/EvotecIT/homeassistant-kef)
