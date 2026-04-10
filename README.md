@@ -41,6 +41,7 @@ Current live validation is strongest on LSX II, but broad KEF coverage is the go
 - media player controls
 - source selection
 - volume and mute
+- source-aware playback controls on modern KEF sources
 - startup-volume controls
 - standby and wake-source settings
 - LED and hardware behavior controls where supported

@@ -30,14 +30,16 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
     """Representation of a KEF speaker."""
 
     _attr_icon = "mdi:speaker-wireless"
-    _attr_supported_features = (
+    _base_supported_features = (
         MediaPlayerEntityFeature.TURN_ON
         | MediaPlayerEntityFeature.TURN_OFF
         | MediaPlayerEntityFeature.VOLUME_SET
         | MediaPlayerEntityFeature.VOLUME_STEP
         | MediaPlayerEntityFeature.VOLUME_MUTE
         | MediaPlayerEntityFeature.SELECT_SOURCE
-        | MediaPlayerEntityFeature.PLAY
+    )
+    _legacy_transport_features = (
+        MediaPlayerEntityFeature.PLAY
         | MediaPlayerEntityFeature.PAUSE
         | MediaPlayerEntityFeature.NEXT_TRACK
         | MediaPlayerEntityFeature.PREVIOUS_TRACK
@@ -55,6 +57,30 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
     def available(self) -> bool:
         """Return whether the entity is available."""
         return self.coordinator.last_update_success
+
+    @property
+    def supported_features(self) -> MediaPlayerEntityFeature:
+        """Return the supported features for the current source and backend."""
+        snapshot = self.coordinator.data
+        features = self._base_supported_features
+
+        if snapshot.device.backend.value == "legacy":
+            return features | self._legacy_transport_features
+
+        playback = snapshot.playback
+        if playback is None:
+            return features
+
+        controls = playback.controls
+        if controls.get("pause"):
+            features |= (
+                MediaPlayerEntityFeature.PLAY | MediaPlayerEntityFeature.PAUSE
+            )
+        if controls.get("next"):
+            features |= MediaPlayerEntityFeature.NEXT_TRACK
+        if controls.get("previous"):
+            features |= MediaPlayerEntityFeature.PREVIOUS_TRACK
+        return features
 
     @property
     def source_list(self) -> list[str]:

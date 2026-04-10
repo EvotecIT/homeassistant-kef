@@ -44,7 +44,8 @@ This checklist tracks what the repository already covers and what still needs wo
   - [x] `event/pollQueue`
   - [x] coordinator refresh integration
   - [ ] broaden event subscriptions and error recovery for more KEF families
-- [ ] Make playback command support more source-aware in the UI
+- [x] Make playback command support more source-aware in the UI for modern KEF sources
+- [ ] Extend source-aware transport behavior further if legacy devices need different handling
 - [ ] Improve capability detection per device family instead of relying only on model assumptions
 
 ## Compatibility Work
