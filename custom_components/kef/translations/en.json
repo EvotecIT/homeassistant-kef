@@ -50,14 +50,36 @@
       "wifi_signal_level": { "name": "Wi-Fi signal level" },
       "wifi_ssid": { "name": "Wi-Fi SSID" },
       "wifi_frequency": { "name": "Wi-Fi frequency" },
-      "wifi_bssid": { "name": "Wi-Fi BSSID" },
+      "wifi_bssid": { "name": "Wi-Fi BSSID" }
+    },
+    "number": {
       "balance": { "name": "Balance" },
-      "bass_extension": { "name": "Bass extension" },
       "treble_amount": { "name": "Treble amount" },
       "subwoofer_gain": { "name": "Subwoofer gain" },
-      "high_pass_frequency": { "name": "High-pass frequency" }
+      "high_pass_frequency": { "name": "High-pass frequency" },
+      "default_volume_global": { "name": "Startup volume" },
+      "maximum_volume": { "name": "Maximum volume" },
+      "volume_step": { "name": "Volume step" },
+      "fixed_volume_level": { "name": "Fixed volume level" }
     },
-    "binary_sensor": {
+    "select": {
+      "standby_mode": { "name": "Standby mode" },
+      "wake_source": { "name": "Wake source" },
+      "master_channel": { "name": "Master channel" },
+      "bass_extension": { "name": "Bass extension" }
+    },
+    "switch": {
+      "startup_tone": { "name": "Startup tone" },
+      "auto_switch_hdmi": { "name": "Auto-switch to HDMI" },
+      "front_led": { "name": "Front LED" },
+      "standby_led": { "name": "Standby LED" },
+      "top_panel": { "name": "Top touch panel" },
+      "usb_charging": { "name": "USB charging" },
+      "startup_volume": { "name": "Use startup volume" },
+      "per_input_startup_volume": { "name": "Per-input startup volumes" },
+      "volume_limit": { "name": "Volume limiter" },
+      "subwoofer_wake": { "name": "Wake subwoofer on startup" },
+      "kw1_wake": { "name": "Wake KW1 subwoofer on startup" },
       "desk_mode": { "name": "Desk mode" },
       "wall_mode": { "name": "Wall mode" },
       "phase_correction": { "name": "Phase correction" },
