@@ -7,6 +7,7 @@ from .client import (
     async_create_client,
 )
 from .exceptions import (
+    KefAuthenticationRequiredError,
     KefConnectionError,
     KefError,
     KefResponseError,
@@ -16,6 +17,7 @@ from .models import (
     KefBackend,
     KefDeviceInfo,
     KefEqProfile,
+    KefFirmwareUpdateInfo,
     KefPlaybackInfo,
     KefSnapshot,
     KefWifiInfo,
@@ -24,10 +26,12 @@ from .models import (
 __all__ = [
     "BaseKefClient",
     "KefBackend",
+    "KefAuthenticationRequiredError",
     "KefConnectionError",
     "KefDeviceInfo",
     "KefEqProfile",
     "KefError",
+    "KefFirmwareUpdateInfo",
     "KefPlaybackInfo",
     "KefResponseError",
     "KefSnapshot",

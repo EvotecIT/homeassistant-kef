@@ -6,7 +6,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, OptionsFlow
-from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
@@ -26,7 +26,11 @@ from .const import (
     MAX_SCAN_INTERVAL_SECONDS,
     MIN_SCAN_INTERVAL_SECONDS,
 )
-from .exceptions import KefError, KefUnsupportedDeviceError
+from .exceptions import (
+    KefAuthenticationRequiredError,
+    KefError,
+    KefUnsupportedDeviceError,
+)
 
 
 class KefConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -42,6 +46,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the flow."""
         self._host = ""
+        self._password = ""
         self._title = "KEF"
         self._errors: dict[str, str] = {}
         self._entry_data: dict[str, Any] = {}
@@ -52,13 +57,19 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._host = user_input[CONF_HOST]
+            self._password = user_input.get(CONF_PASSWORD, "")
             result = await self._async_validate_host()
             if result is not None:
                 return result
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({vol.Required(CONF_HOST): str}),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_HOST): str,
+                    vol.Optional(CONF_PASSWORD, default=self._password): str,
+                }
+            ),
             errors=self._errors,
         )
 
@@ -69,6 +80,10 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._host = user_input[CONF_HOST]
+            self._password = user_input.get(
+                CONF_PASSWORD,
+                entry.options.get(CONF_PASSWORD, entry.data.get(CONF_PASSWORD, "")),
+            )
             result = await self._async_validate_host()
             if result is not None:
                 return self.async_update_reload_and_abort(
@@ -79,7 +94,16 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=vol.Schema(
-                {vol.Required(CONF_HOST, default=entry.data[CONF_HOST]): str}
+                {
+                    vol.Required(CONF_HOST, default=entry.data[CONF_HOST]): str,
+                    vol.Optional(
+                        CONF_PASSWORD,
+                        default=entry.options.get(
+                            CONF_PASSWORD,
+                            entry.data.get(CONF_PASSWORD, ""),
+                        ),
+                    ): str,
+                }
             ),
             errors=self._errors,
         )
@@ -137,8 +161,15 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         session = async_get_clientsession(self.hass)
 
         try:
-            client = await async_create_client(self._host, session)
+            client = await async_create_client(
+                self._host,
+                session,
+                password=self._password,
+            )
             device = await client.async_identify()
+        except KefAuthenticationRequiredError:
+            self._errors["base"] = "invalid_auth"
+            return None
         except KefUnsupportedDeviceError:
             self._errors["base"] = "unsupported"
             return None
@@ -155,6 +186,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_TCP_PORT: DEFAULT_LEGACY_PORT,
             CONF_BACKEND: device.backend.value,
             CONF_DEVICE_ID: device.unique_id,
+            CONF_PASSWORD: self._password,
         }
         return self.async_create_entry(title=device.device_name, data=self._entry_data)
 
@@ -175,6 +207,13 @@ class KefOptionsFlow(OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 {
+                    vol.Optional(
+                        CONF_PASSWORD,
+                        default=self.config_entry.options.get(
+                            CONF_PASSWORD,
+                            self.config_entry.data.get(CONF_PASSWORD, ""),
+                        ),
+                    ): str,
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
                         default=self.config_entry.options.get(

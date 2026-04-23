@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+AUTH_MODE_ALL = "all"
+AUTH_MODE_NONE = "none"
+AUTH_MODE_SETDATA = "setData"
+
 DEFAULT_PORT = 80
 DEFAULT_LEGACY_PORT = 50001
 
@@ -57,6 +61,7 @@ PROBE_PATHS = {
     "release_text": "settings:/releasetext",
     "mac": "settings:/system/primaryMacAddress",
     "model_code": "settings:/kef/host/modelName",
+    "webserver_auth_mode": "settings:/webserver/authMode",
     "speaker_status": "settings:/kef/host/speakerStatus",
     "source": "settings:/kef/play/physicalSource",
     "cable_mode": "settings:/kef/host/cableMode",
@@ -64,6 +69,7 @@ PROBE_PATHS = {
     "volume": "player:volume",
     "mute": "settings:/mediaPlayer/mute",
     "play_mode": "settings:/mediaPlayer/playMode",
+    "firmware_update_status": "firmwareupdate:updateStatus",
     "player_data": "player:player/data",
     "play_time": "player:player/data/playTime",
     "eq_profile": "kef:eqProfile",
@@ -93,6 +99,7 @@ EVENT_SUBSCRIPTIONS = (
     {"path": PROBE_PATHS["volume"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["mute"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["play_mode"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["firmware_update_status"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["player_data"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["play_time"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["eq_profile"], "type": "itemWithValue"},

@@ -8,7 +8,16 @@ from homeassistant.components.diagnostics import async_redact_data
 
 from .coordinator import KefConfigEntry
 
-TO_REDACT = {"host", "mac_address", "ip", "bssid", "ssid", "dns", "gateways"}
+TO_REDACT = {
+    "bssid",
+    "dns",
+    "gateways",
+    "host",
+    "ip",
+    "mac_address",
+    "password",
+    "ssid",
+}
 
 
 async def async_get_config_entry_diagnostics(hass, entry: KefConfigEntry):

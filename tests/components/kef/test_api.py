@@ -8,10 +8,13 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from custom_components.kef.api import ModernKefClient
 from custom_components.kef.const import (
+    AUTH_MODE_ALL,
+    AUTH_MODE_SETDATA,
     EVENT_MODIFY_QUEUE_ENDPOINT,
     EVENT_POLL_QUEUE_ENDPOINT,
     PROBE_PATHS,
 )
+from custom_components.kef.exceptions import KefResponseError
 from tests.conftest import (
     AUTO_SWITCH_HDMI_VALUE,
     CABLE_MODE_VALUE,
@@ -21,6 +24,7 @@ from tests.conftest import (
     DISABLE_FRONT_STANDBY_LED_VALUE,
     DISABLE_TOP_PANEL_VALUE,
     EQ_PROFILE_VALUE,
+    FIRMWARE_UPDATE_STATUS_VALUE,
     FIXED_VOLUME_LEVEL_VALUE,
     MAC_VALUE,
     MASTER_CHANNEL_VALUE,
@@ -74,6 +78,7 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
         PROBE_PATHS["volume"]: VOLUME_VALUE["i32_"],
         PROBE_PATHS["mute"]: MUTE_VALUE["bool_"],
         PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
+        PROBE_PATHS["firmware_update_status"]: FIRMWARE_UPDATE_STATUS_VALUE,
         PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
         PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
         PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
@@ -136,7 +141,15 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     assert snapshot.playback.codec == "pcm"
     assert snapshot.playback.stream_channels == "2.0"
     assert snapshot.eq_profile is not None
+    assert snapshot.eq_profile.profile_id is None
     assert snapshot.eq_profile.balance == 30
+    assert snapshot.eq_profile.audio_polarity == "normal"
+    assert snapshot.eq_profile.subwoofer_polarity == "normal"
+    assert snapshot.eq_profile.subwoofer_preset == "custom"
+    assert snapshot.eq_profile.sub_out_low_pass_frequency == 8
+    assert snapshot.firmware_update is not None
+    assert snapshot.firmware_update.state == "newUpdateAvailable"
+    assert snapshot.firmware_update.available_version == "3.0.135.0x60acbcf"
     assert snapshot.wifi_info is not None
     assert snapshot.wifi_info.ssid == "EvotecLab"
     assert snapshot.wifi_info.signal_level == -49
@@ -306,6 +319,7 @@ async def test_modern_turn_on_prefers_last_active_source(monkeypatch, hass) -> N
         PROBE_PATHS["volume"]: 80,
         PROBE_PATHS["mute"]: False,
         PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
+        PROBE_PATHS["firmware_update_status"]: FIRMWARE_UPDATE_STATUS_VALUE,
         PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
         PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
         PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
@@ -379,6 +393,7 @@ async def test_modern_unknown_model_uses_default_sources(monkeypatch, hass) -> N
         PROBE_PATHS["volume"]: VOLUME_VALUE["i32_"],
         PROBE_PATHS["mute"]: MUTE_VALUE["bool_"],
         PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
+        PROBE_PATHS["firmware_update_status"]: FIRMWARE_UPDATE_STATUS_VALUE,
         PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
         PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
         PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
@@ -456,6 +471,7 @@ async def test_modern_optional_network_info_is_absent_when_unavailable(
         PROBE_PATHS["volume"]: VOLUME_VALUE["i32_"],
         PROBE_PATHS["mute"]: MUTE_VALUE["bool_"],
         PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
+        PROBE_PATHS["firmware_update_status"]: FIRMWARE_UPDATE_STATUS_VALUE,
         PROBE_PATHS["player_data"]: PLAYER_DATA_VALUE,
         PROBE_PATHS["play_time"]: PLAY_TIME_VALUE["i64_"],
         PROBE_PATHS["eq_profile"]: EQ_PROFILE_VALUE,
@@ -781,6 +797,35 @@ async def test_modern_set_master_channel_posts_typed_payload(monkeypatch, hass) 
     }
 
 
+async def test_modern_set_cable_mode_posts_typed_payload(monkeypatch, hass) -> None:
+    """Modern client should post a typed payload for cable mode."""
+    captured = {}
+
+    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+        captured["method"] = method
+        captured["endpoint"] = endpoint
+        captured["json_payload"] = json_payload
+        return {}
+
+    monkeypatch.setattr(ModernKefClient, "_request_json", fake_request)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_cable_mode("wireless")
+
+    assert captured == {
+        "method": "POST",
+        "endpoint": "/setData",
+        "json_payload": {
+            "path": "settings:/kef/host/cableMode",
+            "role": "value",
+            "value": {
+                "type": "kefCableMode",
+                "kefCableMode": "wireless",
+            },
+        },
+    }
+
+
 async def test_modern_set_fixed_volume_level_posts_typed_payload(
     monkeypatch, hass
 ) -> None:
@@ -887,3 +932,207 @@ async def test_modern_set_bass_extension_posts_typed_eq_wrapper(
     await client.async_set_bass_extension("extra")
 
     assert captured["value"]["kefEqProfile"]["dspInfo"]["bassExtension"] == "extra"
+
+
+async def test_modern_get_firmware_update_status_parses_payload(
+    monkeypatch, hass
+) -> None:
+    """Firmware update status should be parsed into a typed model."""
+
+    async def fake_get_optional_value(self, path, *, typed_key=None):
+        assert path == PROBE_PATHS["firmware_update_status"]
+        return FIRMWARE_UPDATE_STATUS_VALUE
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_value",
+        fake_get_optional_value,
+    )
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    status = await client.async_get_firmware_update_status()
+
+    assert status is not None
+    assert status.state == "newUpdateAvailable"
+    assert status.available_version == "3.0.135.0x60acbcf"
+    assert status.is_available is True
+
+
+async def test_modern_check_for_firmware_update_activates_path(
+    monkeypatch, hass
+) -> None:
+    """Checking for updates should trigger the activate endpoint and poll status."""
+    calls = []
+
+    async def fake_activate(self, path, value=None):
+        calls.append(("activate", path, value))
+        return {}
+
+    async def fake_poll(self, *, attempts=10, delay_seconds=1.0):
+        calls.append(("poll", attempts, delay_seconds))
+        return None
+
+    monkeypatch.setattr(ModernKefClient, "_activate_path", fake_activate)
+    monkeypatch.setattr(ModernKefClient, "_poll_firmware_update_status", fake_poll)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_check_for_firmware_update()
+
+    assert calls[0] == ("activate", "firmwareupdate:checkForUpdate", None)
+    assert calls[1][0] == "poll"
+
+
+async def test_modern_install_firmware_update_tries_primary_endpoint(
+    monkeypatch, hass
+) -> None:
+    """Installing firmware should trigger the online-update download path."""
+    calls = []
+
+    async def fake_status(self):
+        return None
+
+    async def fake_check(self):
+        return type(
+            "Status",
+            (),
+            {"state": "newUpdateAvailable", "is_available": True},
+        )()
+
+    async def fake_activate(self, path, value=None):
+        calls.append((path, value))
+        return {}
+
+    async def fake_poll(self, *, attempts=10, delay_seconds=1.0):
+        calls.append(("poll", attempts))
+        return None
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "async_get_firmware_update_status",
+        fake_status,
+    )
+    monkeypatch.setattr(ModernKefClient, "async_check_for_firmware_update", fake_check)
+    monkeypatch.setattr(ModernKefClient, "_activate_path", fake_activate)
+    monkeypatch.setattr(ModernKefClient, "_poll_firmware_update_status", fake_poll)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_install_firmware_update()
+
+    assert calls[0] == ("firmwareupdate:downloadNewUpdate", None)
+    assert calls[1] == ("poll", 120)
+
+
+async def test_modern_request_json_uses_secure_post_for_setdata_mode(
+    monkeypatch, hass
+) -> None:
+    """Authenticated firmware 3.x speakers should encrypt POST writes."""
+    calls = []
+
+    async def fake_auth_mode(self):
+        return AUTH_MODE_SETDATA
+
+    async def fake_plain(self, method, endpoint, *, params=None, json_payload=None):
+        calls.append(("plain", method, endpoint))
+        return {}
+
+    async def fake_secure(self, method, endpoint, *, params=None, json_payload=None):
+        calls.append(("secure", method, endpoint, json_payload))
+        return {"ok": True}
+
+    monkeypatch.setattr(ModernKefClient, "_get_webserver_auth_mode", fake_auth_mode)
+    monkeypatch.setattr(ModernKefClient, "_request_json_plain", fake_plain)
+    monkeypatch.setattr(ModernKefClient, "_request_json_secure", fake_secure)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    response = await client._request_json(
+        "POST",
+        "/setData",
+        json_payload={
+            "path": PROBE_PATHS["cable_mode"],
+            "role": "value",
+            "value": {"type": "kefCableMode", "kefCableMode": "wired"},
+        },
+    )
+
+    assert response == {"ok": True}
+    assert calls == [
+        (
+            "secure",
+            "POST",
+            "/setData",
+            {
+                "path": PROBE_PATHS["cable_mode"],
+                "role": "value",
+                "value": {"type": "kefCableMode", "kefCableMode": "wired"},
+            },
+        )
+    ]
+
+
+async def test_modern_request_json_uses_secure_get_for_all_mode(
+    monkeypatch, hass
+) -> None:
+    """Fully protected speakers should encrypt GET reads too."""
+    calls = []
+
+    async def fake_auth_mode(self):
+        return AUTH_MODE_ALL
+
+    async def fake_plain(self, method, endpoint, *, params=None, json_payload=None):
+        calls.append(("plain", method, endpoint))
+        return {}
+
+    async def fake_secure(self, method, endpoint, *, params=None, json_payload=None):
+        calls.append(("secure", method, endpoint, params))
+        return [{"string_": "3.0.135.0x60acbcf", "type": "string_"}]
+
+    monkeypatch.setattr(ModernKefClient, "_get_webserver_auth_mode", fake_auth_mode)
+    monkeypatch.setattr(ModernKefClient, "_request_json_plain", fake_plain)
+    monkeypatch.setattr(ModernKefClient, "_request_json_secure", fake_secure)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    response = await client._request_json(
+        "GET",
+        "/getData",
+        params={"path": PROBE_PATHS["version"], "roles": "value", "_nocache": "1"},
+    )
+
+    assert response == [{"string_": "3.0.135.0x60acbcf", "type": "string_"}]
+    assert calls == [
+        (
+            "secure",
+            "GET",
+            "/getData",
+            {"path": PROBE_PATHS["version"], "roles": "value", "_nocache": "1"},
+        )
+    ]
+
+
+async def test_modern_get_webserver_auth_mode_defaults_to_none_on_missing_path(
+    monkeypatch, hass
+) -> None:
+    """Older firmware without the auth path should keep using plain requests."""
+
+    async def fake_plain(self, method, endpoint, *, params=None, json_payload=None):
+        raise KefResponseError("missing path")
+
+    monkeypatch.setattr(ModernKefClient, "_request_json_plain", fake_plain)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+
+    assert await client._get_webserver_auth_mode() == "none"
+
+
+async def test_modern_get_webserver_auth_mode_parses_setdata_value(
+    monkeypatch, hass
+) -> None:
+    """The webserver auth probe should parse KEF's typed auth-mode value."""
+
+    async def fake_plain(self, method, endpoint, *, params=None, json_payload=None):
+        return [{"webserverAuthMode": AUTH_MODE_SETDATA, "type": "webserverAuthMode"}]
+
+    monkeypatch.setattr(ModernKefClient, "_request_json_plain", fake_plain)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+
+    assert await client._get_webserver_auth_mode() == AUTH_MODE_SETDATA

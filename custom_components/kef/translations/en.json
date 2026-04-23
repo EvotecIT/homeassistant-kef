@@ -5,7 +5,8 @@
         "title": "Add KEF speaker",
         "description": "Enter the host or IP address of your KEF speaker.",
         "data": {
-          "host": "Host or IP address"
+          "host": "Host or IP address",
+          "password": "Web UI password"
         }
       },
       "confirm": {
@@ -16,12 +17,14 @@
         "title": "Reconfigure KEF",
         "description": "Update the network details for this KEF device.",
         "data": {
-          "host": "Host or IP address"
+          "host": "Host or IP address",
+          "password": "Web UI password"
         }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect to the KEF speaker",
+      "invalid_auth": "The KEF web UI password is invalid",
       "unsupported": "No supported KEF API was detected"
     },
     "abort": {
@@ -34,6 +37,7 @@
       "init": {
         "title": "KEF options",
         "data": {
+          "password": "Web UI password",
           "scan_interval": "Polling interval (seconds)",
           "enable_diagnostics": "Expose diagnostic sensors",
           "enable_eq_sensors": "Expose EQ read-only sensors (advanced)"
@@ -66,6 +70,7 @@
       "standby_mode": { "name": "Standby mode" },
       "wake_source": { "name": "Wake source" },
       "master_channel": { "name": "Master channel" },
+      "cable_mode": { "name": "Cable mode" },
       "bass_extension": { "name": "Bass extension" }
     },
     "switch": {
@@ -84,6 +89,9 @@
       "wall_mode": { "name": "Wall mode" },
       "phase_correction": { "name": "Phase correction" },
       "high_pass_mode": { "name": "High-pass mode" }
+    },
+    "update": {
+      "firmware": { "name": "Firmware" }
     }
   }
 }

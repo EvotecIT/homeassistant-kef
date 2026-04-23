@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from homeassistant import config_entries
-from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -15,6 +15,7 @@ from custom_components.kef.const import (
     CONF_TCP_PORT,
     DOMAIN,
 )
+from custom_components.kef.exceptions import KefAuthenticationRequiredError
 from tests.conftest import TEST_DEVICE_INFO, TEST_HOST
 
 
@@ -59,7 +60,68 @@ async def test_user_flow_creates_modern_entry(monkeypatch, hass) -> None:
         CONF_TCP_PORT: 50001,
         CONF_BACKEND: "modern",
         CONF_DEVICE_ID: "kef-84:17:15:04:43:8c",
+        CONF_PASSWORD: "",
     }
+
+
+async def test_user_flow_stores_web_password(monkeypatch, hass) -> None:
+    """Manual setup should persist the optional web UI password."""
+
+    async def fake_create_client(
+        host,
+        session,
+        *,
+        backend=None,
+        port=None,
+        password=None,
+        tcp_port=None,
+    ):
+        assert host == TEST_HOST
+        assert password == "secret"
+        return _FakeClient()
+
+    monkeypatch.setattr(
+        "custom_components.kef.config_flow.async_create_client",
+        fake_create_client,
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_USER},
+        data={CONF_HOST: TEST_HOST, CONF_PASSWORD: "secret"},
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_PASSWORD] == "secret"
+
+
+async def test_user_flow_surfaces_invalid_auth(monkeypatch, hass) -> None:
+    """Auth failures should be shown as invalid credentials."""
+
+    async def fake_create_client(
+        host,
+        session,
+        *,
+        backend=None,
+        port=None,
+        password=None,
+        tcp_port=None,
+    ):
+        raise KefAuthenticationRequiredError("bad password")
+
+    monkeypatch.setattr(
+        "custom_components.kef.config_flow.async_create_client",
+        fake_create_client,
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_USER},
+        data={CONF_HOST: TEST_HOST, CONF_PASSWORD: "wrong"},
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_auth"}
 
 
 async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) -> None:

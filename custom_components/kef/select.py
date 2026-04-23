@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     BASS_EXTENSION_OPTIONS,
+    CABLE_MODE_OPTIONS,
     MASTER_CHANNEL_OPTIONS,
     STANDBY_MODE_OPTIONS,
     WAKE_SOURCE_OPTIONS,
@@ -53,6 +54,17 @@ async def _async_set_master_channel(
     if client is None:
         return
     await client.async_set_master_channel(value)
+
+
+async def _async_set_cable_mode(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the cable mode."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_cable_mode(value)
 
 
 async def _async_set_bass_extension(
@@ -102,6 +114,15 @@ SELECTS: tuple[KefSelectDescription, ...] = (
         value_fn=lambda data: data.master_channel,
         async_set_fn=_async_set_master_channel,
         options_map=MASTER_CHANNEL_OPTIONS,
+    ),
+    KefSelectDescription(
+        key="cable_mode",
+        name="Cable mode",
+        icon="mdi:cable-data",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.cable_mode,
+        async_set_fn=_async_set_cable_mode,
+        options_map=CABLE_MODE_OPTIONS,
     ),
     KefSelectDescription(
         key="bass_extension",

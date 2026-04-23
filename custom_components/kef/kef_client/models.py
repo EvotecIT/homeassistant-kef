@@ -36,6 +36,47 @@ class KefPlaybackInfo:
 
 
 @dataclass(slots=True)
+class KefFirmwareUpdateInfo:
+    """Firmware-update information exposed by the modern API."""
+
+    state: str | None = None
+    download_progress: int | None = None
+    available_version: str | None = None
+    forced_update: bool | None = None
+    image_size: int | None = None
+    last_forced_version: str | None = None
+    url: str | None = None
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_modern_value(cls, value: dict[str, Any]) -> KefFirmwareUpdateInfo | None:
+        """Build firmware-update info from the modern API payload."""
+        update_info = value.get("firmwareUpdateStatus", {})
+        if not isinstance(update_info, dict) or not update_info:
+            return None
+
+        image = update_info.get("imageDescription", {})
+        if not isinstance(image, dict):
+            image = {}
+
+        return cls(
+            state=update_info.get("state"),
+            download_progress=update_info.get("downloadProgress"),
+            available_version=image.get("version"),
+            forced_update=image.get("forcedUpdate"),
+            image_size=image.get("imageSize"),
+            last_forced_version=image.get("lastForcedVersion"),
+            url=image.get("url"),
+            raw=update_info,
+        )
+
+    @property
+    def is_available(self) -> bool:
+        """Return whether a newer firmware image is available."""
+        return self.state in {"newUpdateAvailable", "updateAvailable"}
+
+
+@dataclass(slots=True)
 class KefWifiInfo:
     """Flattened KEF Wi-Fi information."""
 
@@ -67,6 +108,7 @@ class KefEqProfile:
 
     is_expert_mode: bool | None = None
     profile_name: str | None = None
+    profile_id: str | None = None
     balance: int | None = None
     bass_extension: str | None = None
     treble_amount: int | None = None
@@ -74,8 +116,17 @@ class KefEqProfile:
     high_pass_mode: bool | None = None
     high_pass_frequency: int | None = None
     desk_mode: bool | None = None
+    desk_mode_setting: int | None = None
     wall_mode: bool | None = None
+    wall_mode_setting: int | None = None
     phase_correction: bool | None = None
+    audio_polarity: str | None = None
+    subwoofer_polarity: str | None = None
+    is_kw1: bool | None = None
+    subwoofer_count: int | None = None
+    sub_enable_stereo: bool | None = None
+    subwoofer_preset: str | None = None
+    sub_out_low_pass_frequency: int | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -86,6 +137,7 @@ class KefEqProfile:
         return cls(
             is_expert_mode=profile.get("isExpertMode"),
             profile_name=profile.get("profileName") or None,
+            profile_id=profile.get("profileId") or None,
             balance=dsp_info.get("balance"),
             bass_extension=dsp_info.get("bassExtension"),
             treble_amount=dsp_info.get("trebleAmount"),
@@ -93,8 +145,17 @@ class KefEqProfile:
             high_pass_mode=dsp_info.get("highPassMode"),
             high_pass_frequency=dsp_info.get("highPassModeFreq"),
             desk_mode=dsp_info.get("deskMode"),
+            desk_mode_setting=dsp_info.get("deskModeSetting"),
             wall_mode=dsp_info.get("wallMode"),
+            wall_mode_setting=dsp_info.get("wallModeSetting"),
             phase_correction=dsp_info.get("phaseCorrection"),
+            audio_polarity=dsp_info.get("audioPolarity"),
+            subwoofer_polarity=dsp_info.get("subwooferPolarity"),
+            is_kw1=dsp_info.get("isKW1"),
+            subwoofer_count=dsp_info.get("subwooferCount"),
+            sub_enable_stereo=dsp_info.get("subEnableStereo"),
+            subwoofer_preset=dsp_info.get("subwooferPreset"),
+            sub_out_low_pass_frequency=dsp_info.get("subOutLPFreq"),
             raw=profile,
         )
 
@@ -130,6 +191,7 @@ class KefSnapshot:
     play_mode: str | None
     playback: KefPlaybackInfo | None
     eq_profile: KefEqProfile | None
+    firmware_update: KefFirmwareUpdateInfo | None
     wifi_info: KefWifiInfo | None
     standby_mode: str | None
     startup_tone_enabled: bool | None

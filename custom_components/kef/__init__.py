@@ -18,6 +18,7 @@ PLATFORMS = [
     Platform.NUMBER,
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
+    Platform.UPDATE,
 ]
 
 _ACTIVE_SENSOR_ENTITY_KEYS = {

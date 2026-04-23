@@ -10,6 +10,7 @@ from custom_components.kef.models import (
     KefBackend,
     KefDeviceInfo,
     KefEqProfile,
+    KefFirmwareUpdateInfo,
     KefPlaybackInfo,
     KefSnapshot,
     KefWifiInfo,
@@ -33,6 +34,20 @@ MASTER_CHANNEL_VALUE = {
 VOLUME_VALUE = {"type": "i32_", "i32_": 80}
 MUTE_VALUE = {"type": "bool_", "bool_": False}
 PLAY_MODE_VALUE = {"type": "playerPlayMode", "playerPlayMode": "normal"}
+FIRMWARE_UPDATE_STATUS_VALUE = {
+    "type": "firmwareUpdateStatus",
+    "firmwareUpdateStatus": {
+        "downloadProgress": 0,
+        "state": "newUpdateAvailable",
+        "imageDescription": {
+            "version": "3.0.135.0x60acbcf",
+            "forcedUpdate": False,
+            "imageSize": 0,
+            "lastForcedVersion": "0.0.0.0x0",
+            "url": "https://assets.kef.com/pm/pm_firmware/lsxii/LSXII_V30135.swu",
+        },
+    },
+}
 STANDBY_MODE_VALUE = {"type": "kefStandbyMode", "kefStandbyMode": "standby_none"}
 STARTUP_TONE_VALUE = {"type": "bool_", "bool_": True}
 AUTO_SWITCH_HDMI_VALUE = {"type": "bool_", "bool_": False}
@@ -99,6 +114,12 @@ EQ_PROFILE_VALUE = {
             "wallMode": False,
             "balance": 30,
             "highPassMode": False,
+            "isKW1": False,
+            "subwooferCount": 0,
+            "subEnableStereo": False,
+            "subwooferPreset": "custom",
+            "subOutLPFreq": 8,
+            "deskModeSetting": 14,
         },
     },
 }
@@ -150,6 +171,9 @@ TEST_SNAPSHOT = KefSnapshot(
         audio_channels=2,
     ),
     eq_profile=KefEqProfile.from_modern_value(EQ_PROFILE_VALUE),
+    firmware_update=KefFirmwareUpdateInfo.from_modern_value(
+        FIRMWARE_UPDATE_STATUS_VALUE
+    ),
     wifi_info=KefWifiInfo.from_modern_value(NETWORK_INFO_VALUE),
     standby_mode="standby_none",
     startup_tone_enabled=True,

@@ -174,6 +174,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         snapshot = self.coordinator.data
         playback = snapshot.playback
         eq_profile = snapshot.eq_profile
+        firmware_update = snapshot.firmware_update
         return {
             "backend": snapshot.device.backend.value,
             "speaker_status": snapshot.speaker_status,
@@ -201,7 +202,21 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
             ),
             "wifi_bssid": snapshot.wifi_info.bssid if snapshot.wifi_info else None,
             "eq_profile_name": eq_profile.profile_name if eq_profile else None,
+            "eq_profile_id": eq_profile.profile_id if eq_profile else None,
             "eq_expert_mode": eq_profile.is_expert_mode if eq_profile else None,
+            "audio_polarity": eq_profile.audio_polarity if eq_profile else None,
+            "subwoofer_polarity": (
+                eq_profile.subwoofer_polarity if eq_profile else None
+            ),
+            "is_kw1": eq_profile.is_kw1 if eq_profile else None,
+            "subwoofer_count": eq_profile.subwoofer_count if eq_profile else None,
+            "sub_enable_stereo": eq_profile.sub_enable_stereo if eq_profile else None,
+            "subwoofer_preset": eq_profile.subwoofer_preset if eq_profile else None,
+            "sub_out_low_pass_frequency": (
+                eq_profile.sub_out_low_pass_frequency if eq_profile else None
+            ),
+            "desk_mode_setting": eq_profile.desk_mode_setting if eq_profile else None,
+            "wall_mode_setting": eq_profile.wall_mode_setting if eq_profile else None,
             "standby_mode": snapshot.standby_mode,
             "startup_tone_enabled": snapshot.startup_tone_enabled,
             "auto_switch_hdmi": snapshot.auto_switch_hdmi,
@@ -222,6 +237,14 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
             "volume_step": snapshot.volume_step,
             "volume_limit_enabled": snapshot.volume_limit_enabled,
             "fixed_volume_level": snapshot.fixed_volume_level,
+            "firmware_update_state": firmware_update.state if firmware_update else None,
+            "firmware_update_available_version": (
+                firmware_update.available_version if firmware_update else None
+            ),
+            "firmware_update_download_progress": (
+                firmware_update.download_progress if firmware_update else None
+            ),
+            "firmware_update_url": firmware_update.url if firmware_update else None,
         }
 
     async def async_turn_on(self) -> None:
