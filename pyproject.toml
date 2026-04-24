@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "homeassistant-kef"
-version = "0.7.2"
+version = "0.8.0"
 description = "HACS-ready KEF integration for Home Assistant"
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
 authors = [{ name = "Community Maintainers" }]
-dependencies = ["aiohttp>=3.9"]
+dependencies = ["aiohttp>=3.9", "cryptography>=42.0.0"]
 
 [project.optional-dependencies]
 test = [
@@ -26,7 +26,7 @@ test = [
 include = ["custom_components*", "kef_client*", "tests*"]
 
 [tool.setuptools.package-data]
-"custom_components.kef" = ["manifest.json", "translations/*.json", "brand/*.png"]
+"custom_components.kef" = ["manifest.json", "services.yaml", "translations/*.json", "brand/*.png"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

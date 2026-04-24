@@ -8,7 +8,18 @@ from homeassistant.components.diagnostics import async_redact_data
 
 from .coordinator import KefConfigEntry
 
-TO_REDACT = {"host", "mac_address", "ip", "bssid", "ssid", "dns", "gateways"}
+TO_REDACT = {
+    "bssid",
+    "dns",
+    "gateways",
+    "host",
+    "ip",
+    "mac_address",
+    "password",
+    "serial_number",
+    "ssid",
+    "kef_id",
+}
 
 
 async def async_get_config_entry_diagnostics(hass, entry: KefConfigEntry):
@@ -34,6 +45,8 @@ async def async_get_config_entry_diagnostics(hass, entry: KefConfigEntry):
         "front_led_enabled": snapshot.front_led_enabled,
         "standby_led_enabled": snapshot.standby_led_enabled,
         "top_panel_enabled": snapshot.top_panel_enabled,
+        "top_panel_led_enabled": snapshot.top_panel_led_enabled,
+        "top_panel_standby_led_enabled": snapshot.top_panel_standby_led_enabled,
         "wake_source": snapshot.wake_source,
         "subwoofer_wake_enabled": snapshot.subwoofer_wake_enabled,
         "kw1_wake_enabled": snapshot.kw1_wake_enabled,
@@ -48,5 +61,25 @@ async def async_get_config_entry_diagnostics(hass, entry: KefConfigEntry):
         "volume_step": snapshot.volume_step,
         "volume_limit_enabled": snapshot.volume_limit_enabled,
         "fixed_volume_level": snapshot.fixed_volume_level,
+        "remote_ir_enabled": snapshot.remote_ir_enabled,
+        "remote_ir_code": snapshot.remote_ir_code,
+        "favourite_button": snapshot.favourite_button,
+        "eq_button_1": snapshot.eq_button_1,
+        "eq_button_2": snapshot.eq_button_2,
+        "analytics_enabled": snapshot.analytics_enabled,
+        "app_analytics_enabled": snapshot.app_analytics_enabled,
+        "streaming_quality": snapshot.streaming_quality,
+        "ui_language": snapshot.ui_language,
+        "speaker_location": snapshot.speaker_location,
+        "network_ping_ms": snapshot.network_ping_ms,
+        "network_stability": snapshot.network_stability,
+        "speed_test_status": snapshot.speed_test_status,
+        "speed_test_average_download": snapshot.speed_test_average_download,
+        "speed_test_current_download": snapshot.speed_test_current_download,
+        "speed_test_packet_loss": snapshot.speed_test_packet_loss,
+        "alert_alarm_count": snapshot.alert_alarm_count,
+        "alert_timer_count": snapshot.alert_timer_count,
+        "alert_snooze_minutes": snapshot.alert_snooze_minutes,
+        "player_notification_active": snapshot.player_notification_active,
     }
     return async_redact_data(data, TO_REDACT)

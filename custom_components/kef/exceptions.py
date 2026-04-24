@@ -1,6 +1,7 @@
 """Compatibility wrapper for reusable KEF exceptions."""
 
 from .kef_client import (
+    KefAuthenticationRequiredError,
     KefConnectionError,
     KefError,
     KefResponseError,
@@ -8,6 +9,7 @@ from .kef_client import (
 )
 
 __all__ = [
+    "KefAuthenticationRequiredError",
     "KefConnectionError",
     "KefError",
     "KefResponseError",

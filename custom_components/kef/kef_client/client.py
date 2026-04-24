@@ -3,18 +3,28 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import copy
+import hashlib
+import hmac
 import json
 import logging
+import os
 import socket
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlencode
 
 import aiohttp
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from .const import (
     API_ROOT,
+    AUTH_MODE_ALL,
+    AUTH_MODE_NONE,
+    AUTH_MODE_SETDATA,
     DEFAULT_LEGACY_PORT,
     DEFAULT_MODERN_SOURCE_LIST,
     DEFAULT_PORT,
@@ -30,6 +40,7 @@ from .const import (
     STATE_OFF,
 )
 from .exceptions import (
+    KefAuthenticationRequiredError,
     KefConnectionError,
     KefError,
     KefResponseError,
@@ -39,6 +50,7 @@ from .models import (
     KefBackend,
     KefDeviceInfo,
     KefEqProfile,
+    KefFirmwareUpdateInfo,
     KefPlaybackInfo,
     KefSnapshot,
     KefWifiInfo,
@@ -51,6 +63,13 @@ _LEGACY_GET_START = ord("G")
 _LEGACY_SET_START = ord("S")
 _LEGACY_GET_END = 128
 _LEGACY_SET_MID = 129
+_FIRMWARE_UPDATE_PENDING_STATES = {
+    "checkingForUpdate",
+    "checkingForUpdates",
+    "downloading",
+    "downloadInProgress",
+    "downloadingUpdate",
+}
 
 _INPUT_SOURCES_BASE = {
     "Bluetooth": 9,
@@ -157,6 +176,14 @@ class BaseKefClient(ABC):
         """Enable or disable the top touch panel."""
 
     @abstractmethod
+    async def async_set_top_panel_led_enabled(self, enabled: bool) -> None:
+        """Enable or disable the top-panel LED while the speaker is active."""
+
+    @abstractmethod
+    async def async_set_top_panel_standby_led_enabled(self, enabled: bool) -> None:
+        """Enable or disable the top-panel LED while the speaker is in standby."""
+
+    @abstractmethod
     async def async_set_wake_source(self, source: str) -> None:
         """Set the wake source."""
 
@@ -208,6 +235,10 @@ class BaseKefClient(ABC):
         """Set the startup volume for a specific source."""
 
     @abstractmethod
+    async def async_set_cable_mode(self, mode: str) -> None:
+        """Set the speaker pair cable mode."""
+
+    @abstractmethod
     async def async_set_balance(self, value: int) -> None:
         """Set the EQ balance."""
 
@@ -251,6 +282,61 @@ class BaseKefClient(ABC):
     async def async_set_fixed_volume_level(self, volume: int) -> None:
         """Set the fixed-volume level."""
 
+    @abstractmethod
+    async def async_set_remote_ir_enabled(self, enabled: bool) -> None:
+        """Enable or disable IR remote control."""
+
+    @abstractmethod
+    async def async_set_remote_ir_code(self, code: str) -> None:
+        """Set the IR remote code set."""
+
+    @abstractmethod
+    async def async_set_favourite_button_action(self, action: str) -> None:
+        """Set the favourite button action."""
+
+    @abstractmethod
+    async def async_set_eq_button_action(self, button: int, action: str) -> None:
+        """Set the EQ button action."""
+
+    @abstractmethod
+    async def async_set_analytics_enabled(self, enabled: bool) -> None:
+        """Enable or disable KEF analytics."""
+
+    @abstractmethod
+    async def async_set_app_analytics_enabled(self, enabled: bool) -> None:
+        """Enable or disable app analytics."""
+
+    @abstractmethod
+    async def async_set_streaming_quality(self, quality: str) -> None:
+        """Set the Airable streaming quality."""
+
+    @abstractmethod
+    async def async_set_ui_language(self, language: str) -> None:
+        """Set the speaker UI language."""
+
+    @abstractmethod
+    async def async_set_speaker_location(self, location: str) -> None:
+        """Set the speaker country or region code."""
+
+    @abstractmethod
+    async def async_get_firmware_update_status(self) -> KefFirmwareUpdateInfo | None:
+        """Get the current firmware-update status."""
+
+    @abstractmethod
+    async def async_check_for_firmware_update(self) -> KefFirmwareUpdateInfo | None:
+        """Trigger a firmware check and return the resulting status."""
+
+    @abstractmethod
+    async def async_install_firmware_update(self) -> KefFirmwareUpdateInfo | None:
+        """Trigger firmware installation and return the latest known status."""
+
+    @abstractmethod
+    async def async_upload_firmware_update(
+        self,
+        file_path: str,
+    ) -> KefFirmwareUpdateInfo | None:
+        """Upload a firmware image to the speaker and trigger installation."""
+
     async def async_poll_events(self, timeout: int = 10) -> list[dict[str, Any]]:
         """Poll live device events when supported."""
         return []
@@ -271,15 +357,18 @@ class ModernKefClient(BaseKefClient):
         session: aiohttp.ClientSession,
         *,
         port: int = DEFAULT_PORT,
+        password: str | None = None,
         request_timeout: float = 4.0,
     ) -> None:
         """Initialize the client."""
         super().__init__(host)
         self._session = session
         self._port = port
+        self._password = password or ""
         self._request_timeout = request_timeout
         self._last_active_source: str | None = None
         self._event_queue_id: str | None = None
+        self._auth_mode: str | None = None
 
     async def async_identify(self) -> KefDeviceInfo:
         """Probe the modern HTTP API."""
@@ -288,6 +377,18 @@ class ModernKefClient(BaseKefClient):
         release_text = await self._get_path_value(PROBE_PATHS["release_text"])
         mac_address = await self._get_path_value(PROBE_PATHS["mac"])
         model_code = await self._get_path_value(PROBE_PATHS["model_code"])
+        serial_number = await self._get_optional_path_value(
+            PROBE_PATHS["serial_number"],
+            typed_key="string_",
+        )
+        kef_id = await self._get_optional_path_value(
+            PROBE_PATHS["kef_id"],
+            typed_key="string_",
+        )
+        hardware_version = await self._get_optional_path_value(
+            PROBE_PATHS["hardware_version"],
+            typed_key="string_",
+        )
 
         release_value = self._extract_string(release_text)
         model = (
@@ -309,6 +410,9 @@ class ModernKefClient(BaseKefClient):
             firmware_version=self._extract_string(firmware_version),
             release_text=release_value,
             model_code=self._extract_string(model_code),
+            serial_number=self._extract_string(serial_number),
+            kef_id=self._extract_string(kef_id),
+            hardware_version=self._extract_string(hardware_version),
             host=self._host,
             port=self._port,
         )
@@ -352,12 +456,19 @@ class ModernKefClient(BaseKefClient):
                 typed_key="playerPlayMode",
             )
         )
+        firmware_update = await self._get_optional_path_value(
+            PROBE_PATHS["firmware_update_status"]
+        )
         player_data = await self._get_optional_path_value(PROBE_PATHS["player_data"])
         play_time = await self._get_optional_path_value(
             PROBE_PATHS["play_time"],
             typed_key="i64_",
         )
         eq_profile = await self._get_optional_path_value(PROBE_PATHS["eq_profile"])
+        if eq_profile is None:
+            eq_profile = await self._get_optional_path_value(
+                PROBE_PATHS["eq_profile_v2"]
+            )
         network_info = await self._get_optional_path_value(PROBE_PATHS["network_info"])
         standby_mode = self._extract_string(
             await self._get_optional_path_value(
@@ -392,6 +503,18 @@ class ModernKefClient(BaseKefClient):
         top_panel_disabled = self._extract_bool(
             await self._get_optional_path_value(
                 PROBE_PATHS["disable_top_panel"],
+                typed_key="bool_",
+            )
+        )
+        top_panel_led_enabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["top_panel_led"],
+                typed_key="bool_",
+            )
+        )
+        top_panel_standby_led_enabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["top_panel_standby_led"],
                 typed_key="bool_",
             )
         )
@@ -465,6 +588,118 @@ class ModernKefClient(BaseKefClient):
                 typed_key="i32_",
             )
         )
+        remote_ir_enabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["remote_ir"],
+                typed_key="bool_",
+            )
+        )
+        remote_ir_code = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["remote_ir_code"],
+                typed_key="kefSpeakerIRCode",
+            )
+        )
+        favourite_button = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["favourite_button"],
+                typed_key="kefFavouriteButtonFunction",
+            )
+        )
+        eq_button_1 = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["eq_button_1"],
+                typed_key="string_",
+            )
+        )
+        eq_button_2 = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["eq_button_2"],
+                typed_key="string_",
+            )
+        )
+        analytics_disabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["disable_analytics"],
+                typed_key="bool_",
+            )
+        )
+        app_analytics_disabled = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["disable_app_analytics"],
+                typed_key="bool_",
+            )
+        )
+        streaming_quality = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["streaming_quality"],
+                typed_key="airableStreamBitrate",
+            )
+        )
+        ui_language = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["ui_language"],
+                typed_key="string_",
+            )
+        )
+        speaker_location = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["speaker_location"],
+                typed_key="string_",
+            )
+        )
+        network_ping_ms = self._extract_float(
+            await self._get_optional_path_value(
+                PROBE_PATHS["network_ping"],
+                typed_key="double_",
+            )
+        )
+        network_stability = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["network_stability"],
+                typed_key="kefNetworkStability",
+            )
+        )
+        speed_test_status = self._extract_string(
+            await self._get_optional_path_value(
+                PROBE_PATHS["speed_test_status"],
+                typed_key="kefSpeedTestStatus",
+            )
+        )
+        speed_test_average_download = self._extract_float(
+            await self._get_optional_path_value(
+                PROBE_PATHS["speed_test_average_download"],
+                typed_key="double_",
+            )
+        )
+        speed_test_current_download = self._extract_float(
+            await self._get_optional_path_value(
+                PROBE_PATHS["speed_test_current_download"],
+                typed_key="double_",
+            )
+        )
+        speed_test_packet_loss = self._extract_float(
+            await self._get_optional_path_value(
+                PROBE_PATHS["speed_test_packet_loss"],
+                typed_key="double_",
+            )
+        )
+        alerts_list = await self._get_optional_path_value(
+            PROBE_PATHS["alerts_list"],
+        )
+        alert_counts = self._extract_alert_counts(alerts_list)
+        alert_snooze_minutes = self._extract_int(
+            await self._get_optional_path_value(
+                PROBE_PATHS["alert_snooze_time"],
+                typed_key="i32_",
+            )
+        )
+        player_notification_active = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["player_notification"],
+                typed_key="bool_",
+            )
+        )
         if source not in (None, STATE_OFF):
             self._last_active_source = source
 
@@ -484,6 +719,11 @@ class ModernKefClient(BaseKefClient):
                 if isinstance(eq_profile, dict)
                 else None
             ),
+            firmware_update=(
+                KefFirmwareUpdateInfo.from_modern_value(firmware_update)
+                if isinstance(firmware_update, dict)
+                else None
+            ),
             wifi_info=(
                 KefWifiInfo.from_modern_value(network_info)
                 if isinstance(network_info, dict)
@@ -501,6 +741,8 @@ class ModernKefClient(BaseKefClient):
             top_panel_enabled=(
                 None if top_panel_disabled is None else not top_panel_disabled
             ),
+            top_panel_led_enabled=top_panel_led_enabled,
+            top_panel_standby_led_enabled=top_panel_standby_led_enabled,
             wake_source=wake_source,
             subwoofer_wake_enabled=subwoofer_wake_enabled,
             kw1_wake_enabled=kw1_wake_enabled,
@@ -516,6 +758,32 @@ class ModernKefClient(BaseKefClient):
                 if fixed_volume_level is None or fixed_volume_level < 0
                 else fixed_volume_level
             ),
+            remote_ir_enabled=remote_ir_enabled,
+            remote_ir_code=remote_ir_code,
+            favourite_button=favourite_button,
+            eq_button_1=eq_button_1,
+            eq_button_2=eq_button_2,
+            analytics_enabled=(
+                None if analytics_disabled is None else not analytics_disabled
+            ),
+            app_analytics_enabled=(
+                None
+                if app_analytics_disabled is None
+                else not app_analytics_disabled
+            ),
+            streaming_quality=streaming_quality,
+            ui_language=ui_language,
+            speaker_location=speaker_location,
+            network_ping_ms=network_ping_ms,
+            network_stability=network_stability,
+            speed_test_status=speed_test_status,
+            speed_test_average_download=speed_test_average_download,
+            speed_test_current_download=speed_test_current_download,
+            speed_test_packet_loss=speed_test_packet_loss,
+            alert_alarm_count=alert_counts[0],
+            alert_timer_count=alert_counts[1],
+            alert_snooze_minutes=alert_snooze_minutes,
+            player_notification_active=player_notification_active,
             source_list=source_list,
             default_volume_by_source=default_volume_by_source,
         )
@@ -637,6 +905,22 @@ class ModernKefClient(BaseKefClient):
             value={"type": "bool_", "bool_": not enabled},
         )
 
+    async def async_set_top_panel_led_enabled(self, enabled: bool) -> None:
+        """Enable or disable the top-panel LED while the speaker is active."""
+        await self._set_data(
+            PROBE_PATHS["top_panel_led"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
+        )
+
+    async def async_set_top_panel_standby_led_enabled(self, enabled: bool) -> None:
+        """Enable or disable the top-panel LED while the speaker is in standby."""
+        await self._set_data(
+            PROBE_PATHS["top_panel_standby_led"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
+        )
+
     async def async_set_wake_source(self, source: str) -> None:
         """Set the wake source."""
         await self._set_data(
@@ -732,6 +1016,14 @@ class ModernKefClient(BaseKefClient):
             value={"type": "i32_", "i32_": max(0, min(100, volume))},
         )
 
+    async def async_set_cable_mode(self, mode: str) -> None:
+        """Set the speaker pair cable mode."""
+        await self._set_data(
+            PROBE_PATHS["cable_mode"],
+            role="value",
+            value={"type": "kefCableMode", "kefCableMode": mode},
+        )
+
     async def async_set_balance(self, value: int) -> None:
         """Set the EQ balance."""
         await self._update_eq_profile(
@@ -802,6 +1094,214 @@ class ModernKefClient(BaseKefClient):
             value={"type": "i32_", "i32_": max(0, min(100, volume))},
         )
 
+    async def async_set_remote_ir_enabled(self, enabled: bool) -> None:
+        """Enable or disable IR remote control."""
+        await self._set_data(
+            PROBE_PATHS["remote_ir"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
+        )
+
+    async def async_set_remote_ir_code(self, code: str) -> None:
+        """Set the IR remote code set."""
+        await self._set_data(
+            PROBE_PATHS["remote_ir_code"],
+            role="value",
+            value={"type": "kefSpeakerIRCode", "kefSpeakerIRCode": code},
+        )
+
+    async def async_set_favourite_button_action(self, action: str) -> None:
+        """Set the favourite button action."""
+        await self._set_data(
+            PROBE_PATHS["favourite_button"],
+            role="value",
+            value={
+                "type": "kefFavouriteButtonFunction",
+                "kefFavouriteButtonFunction": action,
+            },
+        )
+
+    async def async_set_eq_button_action(self, button: int, action: str) -> None:
+        """Set the EQ button action."""
+        if button not in (1, 2):
+            raise KefUnsupportedDeviceError("Only EQ buttons 1 and 2 are supported")
+        await self._set_data(
+            PROBE_PATHS[f"eq_button_{button}"],
+            role="value",
+            value={"type": "string_", "string_": action},
+        )
+
+    async def async_set_analytics_enabled(self, enabled: bool) -> None:
+        """Enable or disable KEF analytics."""
+        await self._set_data(
+            PROBE_PATHS["disable_analytics"],
+            role="value",
+            value={"type": "bool_", "bool_": not enabled},
+        )
+
+    async def async_set_app_analytics_enabled(self, enabled: bool) -> None:
+        """Enable or disable app analytics."""
+        await self._set_data(
+            PROBE_PATHS["disable_app_analytics"],
+            role="value",
+            value={"type": "bool_", "bool_": not enabled},
+        )
+
+    async def async_set_streaming_quality(self, quality: str) -> None:
+        """Set the Airable streaming quality."""
+        await self._set_data(
+            PROBE_PATHS["streaming_quality"],
+            role="value",
+            value={
+                "type": "airableStreamBitrate",
+                "airableStreamBitrate": quality,
+            },
+        )
+
+    async def async_set_ui_language(self, language: str) -> None:
+        """Set the speaker UI language."""
+        await self._set_data(
+            PROBE_PATHS["ui_language"],
+            role="value",
+            value={"type": "string_", "string_": language},
+        )
+
+    async def async_set_speaker_location(self, location: str) -> None:
+        """Set the speaker country or region code."""
+        await self._set_data(
+            PROBE_PATHS["speaker_location"],
+            role="value",
+            value={"type": "string_", "string_": location},
+        )
+
+    async def async_get_firmware_update_status(self) -> KefFirmwareUpdateInfo | None:
+        """Get the current firmware-update status."""
+        payload = await self._get_optional_path_value(
+            PROBE_PATHS["firmware_update_status"]
+        )
+        if not isinstance(payload, dict):
+            return None
+        return KefFirmwareUpdateInfo.from_modern_value(payload)
+
+    async def async_check_for_firmware_update(self) -> KefFirmwareUpdateInfo | None:
+        """Ask the speaker to check for a newer firmware image."""
+        try:
+            await self._activate_path("firmwareupdate:checkForUpdate")
+        except KefConnectionError as err:
+            _LOGGER.debug(
+                "KEF firmware check activation timed out; polling status anyway: %s",
+                err,
+            )
+        return await self._poll_firmware_update_status()
+
+    async def async_install_firmware_update(self) -> KefFirmwareUpdateInfo | None:
+        """Trigger firmware installation for an already available update."""
+        status = await self.async_get_firmware_update_status()
+        if status is None or status.state in {None, "idle"}:
+            status = await self.async_check_for_firmware_update()
+
+        if status is not None and status.state == "downloaded":
+            return await self._async_install_downloaded_firmware_update()
+
+        if status is not None and status.state in _FIRMWARE_UPDATE_PENDING_STATES:
+            status = await self._poll_firmware_update_status(
+                attempts=120,
+                delay_seconds=1.0,
+            )
+            if status is not None and status.state == "downloaded":
+                return await self._async_install_downloaded_firmware_update()
+            return status
+
+        if status is not None and not status.is_available:
+            return status
+
+        await self._activate_path("firmwareupdate:downloadNewUpdate")
+        status = await self._poll_firmware_update_status(
+            attempts=120,
+            delay_seconds=1.0,
+        )
+        if status is not None and status.state == "downloaded":
+            return await self._async_install_downloaded_firmware_update()
+        return status
+
+    async def async_upload_firmware_update(
+        self,
+        file_path: str,
+    ) -> KefFirmwareUpdateInfo | None:
+        """Upload a firmware image through the speaker settings page."""
+        upload_url = f"http://{self._host}:{self._port}/settings.fcgi?firmwareupdate=1"
+        form = aiohttp.FormData()
+
+        try:
+            firmware_file = open(file_path, "rb")
+        except OSError as err:
+            raise KefConnectionError(
+                f"Unable to read firmware file {file_path}: {err}"
+            ) from err
+
+        with firmware_file:
+            form.add_field(
+                "datafile",
+                firmware_file,
+                filename=os.path.basename(file_path),
+                content_type="application/octet-stream",
+            )
+            try:
+                async with self._session.post(
+                    upload_url,
+                    data=form,
+                    allow_redirects=False,
+                    timeout=aiohttp.ClientTimeout(total=None),
+                ) as response:
+                    await response.text()
+            except aiohttp.ClientError as err:
+                raise KefConnectionError(str(err)) from err
+            except TimeoutError as err:
+                raise KefConnectionError(
+                    "Firmware upload to the KEF speaker timed out"
+                ) from err
+
+        if response.status >= 400:
+            if response.status in {401, 403}:
+                raise KefAuthenticationRequiredError(
+                    "KEF speaker requires authentication before firmware upload "
+                    "can be used"
+                )
+            raise KefResponseError(f"KEF speaker returned HTTP {response.status}")
+
+        location = response.headers.get("Location", "")
+        if response.status in {301, 302, 303, 307, 308}:
+            if "login" in location.lower() or location.endswith(".fcgi"):
+                raise KefAuthenticationRequiredError(
+                    "KEF speaker requires authentication before firmware upload "
+                    "can be used"
+                )
+            raise KefResponseError(
+                f"KEF speaker redirected firmware upload to {location}"
+            )
+
+        status = await self._poll_firmware_update_status(
+            attempts=120,
+            delay_seconds=1.0,
+        )
+        if status is None or status.state != "downloaded":
+            raise KefResponseError("Firmware upload did not reach the downloaded state")
+
+        return await self._async_install_downloaded_firmware_update()
+
+    async def _async_install_downloaded_firmware_update(
+        self,
+    ) -> KefFirmwareUpdateInfo | None:
+        """Install a firmware package that has already reached downloaded state."""
+        await self._activate_path(
+            "firmwareupdate:installUpdate",
+            {"firmwareUpdateOptions": {"forceSfupdate": True}},
+        )
+        return await self._poll_firmware_update_status(
+            attempts=10,
+            delay_seconds=1.0,
+        )
+
     async def async_poll_events(self, timeout: int = 10) -> list[dict[str, Any]]:
         """Poll the KEF event queue and return any pending updates."""
         queue_id = await self._async_ensure_event_queue()
@@ -869,7 +1369,14 @@ class ModernKefClient(BaseKefClient):
 
     async def _update_eq_profile(self, mutator) -> None:
         """Fetch, mutate, and write back the typed EQ profile wrapper."""
-        payload = await self._get_path_item(PROBE_PATHS["eq_profile"], roles="value")
+        payload = await self._get_optional_path_item(
+            PROBE_PATHS["eq_profile"],
+            roles="value",
+        )
+        if payload is None:
+            await self._update_eq_profile_v2(mutator)
+            return
+
         if not isinstance(payload, dict) or payload.get("type") != "kefEqProfile":
             raise KefResponseError("Unexpected KEF EQ profile payload")
 
@@ -885,6 +1392,97 @@ class ModernKefClient(BaseKefClient):
         mutator(dsp_info)
         await self._set_data(PROBE_PATHS["eq_profile"], role="value", value=wrapper)
 
+    async def _update_eq_profile_v2(self, mutator) -> None:
+        """Fetch, mutate, and write back the modern v2 EQ profile wrapper."""
+        payload = await self._get_path_item(PROBE_PATHS["eq_profile_v2"], roles="value")
+        if not isinstance(payload, dict) or payload.get("type") != "kefEqProfileV2":
+            raise KefResponseError("Unexpected KEF EQ profile v2 payload")
+
+        wrapper = copy.deepcopy(payload)
+        profile = wrapper.get("kefEqProfileV2")
+        if not isinstance(profile, dict):
+            raise KefResponseError("Unexpected KEF EQ profile v2 wrapper")
+
+        compat_dsp = self._eq_profile_v2_to_legacy_dsp(profile)
+        mutator(compat_dsp)
+        self._apply_legacy_dsp_to_eq_profile_v2(compat_dsp, profile)
+        await self._set_data(PROBE_PATHS["eq_profile_v2"], role="value", value=wrapper)
+
+    async def _get_optional_path_item(self, path: str, *, roles: str = "value") -> Any:
+        """Fetch an optional raw item from a KEF API path."""
+        try:
+            return await self._get_path_item(path, roles=roles)
+        except KefError:
+            return None
+
+    @staticmethod
+    def _eq_profile_v2_to_legacy_dsp(profile: dict[str, Any]) -> dict[str, Any]:
+        """Map v2 direct dB/Hz values to the existing HA control scale."""
+        return {
+            "balance": ModernKefClient._v2_balance_to_legacy(profile.get("balance")),
+            "bassExtension": profile.get("bassExtension"),
+            "trebleAmount": ModernKefClient._v2_treble_to_legacy(
+                profile.get("trebleAmount")
+            ),
+            "subwooferGain": ModernKefClient._v2_gain_to_legacy(
+                profile.get("subwooferGain")
+            ),
+            "deskMode": profile.get("deskMode"),
+            "wallMode": profile.get("wallMode"),
+            "phaseCorrection": profile.get("phaseCorrection"),
+            "highPassMode": profile.get("highPassMode"),
+            "highPassModeFreq": ModernKefClient._v2_high_pass_to_legacy(
+                profile.get("highPassModeFreq")
+            ),
+        }
+
+    @staticmethod
+    def _apply_legacy_dsp_to_eq_profile_v2(
+        compat_dsp: dict[str, Any],
+        profile: dict[str, Any],
+    ) -> None:
+        """Apply existing HA control-scale values back to a v2 EQ profile."""
+        if compat_dsp.get("balance") is not None:
+            profile["balance"] = max(0, min(60, compat_dsp["balance"])) - 30
+        if compat_dsp.get("bassExtension") is not None:
+            profile["bassExtension"] = compat_dsp["bassExtension"]
+        if compat_dsp.get("trebleAmount") is not None:
+            legacy = max(0, min(16, compat_dsp["trebleAmount"]))
+            profile["trebleAmount"] = round(((legacy / 16.0) * 6.0) - 3.0, 2)
+        if compat_dsp.get("subwooferGain") is not None:
+            profile["subwooferGain"] = max(0, min(20, compat_dsp["subwooferGain"])) - 10
+        if compat_dsp.get("deskMode") is not None:
+            profile["deskMode"] = compat_dsp["deskMode"]
+        if compat_dsp.get("wallMode") is not None:
+            profile["wallMode"] = compat_dsp["wallMode"]
+        if compat_dsp.get("phaseCorrection") is not None:
+            profile["phaseCorrection"] = compat_dsp["phaseCorrection"]
+        if compat_dsp.get("highPassMode") is not None:
+            profile["highPassMode"] = compat_dsp["highPassMode"]
+        if compat_dsp.get("highPassModeFreq") is not None:
+            legacy = max(0, min(10, compat_dsp["highPassModeFreq"]))
+            profile["highPassModeFreq"] = 50 + legacy * 5
+
+    @staticmethod
+    def _v2_balance_to_legacy(value: Any) -> int | None:
+        """Convert v2 -30..30 balance into the existing 0..60 UI scale."""
+        return None if value is None else round(float(value)) + 30
+
+    @staticmethod
+    def _v2_treble_to_legacy(value: Any) -> int | None:
+        """Convert v2 -3..3 dB treble into the existing 0..16 UI scale."""
+        return None if value is None else round((float(value) + 3.0) / 6.0 * 16)
+
+    @staticmethod
+    def _v2_gain_to_legacy(value: Any) -> int | None:
+        """Convert v2 -10..10 dB gain into the existing 0..20 UI scale."""
+        return None if value is None else round(float(value)) + 10
+
+    @staticmethod
+    def _v2_high_pass_to_legacy(value: Any) -> int | None:
+        """Convert v2 Hz high-pass frequency into the existing 0..10 step."""
+        return None if value is None else round((float(value) - 50.0) / 5.0)
+
     async def _set_data(self, path: str, *, role: str, value: Any) -> None:
         """Set a value on the speaker."""
         await self._request_json(
@@ -892,6 +1490,35 @@ class ModernKefClient(BaseKefClient):
             SET_DATA_ENDPOINT,
             json_payload={"path": path, "role": role, "value": value},
         )
+
+    async def _activate_path(self, path: str, value: Any | None = None) -> Any:
+        """Trigger an activate-style KEF API path."""
+        payload_value = value
+        if payload_value is None:
+            payload_value = {}
+
+        return await self._request_json(
+            "POST",
+            SET_DATA_ENDPOINT,
+            json_payload={"path": path, "role": "activate", "value": payload_value},
+        )
+
+    async def _poll_firmware_update_status(
+        self,
+        *,
+        attempts: int = 10,
+        delay_seconds: float = 1.0,
+    ) -> KefFirmwareUpdateInfo | None:
+        """Poll firmware status for a short period after a trigger call."""
+        last_status: KefFirmwareUpdateInfo | None = None
+        for _ in range(max(1, attempts)):
+            last_status = await self.async_get_firmware_update_status()
+            if last_status is None:
+                return None
+            if last_status.state not in _FIRMWARE_UPDATE_PENDING_STATES:
+                return last_status
+            await asyncio.sleep(delay_seconds)
+        return last_status
 
     async def _async_ensure_event_queue(self) -> str:
         """Create or reuse the KEF event queue."""
@@ -920,15 +1547,203 @@ class ModernKefClient(BaseKefClient):
         json_payload: Mapping[str, object] | None = None,
     ) -> Any:
         """Issue an HTTP request to the speaker."""
-        url = self._build_url(endpoint)
+        path = self._extract_nsdk_path(
+            endpoint,
+            params=params,
+            json_payload=json_payload,
+        )
+
+        use_secure = await self._should_use_secure_request(
+            method,
+            endpoint,
+            path=path,
+        )
+        try:
+            if use_secure:
+                return await self._request_json_secure(
+                    method,
+                    endpoint,
+                    params=params,
+                    json_payload=json_payload,
+                )
+            return await self._request_json_plain(
+                method,
+                endpoint,
+                params=params,
+                json_payload=json_payload,
+            )
+        except KefAuthenticationRequiredError:
+            if use_secure or endpoint not in {GET_DATA_ENDPOINT, SET_DATA_ENDPOINT}:
+                raise
+            self._auth_mode = None
+            if await self._should_use_secure_request(method, endpoint, path=path):
+                return await self._request_json_secure(
+                    method,
+                    endpoint,
+                    params=params,
+                    json_payload=json_payload,
+                )
+            raise
+
+    async def _should_use_secure_request(
+        self,
+        method: str,
+        endpoint: str,
+        *,
+        path: str | None,
+    ) -> bool:
+        """Return whether this request should use the authenticated API."""
+        if endpoint not in {GET_DATA_ENDPOINT, SET_DATA_ENDPOINT}:
+            return False
+
+        if path == PROBE_PATHS["webserver_auth_mode"] and self._auth_mode is None:
+            return False
+
+        auth_mode = await self._get_webserver_auth_mode()
+        if method == "GET":
+            return auth_mode == AUTH_MODE_ALL
+        if method == "POST":
+            return auth_mode in {AUTH_MODE_SETDATA, AUTH_MODE_ALL}
+        return False
+
+    async def _get_webserver_auth_mode(self) -> str:
+        """Return the active KEF webserver auth mode."""
+        if self._auth_mode is not None:
+            return self._auth_mode
+
+        auth_mode_params = {
+            "path": PROBE_PATHS["webserver_auth_mode"],
+            "roles": "value",
+            "_nocache": "1",
+        }
+        try:
+            payload = await self._request_json_plain(
+                "GET",
+                GET_DATA_ENDPOINT,
+                params=auth_mode_params,
+            )
+        except KefAuthenticationRequiredError:
+            payload = await self._request_json_secure(
+                "GET",
+                GET_DATA_ENDPOINT,
+                params=auth_mode_params,
+            )
+        except KefError:
+            self._auth_mode = AUTH_MODE_NONE
+            return self._auth_mode
+
+        auth_mode = AUTH_MODE_NONE
+        if isinstance(payload, list) and payload:
+            auth_mode = self._extract_string(payload[0]) or AUTH_MODE_NONE
+        elif isinstance(payload, dict):
+            value = payload.get("value")
+            auth_mode = self._extract_string(value) or AUTH_MODE_NONE
+
+        if auth_mode not in {AUTH_MODE_NONE, AUTH_MODE_SETDATA, AUTH_MODE_ALL}:
+            auth_mode = AUTH_MODE_NONE
+
+        self._auth_mode = auth_mode
+        return auth_mode
+
+    async def _request_json_plain(
+        self,
+        method: str,
+        endpoint: str,
+        *,
+        params: Mapping[str, object] | None = None,
+        json_payload: Mapping[str, object] | None = None,
+    ) -> Any:
+        """Issue a plain-text JSON request to the speaker."""
+        url = self._build_url(endpoint, params=params)
+        body = None
+        headers: dict[str, str] = {}
+        if json_payload is not None:
+            body = json.dumps(json_payload)
+            headers["Content-Type"] = "application/json"
+        return await self._execute_json_request(
+            method,
+            url,
+            endpoint=endpoint,
+            body=body,
+            headers=headers or None,
+            authenticated=False,
+        )
+
+    async def _request_json_secure(
+        self,
+        method: str,
+        endpoint: str,
+        *,
+        params: Mapping[str, object] | None = None,
+        json_payload: Mapping[str, object] | None = None,
+    ) -> Any:
+        """Issue an authenticated request using the KEF HMAC/AES scheme."""
+        url = self._build_url(endpoint, params=params)
+        headers: dict[str, str] = {}
+        body = None
+        salt_b64, key = self._build_secure_key()
+        if method == "POST":
+            if json_payload is None:
+                raise KefResponseError(
+                    "Missing KEF JSON payload for authenticated POST"
+                )
+            path = self._extract_nsdk_path(
+                endpoint,
+                params=params,
+                json_payload=json_payload,
+            )
+            if path is None:
+                raise KefResponseError(
+                    "Missing KEF API path for authenticated POST"
+                )
+            role = str(json_payload.get("role", "value"))
+            wrapped_value = self._wrap_nsdk_value(json_payload.get("value"))
+            encrypted_value = self._encrypt_secure_value(wrapped_value, key)
+            body = json.dumps(
+                {
+                    "path": path,
+                    "role": role,
+                    "value": encrypted_value,
+                },
+                separators=(",", ":"),
+            )
+            headers["Content-Type"] = "application/json"
+
+        headers["Authorization"] = self._build_secure_authorization(
+            method,
+            url,
+            salt_b64=salt_b64,
+            key=key,
+            body=body,
+        )
+        return await self._execute_json_request(
+            method,
+            url,
+            endpoint=endpoint,
+            body=body,
+            headers=headers,
+            authenticated=True,
+        )
+
+    async def _execute_json_request(
+        self,
+        method: str,
+        url: str,
+        *,
+        endpoint: str,
+        body: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        authenticated: bool,
+    ) -> Any:
+        """Execute a request and parse the JSON response."""
         kwargs: dict[str, object] = {
             "allow_redirects": False,
             "timeout": aiohttp.ClientTimeout(total=self._request_timeout),
         }
-        if params is not None:
-            kwargs["params"] = params
-        if json_payload is not None:
-            kwargs["json"] = json_payload
+        if headers:
+            kwargs["headers"] = dict(headers)
+        if body is not None:
+            kwargs["data"] = body
 
         try:
             async with self._session.request(method, url, **kwargs) as response:
@@ -938,18 +1753,58 @@ class ModernKefClient(BaseKefClient):
         except TimeoutError as err:
             raise KefConnectionError("Request to KEF speaker timed out") from err
 
-        if response.status >= 400:
-            raise KefResponseError(f"KEF speaker returned HTTP {response.status}")
+        location = response.headers.get("Location", "")
+        if response.status in {301, 302, 303, 307, 308}:
+            if "login" in location.lower() or location.endswith(".fcgi"):
+                raise KefAuthenticationRequiredError(
+                    "KEF speaker requires authentication before the local API "
+                    "can be used"
+                )
+            raise KefResponseError(f"KEF speaker redirected {endpoint} to {location}")
+
+        if response.status in {401, 403}:
+            if authenticated:
+                if self._password:
+                    raise KefAuthenticationRequiredError(
+                        "KEF speaker rejected the configured API password"
+                    )
+                raise KefAuthenticationRequiredError(
+                    "KEF speaker requires a web UI password for authenticated "
+                    "local API writes"
+                )
+            raise KefAuthenticationRequiredError(
+                "KEF speaker rejected the request and may require authentication"
+            )
 
         if not text.strip():
+            if response.status >= 400:
+                raise KefResponseError(f"KEF speaker returned HTTP {response.status}")
             return {}
+
+        stripped = text.lstrip()
+        if stripped.startswith("<!DOCTYPE html") or stripped.startswith("<html"):
+            raise KefAuthenticationRequiredError(
+                "KEF speaker returned HTML instead of JSON; the local API may "
+                "require authentication"
+            )
 
         try:
             data = json.loads(text)
         except json.JSONDecodeError as err:
+            if response.status >= 400:
+                raise KefResponseError(
+                    f"KEF speaker returned HTTP {response.status}"
+                ) from err
             raise KefResponseError(
                 f"KEF speaker returned non-JSON data for {endpoint}"
             ) from err
+
+        if response.status >= 400:
+            if isinstance(data, dict) and data.get("error"):
+                error = data["error"]
+                message = error.get("message") if isinstance(error, dict) else None
+                raise KefResponseError(message or "KEF API returned an error")
+            raise KefResponseError(f"KEF speaker returned HTTP {response.status}")
 
         if isinstance(data, dict) and data.get("error"):
             error = data["error"]
@@ -958,6 +1813,80 @@ class ModernKefClient(BaseKefClient):
 
         _LOGGER.debug("KEF modern %s %s -> %s", method, url, data)
         return data
+
+    def _build_secure_authorization(
+        self,
+        method: str,
+        url: str,
+        *,
+        salt_b64: str,
+        key: bytes,
+        body: str | None = None,
+    ) -> str:
+        """Build the KEF HMAC/AES authorization header."""
+        username = "user"
+        timestamp = str(int(time.time() * 1000))
+        if method == "GET":
+            message = f"{username}.{salt_b64}.{timestamp}.{url}"
+        else:
+            message = f"{username}.{salt_b64}.{timestamp}.{url}.{body or ''}"
+        signature = base64.b64encode(
+            hmac.new(key, message.encode("utf-8"), hashlib.sha256).digest()
+        ).decode("ascii")
+        username_b64 = base64.b64encode(username.encode("utf-8")).decode("ascii")
+        return (
+            f"HMAC_SHA256_AES256 {username_b64}.{salt_b64}.{timestamp}.{signature}"
+        )
+
+    def _build_secure_key(self) -> tuple[str, bytes]:
+        """Create the per-request KEF salt and AES/HMAC key."""
+        salt = os.urandom(6)
+        salt_b64 = base64.b64encode(salt).decode("ascii")
+        key = hashlib.sha256(salt + self._password.encode("utf-8")).digest()
+        return salt_b64, key
+
+    @staticmethod
+    def _encrypt_secure_value(value: Any, key: bytes) -> str:
+        """Encrypt the KEF request payload value for an authenticated POST."""
+        plaintext = (
+            value
+            if isinstance(value, str)
+            else json.dumps(value, separators=(",", ":"))
+        )
+        plaintext_bytes = plaintext.encode("utf-8")
+        pad_len = 16 - (len(plaintext_bytes) % 16)
+        padded = plaintext_bytes + bytes([pad_len]) * pad_len
+        iv = os.urandom(16)
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv)).encryptor()
+        ciphertext = cipher.update(padded) + cipher.finalize()
+        return base64.b64encode(iv + ciphertext).decode("ascii")
+
+    @staticmethod
+    def _wrap_nsdk_value(value: Any) -> Any:
+        """Wrap primitive values using the KEF nSDK type envelope."""
+        if isinstance(value, bool):
+            return {"type": "bool_", "bool_": value}
+        if isinstance(value, str):
+            return {"type": "string_", "string_": value}
+        if isinstance(value, int):
+            return {"type": "i32_", "i32_": value}
+        return value
+
+    @staticmethod
+    def _extract_nsdk_path(
+        endpoint: str,
+        *,
+        params: Mapping[str, object] | None = None,
+        json_payload: Mapping[str, object] | None = None,
+    ) -> str | None:
+        """Return the nSDK path carried by a GET/POST KEF API request."""
+        if endpoint == GET_DATA_ENDPOINT and params is not None:
+            path = params.get("path")
+            return str(path) if path is not None else None
+        if endpoint == SET_DATA_ENDPOINT and json_payload is not None:
+            path = json_payload.get("path")
+            return str(path) if path is not None else None
+        return None
 
     async def _async_get_default_volume_by_source(
         self,
@@ -979,10 +1908,25 @@ class ModernKefClient(BaseKefClient):
                 values[source] = value
         return values
 
-    def _build_url(self, endpoint: str) -> str:
+    def _build_url(
+        self,
+        endpoint: str,
+        *,
+        params: Mapping[str, object] | None = None,
+    ) -> str:
         """Build the request URL."""
         endpoint = endpoint if endpoint.startswith("/") else f"/{endpoint}"
-        return f"http://{self._host}:{self._port}{API_ROOT}{endpoint}"
+        authority = self._host
+        if self._port != DEFAULT_PORT:
+            authority = f"{authority}:{self._port}"
+        url = f"http://{authority}{API_ROOT}{endpoint}"
+        if not params:
+            return url
+        query = urlencode(
+            [(key, str(value)) for key, value in params.items()],
+            doseq=True,
+        )
+        return f"{url}?{query}"
 
     @staticmethod
     def _default_volume_path_for_source(source: str) -> str:
@@ -1009,12 +1953,28 @@ class ModernKefClient(BaseKefClient):
                 "playerPlayMode",
                 "kefStandbyMode",
                 "kefWakeUpSource",
+                "webserverAuthMode",
                 "kefCableMode",
                 "kefMasterChannelMode",
+                "airableStreamBitrate",
+                "kefFavouriteButtonFunction",
+                "kefNetworkStability",
+                "kefSpeedTestStatus",
             ):
                 raw = value.get(key)
                 if isinstance(raw, str):
                     return raw
+        return None
+
+    @staticmethod
+    def _extract_float(value: dict[str, Any] | Any | None) -> float | None:
+        """Extract a float from a typed or raw value."""
+        if isinstance(value, int | float):
+            return float(value)
+        if isinstance(value, dict):
+            raw = value.get("double_")
+            if isinstance(raw, int | float):
+                return float(raw)
         return None
 
     @staticmethod
@@ -1103,6 +2063,22 @@ class ModernKefClient(BaseKefClient):
         )
 
     @staticmethod
+    def _extract_alert_counts(
+        value: dict[str, Any] | Any | None,
+    ) -> tuple[int | None, int | None]:
+        """Extract alarm and timer counts from an alerts list payload."""
+        if not isinstance(value, dict):
+            return (None, None)
+        alerts = value.get("alertsList")
+        if not isinstance(alerts, dict):
+            return (None, None)
+        alarms = alerts.get("alarms")
+        timers = alerts.get("timers")
+        alarm_count = len(alarms) if isinstance(alarms, list) else None
+        timer_count = len(timers) if isinstance(timers, list) else None
+        return (alarm_count, timer_count)
+
+    @staticmethod
     def _source_list_for_model(model: str) -> tuple[str, ...]:
         """Return the supported sources for a modern KEF model."""
         normalized = model.upper()
@@ -1180,6 +2156,7 @@ class LegacyBinaryClient(BaseKefClient):
             play_mode=None,
             playback=KefPlaybackInfo(state=playback_state),
             eq_profile=None,
+            firmware_update=None,
             wifi_info=None,
             standby_mode=None,
             startup_tone_enabled=None,
@@ -1187,6 +2164,8 @@ class LegacyBinaryClient(BaseKefClient):
             front_led_enabled=None,
             standby_led_enabled=None,
             top_panel_enabled=None,
+            top_panel_led_enabled=None,
+            top_panel_standby_led_enabled=None,
             wake_source=None,
             subwoofer_wake_enabled=None,
             kw1_wake_enabled=None,
@@ -1198,6 +2177,26 @@ class LegacyBinaryClient(BaseKefClient):
             volume_step=None,
             volume_limit_enabled=None,
             fixed_volume_level=None,
+            remote_ir_enabled=None,
+            remote_ir_code=None,
+            favourite_button=None,
+            eq_button_1=None,
+            eq_button_2=None,
+            analytics_enabled=None,
+            app_analytics_enabled=None,
+            streaming_quality=None,
+            ui_language=None,
+            speaker_location=None,
+            network_ping_ms=None,
+            network_stability=None,
+            speed_test_status=None,
+            speed_test_average_download=None,
+            speed_test_current_download=None,
+            speed_test_packet_loss=None,
+            alert_alarm_count=None,
+            alert_timer_count=None,
+            alert_snooze_minutes=None,
+            player_notification_active=None,
             source_list=LEGACY_SOURCE_LIST,
             default_volume_by_source={},
         )
@@ -1288,6 +2287,18 @@ class LegacyBinaryClient(BaseKefClient):
         """Legacy speakers do not expose top-panel settings."""
         raise KefUnsupportedDeviceError("Top panel is not supported for legacy KEF")
 
+    async def async_set_top_panel_led_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose top-panel LED settings."""
+        raise KefUnsupportedDeviceError(
+            "Top-panel LED is not supported for legacy KEF"
+        )
+
+    async def async_set_top_panel_standby_led_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose top-panel standby LED settings."""
+        raise KefUnsupportedDeviceError(
+            "Top-panel standby LED is not supported for legacy KEF"
+        )
+
     async def async_set_wake_source(self, source: str) -> None:
         """Legacy speakers do not expose wake-source settings."""
         raise KefUnsupportedDeviceError("Wake source is not supported for legacy KEF")
@@ -1355,6 +2366,10 @@ class LegacyBinaryClient(BaseKefClient):
             "Per-source startup volume is not supported for legacy KEF"
         )
 
+    async def async_set_cable_mode(self, mode: str) -> None:
+        """Legacy speakers do not expose cable-mode configuration."""
+        raise KefUnsupportedDeviceError("Cable mode is not supported for legacy KEF")
+
     async def async_set_balance(self, value: int) -> None:
         """Legacy speakers do not expose EQ balance configuration."""
         raise KefUnsupportedDeviceError("EQ balance is not supported for legacy KEF")
@@ -1413,6 +2428,87 @@ class LegacyBinaryClient(BaseKefClient):
         """Legacy speakers do not expose fixed-volume configuration."""
         raise KefUnsupportedDeviceError(
             "Fixed volume is not supported for legacy KEF"
+        )
+
+    async def async_set_remote_ir_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose IR remote configuration."""
+        raise KefUnsupportedDeviceError(
+            "IR remote settings are not supported for legacy KEF"
+        )
+
+    async def async_set_remote_ir_code(self, code: str) -> None:
+        """Legacy speakers do not expose IR remote code configuration."""
+        raise KefUnsupportedDeviceError(
+            "IR remote code settings are not supported for legacy KEF"
+        )
+
+    async def async_set_favourite_button_action(self, action: str) -> None:
+        """Legacy speakers do not expose favourite button configuration."""
+        raise KefUnsupportedDeviceError(
+            "Favourite button settings are not supported for legacy KEF"
+        )
+
+    async def async_set_eq_button_action(self, button: int, action: str) -> None:
+        """Legacy speakers do not expose EQ button configuration."""
+        raise KefUnsupportedDeviceError(
+            "EQ button settings are not supported for legacy KEF"
+        )
+
+    async def async_set_analytics_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose analytics settings."""
+        raise KefUnsupportedDeviceError(
+            "Analytics settings are not supported for legacy KEF"
+        )
+
+    async def async_set_app_analytics_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose app analytics settings."""
+        raise KefUnsupportedDeviceError(
+            "App analytics settings are not supported for legacy KEF"
+        )
+
+    async def async_set_streaming_quality(self, quality: str) -> None:
+        """Legacy speakers do not expose Airable streaming quality settings."""
+        raise KefUnsupportedDeviceError(
+            "Streaming quality settings are not supported for legacy KEF"
+        )
+
+    async def async_set_ui_language(self, language: str) -> None:
+        """Legacy speakers do not expose UI language settings."""
+        raise KefUnsupportedDeviceError(
+            "UI language settings are not supported for legacy KEF"
+        )
+
+    async def async_set_speaker_location(self, location: str) -> None:
+        """Legacy speakers do not expose speaker location settings."""
+        raise KefUnsupportedDeviceError(
+            "Speaker location settings are not supported for legacy KEF"
+        )
+
+    async def async_get_firmware_update_status(self) -> KefFirmwareUpdateInfo | None:
+        """Legacy speakers do not expose firmware-update status."""
+        raise KefUnsupportedDeviceError(
+            "Firmware updates are not supported for legacy KEF"
+        )
+
+    async def async_check_for_firmware_update(self) -> KefFirmwareUpdateInfo | None:
+        """Legacy speakers do not expose firmware update checks."""
+        raise KefUnsupportedDeviceError(
+            "Firmware updates are not supported for legacy KEF"
+        )
+
+    async def async_install_firmware_update(self) -> KefFirmwareUpdateInfo | None:
+        """Legacy speakers do not expose firmware installation."""
+        raise KefUnsupportedDeviceError(
+            "Firmware updates are not supported for legacy KEF"
+        )
+
+    async def async_upload_firmware_update(
+        self,
+        file_path: str,
+    ) -> KefFirmwareUpdateInfo | None:
+        """Legacy speakers do not expose firmware uploads."""
+        raise KefUnsupportedDeviceError(
+            "Firmware updates are not supported for legacy KEF"
         )
 
     async def _set_source(self, source: str, *, off: bool = False) -> None:
@@ -1479,13 +2575,19 @@ async def async_create_client(
     *,
     backend: KefBackend | str | None = None,
     port: int | None = None,
+    password: str | None = None,
     tcp_port: int | None = None,
 ) -> BaseKefClient:
     """Create the appropriate KEF backend client."""
     normalized_backend = KefBackend(backend) if backend is not None else None
 
     if normalized_backend is KefBackend.MODERN:
-        client = ModernKefClient(host, session, port=port or DEFAULT_PORT)
+        client = ModernKefClient(
+            host,
+            session,
+            port=port or DEFAULT_PORT,
+            password=password,
+        )
         await client.async_identify()
         return client
 
@@ -1494,9 +2596,16 @@ async def async_create_client(
         await client.async_identify()
         return client
 
-    modern_client = ModernKefClient(host, session, port=port or DEFAULT_PORT)
+    modern_client = ModernKefClient(
+        host,
+        session,
+        port=port or DEFAULT_PORT,
+        password=password,
+    )
     try:
         await modern_client.async_identify()
+    except KefAuthenticationRequiredError:
+        raise
     except KefError:
         pass
     else:

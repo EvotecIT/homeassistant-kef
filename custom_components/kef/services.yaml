@@ -1,0 +1,18 @@
+install_firmware_file:
+  name: Install firmware file
+  description: Upload a local KEF .swu firmware file to the speaker and start installation.
+  fields:
+    entity_id:
+      name: Firmware update entity
+      description: The KEF firmware update entity to use for the upload.
+      required: true
+      selector:
+        entity:
+          domain: update
+          integration: kef
+    file_path:
+      name: Firmware file path
+      description: Local path to the .swu firmware file available to Home Assistant.
+      required: true
+      selector:
+        text:

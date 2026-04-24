@@ -7,7 +7,7 @@ import logging
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -57,6 +57,10 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
                 self._session,
                 backend=self.config_entry.data[CONF_BACKEND],
                 port=self.config_entry.data.get(CONF_PORT),
+                password=self.config_entry.options.get(
+                    CONF_PASSWORD,
+                    self.config_entry.data.get(CONF_PASSWORD),
+                ),
                 tcp_port=self.config_entry.data.get(CONF_TCP_PORT),
             )
 

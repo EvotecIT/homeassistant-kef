@@ -45,6 +45,7 @@ Current live validation is strongest on LSX II, but broad KEF coverage is the go
 - startup-volume controls
 - standby and wake-source settings
 - LED and hardware behavior controls where supported
+- privacy, streaming-quality, and regional settings where supported
 - event-assisted refresh on modern KEF speakers
 - optional diagnostics
 
@@ -68,6 +69,7 @@ Current live validation is strongest on LSX II, but broad KEF coverage is the go
 
 - strongest real-device validation today: LSX II
 - modern KEF support is already practical and expanding, including event-assisted refresh on LSX II-era devices
+- firmware updates are exposed through the update entity, with `kef.install_firmware_file` for local `.swu` uploads
 - legacy KEF support is part of the design, not an afterthought
 - compatibility is handled by transport and capability detection, not just hardcoded firmware guesses
 
@@ -103,7 +105,7 @@ That keeps the protocol layer reusable for scripts and apps while the integratio
 ## 🛣️ Roadmap
 
 - next tracked work lives in `docs/feature-checklist.md`
-- top priorities are writable cable mode, older-device validation, and continued capability polishing
+- top priorities are older-device validation, newer firmware auth/password coverage, and continued capability polishing
 - the long-term direction remains one integration with strong modern and legacy support
 
 ## 🛠️ Development
