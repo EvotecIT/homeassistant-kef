@@ -13,7 +13,7 @@ This note captures what was confirmed from:
 
 - the current Home Assistant KEF integration
 - the `aiokef` library
-- the `pykefcontrol` library
+- community research around the second-generation KEF HTTP API
 - a live KEF LSX II at `192.168.241.228`
 
 ## Short conclusion
@@ -216,17 +216,15 @@ The path `kef:eqProfile` returned a structured object like:
 
 This is already much richer than the first-generation KEF DSP model exposed by `aiokef`.
 
-## `pykefcontrol` findings
+## Community HTTP API Findings
 
-`pykefcontrol` is the right family for LSX II-era devices.
-
-Package metadata explicitly says it supports:
+Community HTTP API research targets the LSX II-era device family, including:
 
 - LS50 Wireless II
 - LSX II
 - LS60
 
-Its implementation reads from the same HTTP paths confirmed on the live speaker, including:
+The useful overlap is the same local HTTP path family confirmed on the live speaker, including:
 
 - `player:volume`
 - `player:player/data`
@@ -237,13 +235,11 @@ Its implementation reads from the same HTTP paths confirmed on the live speaker,
 - `settings:/deviceName`
 - `settings:/releasetext`
 
-However, it also has some rough edges:
+The important implementation lesson is to treat those paths as useful signals, not as a one-to-one Home Assistant entity contract:
 
 - the documented source list appears stale for LSX II, because the live device reported `usb`
 - some helper methods assume fields like `status.duration` always exist, which is not true for every input type
 - the polling queue handling is useful, but we should wrap it more defensively in a Home Assistant integration
-
-So `pykefcontrol` is a strong reference, but not something we should blindly expose one-to-one.
 
 ## Suggested integration design
 

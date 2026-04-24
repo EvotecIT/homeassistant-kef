@@ -71,6 +71,28 @@ async def _async_set_top_panel(
     await client.async_set_top_panel_enabled(enabled)
 
 
+async def _async_set_top_panel_led(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set the active top-panel LED state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_top_panel_led_enabled(enabled)
+
+
+async def _async_set_top_panel_standby_led(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set the standby top-panel LED state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_top_panel_standby_led_enabled(enabled)
+
+
 async def _async_set_usb_charging(
     coordinator: KefCoordinator,
     enabled: bool,
@@ -135,6 +157,39 @@ async def _async_set_kw1_wake(
     if client is None:
         return
     await client.async_set_kw1_wake_enabled(enabled)
+
+
+async def _async_set_remote_ir(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set IR remote control state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_remote_ir_enabled(enabled)
+
+
+async def _async_set_analytics(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set KEF analytics state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_analytics_enabled(enabled)
+
+
+async def _async_set_app_analytics(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Set app analytics state."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_app_analytics_enabled(enabled)
 
 
 async def _async_set_desk_mode(
@@ -231,6 +286,22 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         async_set_fn=_async_set_top_panel,
     ),
     KefSwitchDescription(
+        key="top_panel_led",
+        name="Top panel LED",
+        icon="mdi:led-on",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.top_panel_led_enabled,
+        async_set_fn=_async_set_top_panel_led,
+    ),
+    KefSwitchDescription(
+        key="top_panel_standby_led",
+        name="Top panel standby LED",
+        icon="mdi:led-outline",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.top_panel_standby_led_enabled,
+        async_set_fn=_async_set_top_panel_standby_led,
+    ),
+    KefSwitchDescription(
         key="usb_charging",
         name="USB charging",
         icon="mdi:usb-port",
@@ -277,6 +348,30 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.kw1_wake_enabled,
         async_set_fn=_async_set_kw1_wake,
+    ),
+    KefSwitchDescription(
+        key="remote_ir",
+        name="IR remote",
+        icon="mdi:remote",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.remote_ir_enabled,
+        async_set_fn=_async_set_remote_ir,
+    ),
+    KefSwitchDescription(
+        key="analytics",
+        name="KEF analytics",
+        icon="mdi:chart-line",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.analytics_enabled,
+        async_set_fn=_async_set_analytics,
+    ),
+    KefSwitchDescription(
+        key="app_analytics",
+        name="App analytics",
+        icon="mdi:cellphone-cog",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.app_analytics_enabled,
+        async_set_fn=_async_set_app_analytics,
     ),
     KefSwitchDescription(
         key="desk_mode",

@@ -19,6 +19,7 @@ _IN_PROGRESS_STATES = {
     "checkingForUpdates",
     "downloading",
     "downloadInProgress",
+    "downloadingUpdate",
     "installing",
     "updateInProgress",
 }
@@ -61,7 +62,7 @@ class KefFirmwareUpdateEntity(
     def latest_version(self) -> str | None:
         """Return the latest available firmware version."""
         update = self.coordinator.data.firmware_update
-        if update is None or not update.is_available:
+        if update is None:
             return self.installed_version
         return update.available_version or self.installed_version
 

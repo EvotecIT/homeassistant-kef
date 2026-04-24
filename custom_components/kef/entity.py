@@ -25,6 +25,7 @@ class KefEntity:
             "model": device.model,
             "model_id": device.model_code,
             "sw_version": device.firmware_version,
-            "serial_number": device.mac_address,
+            "hw_version": device.hardware_version,
+            "serial_number": device.serial_number or device.mac_address,
             "configuration_url": f"http://{device.host}:{device.port}",
         }

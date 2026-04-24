@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, OptionsFlow
+from homeassistant.config_entries import SOURCE_RECONFIGURE, ConfigFlow, OptionsFlow
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
@@ -50,6 +50,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         self._title = "KEF"
         self._errors: dict[str, str] = {}
         self._entry_data: dict[str, Any] = {}
+        self._entry_title = "KEF"
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """Handle manual setup."""
@@ -58,9 +59,11 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._host = user_input[CONF_HOST]
             self._password = user_input.get(CONF_PASSWORD, "")
-            result = await self._async_validate_host()
-            if result is not None:
-                return result
+            if await self._async_validate_host():
+                return self.async_create_entry(
+                    title=self._entry_title,
+                    data=self._entry_data,
+                )
 
         return self.async_show_form(
             step_id="user",
@@ -84,11 +87,11 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_PASSWORD,
                 entry.options.get(CONF_PASSWORD, entry.data.get(CONF_PASSWORD, "")),
             )
-            result = await self._async_validate_host()
-            if result is not None:
+            if await self._async_validate_host():
                 return self.async_update_reload_and_abort(
                     entry,
                     data_updates=self._entry_data,
+                    options={**entry.options, CONF_PASSWORD: self._password},
                 )
 
         return self.async_show_form(
@@ -145,18 +148,26 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         self._errors = {}
 
         if user_input is not None:
-            result = await self._async_validate_host()
-            if result is not None:
-                return result
+            self._password = user_input.get(CONF_PASSWORD, "")
+            if await self._async_validate_host():
+                return self.async_create_entry(
+                    title=self._entry_title,
+                    data=self._entry_data,
+                )
 
         return self.async_show_form(
             step_id="confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_PASSWORD, default=self._password): str,
+                }
+            ),
             errors=self._errors,
             description_placeholders={"title": self._title},
             last_step=True,
         )
 
-    async def _async_validate_host(self):
+    async def _async_validate_host(self) -> bool:
         """Validate a host and create entry data."""
         session = async_get_clientsession(self.hass)
 
@@ -178,7 +189,10 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             return None
 
         await self.async_set_unique_id(device.unique_id)
-        self._abort_if_unique_id_configured(updates={CONF_HOST: self._host})
+        if self.source == SOURCE_RECONFIGURE:
+            self._abort_if_unique_id_mismatch()
+        else:
+            self._abort_if_unique_id_configured(updates={CONF_HOST: self._host})
 
         self._entry_data = {
             CONF_HOST: self._host,
@@ -188,7 +202,8 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_DEVICE_ID: device.unique_id,
             CONF_PASSWORD: self._password,
         }
-        return self.async_create_entry(title=device.device_name, data=self._entry_data)
+        self._entry_title = device.device_name
+        return True
 
 
 class KefOptionsFlow(OptionsFlow):

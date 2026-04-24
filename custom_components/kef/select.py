@@ -14,8 +14,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     BASS_EXTENSION_OPTIONS,
     CABLE_MODE_OPTIONS,
+    EQ_BUTTON_OPTIONS,
+    FAVOURITE_BUTTON_OPTIONS,
+    IR_CODE_OPTIONS,
     MASTER_CHANNEL_OPTIONS,
     STANDBY_MODE_OPTIONS,
+    STREAMING_QUALITY_OPTIONS,
     WAKE_SOURCE_OPTIONS,
 )
 from .coordinator import KefConfigEntry, KefCoordinator
@@ -78,6 +82,61 @@ async def _async_set_bass_extension(
     await client.async_set_bass_extension(value)
 
 
+async def _async_set_remote_ir_code(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the IR remote code set."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_remote_ir_code(value)
+
+
+async def _async_set_streaming_quality(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the Airable streaming quality."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_streaming_quality(value)
+
+
+async def _async_set_favourite_button(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the favourite button action."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_favourite_button_action(value)
+
+
+async def _async_set_eq_button_1(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the first EQ button action."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_eq_button_action(1, value)
+
+
+async def _async_set_eq_button_2(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the second EQ button action."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_eq_button_action(2, value)
+
+
 @dataclass(frozen=True, kw_only=True)
 class KefSelectDescription(SelectEntityDescription):
     """Describe a KEF configuration select."""
@@ -134,6 +193,51 @@ SELECTS: tuple[KefSelectDescription, ...] = (
         ),
         async_set_fn=_async_set_bass_extension,
         options_map=BASS_EXTENSION_OPTIONS,
+    ),
+    KefSelectDescription(
+        key="remote_ir_code",
+        name="IR remote code",
+        icon="mdi:remote",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.remote_ir_code,
+        async_set_fn=_async_set_remote_ir_code,
+        options_map=IR_CODE_OPTIONS,
+    ),
+    KefSelectDescription(
+        key="streaming_quality",
+        name="Streaming quality",
+        icon="mdi:music-circle",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.streaming_quality,
+        async_set_fn=_async_set_streaming_quality,
+        options_map=STREAMING_QUALITY_OPTIONS,
+    ),
+    KefSelectDescription(
+        key="favourite_button",
+        name="Favourite button",
+        icon="mdi:star",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.favourite_button,
+        async_set_fn=_async_set_favourite_button,
+        options_map=FAVOURITE_BUTTON_OPTIONS,
+    ),
+    KefSelectDescription(
+        key="eq_button_1",
+        name="EQ button 1",
+        icon="mdi:gesture-tap-button",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.eq_button_1,
+        async_set_fn=_async_set_eq_button_1,
+        options_map=EQ_BUTTON_OPTIONS,
+    ),
+    KefSelectDescription(
+        key="eq_button_2",
+        name="EQ button 2",
+        icon="mdi:gesture-tap-button",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.eq_button_2,
+        async_set_fn=_async_set_eq_button_2,
+        options_map=EQ_BUTTON_OPTIONS,
     ),
 )
 

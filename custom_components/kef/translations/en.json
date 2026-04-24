@@ -54,7 +54,16 @@
       "wifi_signal_level": { "name": "Wi-Fi signal level" },
       "wifi_ssid": { "name": "Wi-Fi SSID" },
       "wifi_frequency": { "name": "Wi-Fi frequency" },
-      "wifi_bssid": { "name": "Wi-Fi BSSID" }
+      "wifi_bssid": { "name": "Wi-Fi BSSID" },
+      "network_ping": { "name": "Network ping" },
+      "network_stability": { "name": "Network stability" },
+      "speed_test_status": { "name": "Speed-test status" },
+      "speed_test_average_download": { "name": "Speed-test average download" },
+      "speed_test_current_download": { "name": "Speed-test current download" },
+      "speed_test_packet_loss": { "name": "Speed-test packet loss" },
+      "alert_alarm_count": { "name": "Alarm count" },
+      "alert_timer_count": { "name": "Timer count" },
+      "alert_snooze_time": { "name": "Alert snooze time" }
     },
     "number": {
       "balance": { "name": "Balance" },
@@ -71,7 +80,16 @@
       "wake_source": { "name": "Wake source" },
       "master_channel": { "name": "Master channel" },
       "cable_mode": { "name": "Cable mode" },
-      "bass_extension": { "name": "Bass extension" }
+      "bass_extension": { "name": "Bass extension" },
+      "remote_ir_code": { "name": "IR remote code" },
+      "streaming_quality": { "name": "Streaming quality" },
+      "favourite_button": { "name": "Favourite button" },
+      "eq_button_1": { "name": "EQ button 1" },
+      "eq_button_2": { "name": "EQ button 2" }
+    },
+    "text": {
+      "ui_language": { "name": "UI language" },
+      "speaker_location": { "name": "Speaker location" }
     },
     "switch": {
       "startup_tone": { "name": "Startup tone" },
@@ -79,12 +97,17 @@
       "front_led": { "name": "Front LED" },
       "standby_led": { "name": "Standby LED" },
       "top_panel": { "name": "Top touch panel" },
+      "top_panel_led": { "name": "Top panel LED" },
+      "top_panel_standby_led": { "name": "Top panel standby LED" },
       "usb_charging": { "name": "USB charging" },
       "startup_volume": { "name": "Use startup volume" },
       "per_input_startup_volume": { "name": "Per-input startup volumes" },
       "volume_limit": { "name": "Volume limiter" },
       "subwoofer_wake": { "name": "Wake subwoofer on startup" },
       "kw1_wake": { "name": "Wake KW1 subwoofer on startup" },
+      "remote_ir": { "name": "IR remote" },
+      "analytics": { "name": "KEF analytics" },
+      "app_analytics": { "name": "App analytics" },
       "desk_mode": { "name": "Desk mode" },
       "wall_mode": { "name": "Wall mode" },
       "phase_correction": { "name": "Phase correction" },

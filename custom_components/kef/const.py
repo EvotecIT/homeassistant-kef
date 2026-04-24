@@ -86,6 +86,31 @@ MASTER_CHANNEL_OPTIONS = {
     "right": "Right",
 }
 
+IR_CODE_OPTIONS = {
+    "ir_code_set_a": "Set A",
+    "ir_code_set_b": "Set B",
+    "ir_code_set_c": "Set C",
+}
+
+STREAMING_QUALITY_OPTIONS = {
+    "unlimited": "Unlimited",
+    "320": "320 kbps",
+    "256": "256 kbps",
+    "192": "192 kbps",
+    "128": "128 kbps",
+}
+
+FAVOURITE_BUTTON_OPTIONS = {
+    "nextSource": "Next source",
+}
+
+EQ_BUTTON_OPTIONS = {
+    "dialogue": "Dialogue",
+    "night": "Night",
+    "music": "Music",
+    "movie": "Movie",
+}
+
 DEFAULT_VOLUME_SOURCE_SUFFIX = {
     "wifi": "Wifi",
     "bluetooth": "Bluetooth",
@@ -110,6 +135,9 @@ PROBE_PATHS = {
     "release_text": "settings:/releasetext",
     "mac": "settings:/system/primaryMacAddress",
     "model_code": "settings:/kef/host/modelName",
+    "serial_number": "settings:/kef/host/serialNumber",
+    "kef_id": "settings:/kef/host/kefId",
+    "hardware_version": "settings:/kef/host/hardwareVersion",
     "webserver_auth_mode": "settings:/webserver/authMode",
     "speaker_status": "settings:/kef/host/speakerStatus",
     "source": "settings:/kef/play/physicalSource",
@@ -122,6 +150,7 @@ PROBE_PATHS = {
     "player_data": "player:player/data",
     "play_time": "player:player/data/playTime",
     "eq_profile": "kef:eqProfile",
+    "eq_profile_v2": "kef:eqProfile/v2",
     "network_info": "network:info",
     "standby_mode": "settings:/kef/host/standbyMode",
     "startup_tone": "settings:/kef/host/startupTone",
@@ -129,6 +158,8 @@ PROBE_PATHS = {
     "disable_front_led": "settings:/kef/host/disableFrontLED",
     "disable_front_standby_led": "settings:/kef/host/disableFrontStandbyLED",
     "disable_top_panel": "settings:/kef/host/disableTopPanel",
+    "top_panel_led": "settings:/kef/host/topPanelLED",
+    "top_panel_standby_led": "settings:/kef/host/topPanelStandbyLED",
     "wake_up_source": "settings:/kef/host/wakeUpSource",
     "subwoofer_force_on": "settings:/kef/host/subwooferForceOn",
     "subwoofer_force_on_kw1": "settings:/kef/host/subwooferForceOnKW1",
@@ -140,6 +171,25 @@ PROBE_PATHS = {
     "volume_step": "settings:/kef/host/volumeStep",
     "volume_limit": "settings:/kef/host/volumeLimit",
     "fixed_volume_level": "settings:/kef/host/remote/userFixedVolume",
+    "remote_ir": "settings:/kef/host/remote/remoteIR",
+    "remote_ir_code": "settings:/kef/host/remote/remoteIRCode",
+    "favourite_button": "settings:/kef/host/remote/favouriteButton",
+    "eq_button_1": "settings:/kef/host/remote/eqButton1",
+    "eq_button_2": "settings:/kef/host/remote/eqButton2",
+    "disable_analytics": "settings:/kef/host/disableAnalytics",
+    "disable_app_analytics": "settings:/kef/host/disableAppAnalytics",
+    "streaming_quality": "settings:/airable/bitrate",
+    "ui_language": "settings:/ui/language",
+    "speaker_location": "settings:/kef/host/speakerLocation",
+    "network_ping": "kef:network/pingInternet",
+    "network_stability": "kef:network/pingInternetStability",
+    "speed_test_status": "kef:speedTest/status",
+    "speed_test_average_download": "kef:speedTest/averageDownloadSpeed",
+    "speed_test_current_download": "kef:speedTest/currentDownloadSpeed",
+    "speed_test_packet_loss": "kef:speedTest/packetLoss",
+    "alerts_list": "alerts:/list",
+    "alert_snooze_time": "settings:/alerts/snoozeTime",
+    "player_notification": "notifications:/player/playing",
 }
 
 EVENT_SUBSCRIPTIONS = (
@@ -152,6 +202,7 @@ EVENT_SUBSCRIPTIONS = (
     {"path": PROBE_PATHS["player_data"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["play_time"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["eq_profile"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["eq_profile_v2"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["network_info"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["standby_mode"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["startup_tone"], "type": "itemWithValue"},
@@ -159,6 +210,8 @@ EVENT_SUBSCRIPTIONS = (
     {"path": PROBE_PATHS["disable_front_led"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["disable_front_standby_led"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["disable_top_panel"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["top_panel_led"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["top_panel_standby_led"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["wake_up_source"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["subwoofer_force_on"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["subwoofer_force_on_kw1"], "type": "itemWithValue"},
@@ -170,6 +223,25 @@ EVENT_SUBSCRIPTIONS = (
     {"path": PROBE_PATHS["volume_step"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["volume_limit"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["fixed_volume_level"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["remote_ir"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["remote_ir_code"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["favourite_button"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["eq_button_1"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["eq_button_2"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["disable_analytics"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["disable_app_analytics"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["streaming_quality"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["ui_language"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["speaker_location"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["network_ping"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["network_stability"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["speed_test_status"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["speed_test_average_download"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["speed_test_current_download"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["speed_test_packet_loss"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["alerts_list"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["alert_snooze_time"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["player_notification"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["master_channel"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["cable_mode"], "type": "itemWithValue"},
     {"path": "notifications:/display/queue", "type": "rows"},
