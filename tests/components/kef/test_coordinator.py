@@ -6,6 +6,7 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef.const import (
@@ -14,6 +15,7 @@ from custom_components.kef.const import (
     DOMAIN,
 )
 from custom_components.kef.coordinator import KefCoordinator
+from custom_components.kef.exceptions import KefAuthenticationRequiredError
 from custom_components.kef.models import KefBackend
 from tests.conftest import TEST_HOST, TEST_PORT
 
@@ -58,3 +60,27 @@ async def test_event_listener_requests_refresh_on_events(hass) -> None:
         await coordinator._async_event_listener_loop()
 
     coordinator.async_request_refresh.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_update_data_raises_config_entry_auth_failed(hass) -> None:
+    """Authentication failures should trigger Home Assistant reauth."""
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "host": TEST_HOST,
+            "port": TEST_PORT,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: "modern",
+        },
+        title="KEF",
+    )
+    coordinator = KefCoordinator(hass, entry)
+    coordinator.client = AsyncMock()
+    coordinator.client.async_refresh.side_effect = KefAuthenticationRequiredError(
+        "password required"
+    )
+
+    with pytest.raises(ConfigEntryAuthFailed):
+        await coordinator._async_update_data()

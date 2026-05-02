@@ -269,7 +269,9 @@ class KefNumber(KefEntity, CoordinatorEntity[KefCoordinator], NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the number value."""
-        await self.entity_description.async_set_fn(self.coordinator, value)
+        await self.async_call_kef(
+            lambda: self.entity_description.async_set_fn(self.coordinator, value)
+        )
         await self.coordinator.async_request_refresh()
 
 
@@ -320,5 +322,9 @@ class KefSourceVolumeNumber(KefEntity, CoordinatorEntity[KefCoordinator], Number
         client = self.coordinator.client
         if client is None:
             return
-        await client.async_set_default_volume_for_source(self._source, round(value))
+        await self.async_call_kef(
+            lambda: client.async_set_default_volume_for_source(
+                self._source, round(value)
+            )
+        )
         await self.coordinator.async_request_refresh()

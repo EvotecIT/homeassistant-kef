@@ -278,12 +278,12 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
 
     async def async_turn_on(self) -> None:
         """Turn on the speaker."""
-        await self.coordinator.client.async_turn_on()
+        await self.async_call_kef(self.coordinator.client.async_turn_on)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self) -> None:
         """Turn off the speaker."""
-        await self.coordinator.client.async_turn_off()
+        await self.async_call_kef(self.coordinator.client.async_turn_off)
         await self.coordinator.async_request_refresh()
 
     async def async_set_volume_level(self, volume: float) -> None:
@@ -291,19 +291,29 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         raw_volume = round(max(0.0, min(1.0, volume)) * 100)
         if raw_volume > 0:
             self._last_volume_before_mute = raw_volume
-        await self.coordinator.client.async_set_volume_raw(raw_volume)
+        await self.async_call_kef(
+            lambda: self.coordinator.client.async_set_volume_raw(raw_volume)
+        )
         await self.coordinator.async_request_refresh()
 
     async def async_volume_up(self) -> None:
         """Raise the volume."""
         current = self.coordinator.data.volume_raw or 0
-        await self.coordinator.client.async_set_volume_raw(min(100, current + 4))
+        await self.async_call_kef(
+            lambda: self.coordinator.client.async_set_volume_raw(
+                min(100, current + 4)
+            )
+        )
         await self.coordinator.async_request_refresh()
 
     async def async_volume_down(self) -> None:
         """Lower the volume."""
         current = self.coordinator.data.volume_raw or 0
-        await self.coordinator.client.async_set_volume_raw(max(0, current - 4))
+        await self.async_call_kef(
+            lambda: self.coordinator.client.async_set_volume_raw(
+                max(0, current - 4)
+            )
+        )
         await self.coordinator.async_request_refresh()
 
     async def async_mute_volume(self, mute: bool) -> None:
@@ -311,32 +321,40 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         current = self.coordinator.data.volume_raw or 0
         if not mute and current == 0:
             self._last_volume_before_mute = max(1, self._last_volume_before_mute)
-        await self.coordinator.client.async_set_muted(mute)
+        await self.async_call_kef(
+            lambda: self.coordinator.client.async_set_muted(mute)
+        )
         await self.coordinator.async_request_refresh()
 
     async def async_select_source(self, source: str) -> None:
         """Select the input source."""
-        await self.coordinator.client.async_select_source(source)
+        await self.async_call_kef(
+            lambda: self.coordinator.client.async_select_source(source)
+        )
         await self.coordinator.async_request_refresh()
 
     async def async_media_play(self) -> None:
         """Play or resume playback."""
         if self.state != MediaPlayerState.PLAYING:
-            await self.coordinator.client.async_toggle_play_pause()
+            await self.async_call_kef(
+                self.coordinator.client.async_toggle_play_pause
+            )
             await self.coordinator.async_request_refresh()
 
     async def async_media_pause(self) -> None:
         """Pause playback."""
         if self.state == MediaPlayerState.PLAYING:
-            await self.coordinator.client.async_toggle_play_pause()
+            await self.async_call_kef(
+                self.coordinator.client.async_toggle_play_pause
+            )
             await self.coordinator.async_request_refresh()
 
     async def async_media_next_track(self) -> None:
         """Skip to the next track."""
-        await self.coordinator.client.async_next_track()
+        await self.async_call_kef(self.coordinator.client.async_next_track)
         await self.coordinator.async_request_refresh()
 
     async def async_media_previous_track(self) -> None:
         """Go to the previous track."""
-        await self.coordinator.client.async_previous_track()
+        await self.async_call_kef(self.coordinator.client.async_previous_track)
         await self.coordinator.async_request_refresh()

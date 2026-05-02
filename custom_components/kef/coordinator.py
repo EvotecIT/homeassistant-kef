@@ -8,6 +8,7 @@ from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -18,7 +19,7 @@ from .const import (
     CONF_TCP_PORT,
     DEFAULT_SCAN_INTERVAL_SECONDS,
 )
-from .exceptions import KefError
+from .exceptions import KefAuthenticationRequiredError, KefError
 from .models import KefBackend, KefSnapshot
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,6 +67,8 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
 
         try:
             return await self.client.async_refresh()
+        except KefAuthenticationRequiredError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
         except KefError as err:
             raise UpdateFailed(str(err)) from err
 

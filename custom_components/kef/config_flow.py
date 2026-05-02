@@ -5,7 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import SOURCE_RECONFIGURE, ConfigFlow, OptionsFlow
+from homeassistant.config_entries import (
+    SOURCE_REAUTH,
+    SOURCE_RECONFIGURE,
+    ConfigFlow,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
@@ -111,6 +116,47 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=self._errors,
         )
 
+    async def async_step_reauth(self, entry_data: dict[str, Any]):
+        """Handle a request to update KEF credentials."""
+        entry = self._get_reauth_entry()
+        self._host = entry.data[CONF_HOST]
+        self._password = entry.options.get(
+            CONF_PASSWORD,
+            entry.data.get(CONF_PASSWORD, ""),
+        )
+        self._title = entry.title
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ):
+        """Confirm updated KEF credentials."""
+        self._errors = {}
+        entry = self._get_reauth_entry()
+
+        if user_input is not None:
+            self._host = entry.data[CONF_HOST]
+            self._password = user_input.get(CONF_PASSWORD, "")
+            if await self._async_validate_host():
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates=self._entry_data,
+                    options={**entry.options, CONF_PASSWORD: self._password},
+                )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_PASSWORD, default=self._password): str,
+                }
+            ),
+            errors=self._errors,
+            description_placeholders={"title": self._title},
+            last_step=True,
+        )
+
     async def async_step_zeroconf(self, discovery_info: ZeroconfServiceInfo):
         """Handle zeroconf discovery."""
         if discovery_info.type != AIRPLAY_ZEROCONF_TYPE:
@@ -189,7 +235,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             return None
 
         await self.async_set_unique_id(device.unique_id)
-        if self.source == SOURCE_RECONFIGURE:
+        if self.source in {SOURCE_REAUTH, SOURCE_RECONFIGURE}:
             self._abort_if_unique_id_mismatch()
         else:
             self._abort_if_unique_id_configured(updates={CONF_HOST: self._host})

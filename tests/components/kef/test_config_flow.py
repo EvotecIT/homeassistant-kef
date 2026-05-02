@@ -255,6 +255,66 @@ async def test_reconfigure_updates_password_options(monkeypatch, hass) -> None:
     assert entry.options[CONF_PASSWORD] == "new-secret"
 
 
+async def test_reauth_updates_password_options(monkeypatch, hass) -> None:
+    """Reauth should prompt for and store a replacement web UI password."""
+
+    async def fake_create_client(
+        host,
+        session,
+        *,
+        backend=None,
+        port=None,
+        password=None,
+        tcp_port=None,
+    ):
+        assert host == TEST_HOST
+        assert password == "fixed-secret"
+        return _FakeClient()
+
+    monkeypatch.setattr(
+        "custom_components.kef.config_flow.async_create_client",
+        fake_create_client,
+    )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_DEVICE_INFO.unique_id,
+        data={
+            CONF_HOST: TEST_HOST,
+            CONF_PORT: 80,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: "modern",
+            CONF_DEVICE_ID: TEST_DEVICE_INFO.unique_id,
+            CONF_PASSWORD: "old-secret",
+        },
+        options={CONF_PASSWORD: "old-secret"},
+        title=TEST_DEVICE_INFO.device_name,
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": config_entries.SOURCE_REAUTH,
+            "entry_id": entry.entry_id,
+        },
+        data=entry.data,
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "reauth_confirm"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_PASSWORD: "fixed-secret"},
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert entry.data[CONF_PASSWORD] == "fixed-secret"
+    assert entry.options[CONF_PASSWORD] == "fixed-secret"
+
+
 async def test_zeroconf_updates_existing_entry_using_deviceid(hass) -> None:
     """Discovered speakers should match the configured MAC-based unique ID."""
 
