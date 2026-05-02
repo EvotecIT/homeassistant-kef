@@ -20,6 +20,13 @@
           "host": "Host or IP address",
           "password": "Web UI password"
         }
+      },
+      "reauth_confirm": {
+        "title": "Update KEF password",
+        "description": "Enter the web UI password for {title}.",
+        "data": {
+          "password": "Web UI password"
+        }
       }
     },
     "error": {
@@ -29,6 +36,7 @@
     },
     "abort": {
       "already_configured": "This KEF speaker is already configured",
+      "reauth_successful": "The KEF password was updated",
       "unsupported": "This discovered device is not a supported KEF speaker"
     }
   },

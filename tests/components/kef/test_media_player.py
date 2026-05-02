@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from copy import deepcopy
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from homeassistant.components.media_player import MediaPlayerEntityFeature
+from homeassistant.exceptions import HomeAssistantError
 
+from custom_components.kef.exceptions import KefAuthenticationRequiredError
 from custom_components.kef.media_player import KefMediaPlayer
 from tests.conftest import TEST_SNAPSHOT
 
@@ -17,7 +19,11 @@ def _build_player(snapshot):
     coordinator = Mock()
     coordinator.data = snapshot
     coordinator.last_update_success = True
-    coordinator.config_entry = SimpleNamespace(domain="kef")
+    coordinator.config_entry = SimpleNamespace(
+        domain="kef",
+        async_start_reauth=Mock(),
+    )
+    coordinator.hass = Mock()
     return KefMediaPlayer(coordinator)
 
 
@@ -63,3 +69,27 @@ def test_legacy_supported_features_keep_transport_controls() -> None:
     assert player.supported_features & MediaPlayerEntityFeature.PAUSE
     assert player.supported_features & MediaPlayerEntityFeature.NEXT_TRACK
     assert player.supported_features & MediaPlayerEntityFeature.PREVIOUS_TRACK
+
+
+async def test_volume_auth_failure_starts_reauth() -> None:
+    """Runtime auth failures should start reauth and raise a HA error."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    player = _build_player(snapshot)
+    player.coordinator.client = SimpleNamespace(
+        async_set_volume_raw=AsyncMock(
+            side_effect=KefAuthenticationRequiredError("bad password")
+        )
+    )
+    player.coordinator.async_request_refresh = AsyncMock()
+
+    try:
+        await player.async_set_volume_level(0.5)
+    except HomeAssistantError as err:
+        assert "valid web UI password" in str(err)
+    else:
+        raise AssertionError("Expected HomeAssistantError")
+
+    player.coordinator.config_entry.async_start_reauth.assert_called_once_with(
+        player.coordinator.hass
+    )
+    player.coordinator.async_request_refresh.assert_not_awaited()

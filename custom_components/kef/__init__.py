@@ -10,12 +10,13 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 
 from .const import (
+    AUTH_FAILURE_MESSAGE,
     CONF_ENABLE_DIAGNOSTICS,
     DEFAULT_ENABLE_DIAGNOSTICS,
     DOMAIN,
 )
 from .coordinator import KefConfigEntry, KefCoordinator
-from .exceptions import KefError
+from .exceptions import KefAuthenticationRequiredError, KefError
 
 PLATFORMS = [
     Platform.MEDIA_PLAYER,
@@ -105,6 +106,9 @@ async def _async_handle_install_firmware_file(
             call.data[ATTR_FIRMWARE_FILE_PATH]
         )
         await coordinator.async_request_refresh()
+    except KefAuthenticationRequiredError as err:
+        config_entry.async_start_reauth(hass)
+        raise HomeAssistantError(AUTH_FAILURE_MESSAGE) from err
     except KefError as err:
         raise HomeAssistantError(str(err)) from err
 

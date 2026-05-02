@@ -65,6 +65,14 @@ Current live validation is strongest on LSX II, but broad KEF coverage is the go
 2. Restart Home Assistant.
 3. Add the integration from `Settings -> Devices & services`.
 
+### KEF Web UI Passwords
+
+Recent KEF firmware can require a password for the speaker web interface and
+local API writes. If your speaker has web UI password protection enabled, enter
+that password when adding or reconfiguring the integration. If the speaker starts
+requiring a password after a firmware update, Home Assistant will ask you to
+reauthenticate the KEF integration.
+
 ## ✅ Current Status
 
 - strongest real-device validation today: LSX II

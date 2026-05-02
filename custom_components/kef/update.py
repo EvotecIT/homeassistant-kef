@@ -95,5 +95,7 @@ class KefFirmwareUpdateEntity(
         **kwargs,
     ) -> None:
         """Install the available firmware update."""
-        await self.coordinator.client.async_install_firmware_update()
+        await self.async_call_kef(
+            self.coordinator.client.async_install_firmware_update
+        )
         await self.coordinator.async_request_refresh()

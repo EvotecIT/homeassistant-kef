@@ -295,5 +295,9 @@ class KefSelect(KefEntity, CoordinatorEntity[KefCoordinator], SelectEntity):
             for raw, friendly in self.entity_description.options_map.items()
         }
         raw_value = reverse_map.get(option, option)
-        await self.entity_description.async_set_fn(self.coordinator, raw_value)
+        await self.async_call_kef(
+            lambda: self.entity_description.async_set_fn(
+                self.coordinator, raw_value
+            )
+        )
         await self.coordinator.async_request_refresh()

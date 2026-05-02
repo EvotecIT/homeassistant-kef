@@ -8,6 +8,11 @@ AUTH_MODE_SETDATA = "setData"
 
 DOMAIN = "kef"
 
+AUTH_FAILURE_MESSAGE = (
+    "KEF speaker requires a valid web UI password. Reconfigure the KEF "
+    "integration and enter the password configured in the speaker web interface."
+)
+
 DEFAULT_PORT = 80
 DEFAULT_SCAN_INTERVAL_SECONDS = 10
 MIN_SCAN_INTERVAL_SECONDS = 5

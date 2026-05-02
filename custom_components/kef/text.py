@@ -110,5 +110,7 @@ class KefText(KefEntity, CoordinatorEntity[KefCoordinator], TextEntity):
 
     async def async_set_value(self, value: str) -> None:
         """Set the text value."""
-        await self.entity_description.async_set_fn(self.coordinator, value)
+        await self.async_call_kef(
+            lambda: self.entity_description.async_set_fn(self.coordinator, value)
+        )
         await self.coordinator.async_request_refresh()

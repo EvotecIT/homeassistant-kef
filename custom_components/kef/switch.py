@@ -456,10 +456,14 @@ class KefSwitch(KefEntity, CoordinatorEntity[KefCoordinator], SwitchEntity):
 
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the switch on."""
-        await self.entity_description.async_set_fn(self.coordinator, True)
+        await self.async_call_kef(
+            lambda: self.entity_description.async_set_fn(self.coordinator, True)
+        )
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the switch off."""
-        await self.entity_description.async_set_fn(self.coordinator, False)
+        await self.async_call_kef(
+            lambda: self.entity_description.async_set_fn(self.coordinator, False)
+        )
         await self.coordinator.async_request_refresh()
