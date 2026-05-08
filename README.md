@@ -53,11 +53,15 @@ Current live validation is strongest on LSX II, but broad KEF coverage is the go
 
 ### HACS
 
-1. Open HACS.
-2. Add `https://github.com/EvotecIT/homeassistant-kef` as a custom repository of type `Integration`.
-3. Install `KEF`.
-4. Restart Home Assistant.
-5. Go to `Settings -> Devices & services` and add `KEF`.
+Click the button below to open this repository inside HACS. If the button does not open your Home Assistant instance, add `https://github.com/EvotecIT/homeassistant-kef` manually as a custom repository of type `Integration`.
+
+[![Open your Home Assistant instance and open the KEF repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=EvotecIT&repository=homeassistant-kef&category=integration)
+
+1. Download `KEF` from HACS.
+2. Restart Home Assistant.
+3. Add the integration from `Settings -> Devices & services`, or use the button below.
+
+[![Open your Home Assistant instance and start setting up a new KEF integration instance.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=kef)
 
 ### Manual
 
