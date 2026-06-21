@@ -63,6 +63,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
                     self.config_entry.data.get(CONF_PASSWORD),
                 ),
                 tcp_port=self.config_entry.data.get(CONF_TCP_PORT),
+                async_add_executor_job=self.hass.async_add_executor_job,
             )
 
         try:

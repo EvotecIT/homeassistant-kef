@@ -13,7 +13,7 @@ import os
 import socket
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 from urllib.parse import urlencode
 
@@ -359,6 +359,7 @@ class ModernKefClient(BaseKefClient):
         port: int = DEFAULT_PORT,
         password: str | None = None,
         request_timeout: float = 4.0,
+        async_add_executor_job: Callable[..., Awaitable[Any]] | None = None,
     ) -> None:
         """Initialize the client."""
         super().__init__(host)
@@ -366,6 +367,7 @@ class ModernKefClient(BaseKefClient):
         self._port = port
         self._password = password or ""
         self._request_timeout = request_timeout
+        self._async_add_executor_job = async_add_executor_job
         self._last_active_source: str | None = None
         self._event_queue_id: str | None = None
         self._auth_mode: str | None = None
@@ -1233,7 +1235,7 @@ class ModernKefClient(BaseKefClient):
         form = aiohttp.FormData()
 
         try:
-            firmware_file = open(file_path, "rb")
+            firmware_file = await self._async_open_firmware_file(file_path)
         except OSError as err:
             raise KefConnectionError(
                 f"Unable to read firmware file {file_path}: {err}"
@@ -1288,6 +1290,12 @@ class ModernKefClient(BaseKefClient):
             raise KefResponseError("Firmware upload did not reach the downloaded state")
 
         return await self._async_install_downloaded_firmware_update()
+
+    async def _async_open_firmware_file(self, file_path: str) -> Any:
+        """Open firmware files away from the Home Assistant event loop."""
+        if self._async_add_executor_job is not None:
+            return await self._async_add_executor_job(open, file_path, "rb")
+        return await asyncio.to_thread(open, file_path, "rb")
 
     async def _async_install_downloaded_firmware_update(
         self,
@@ -2577,6 +2585,7 @@ async def async_create_client(
     port: int | None = None,
     password: str | None = None,
     tcp_port: int | None = None,
+    async_add_executor_job: Callable[..., Awaitable[Any]] | None = None,
 ) -> BaseKefClient:
     """Create the appropriate KEF backend client."""
     normalized_backend = KefBackend(backend) if backend is not None else None
@@ -2587,6 +2596,7 @@ async def async_create_client(
             session,
             port=port or DEFAULT_PORT,
             password=password,
+            async_add_executor_job=async_add_executor_job,
         )
         await client.async_identify()
         return client
@@ -2601,6 +2611,7 @@ async def async_create_client(
         session,
         port=port or DEFAULT_PORT,
         password=password,
+        async_add_executor_job=async_add_executor_job,
     )
     try:
         await modern_client.async_identify()

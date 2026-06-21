@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import copy
 
 import pytest
@@ -1533,6 +1534,54 @@ async def test_modern_upload_firmware_update_detects_auth_redirect(
 
     with pytest.raises(KefAuthenticationRequiredError):
         await client.async_upload_firmware_update(str(firmware_file))
+
+
+async def test_modern_upload_firmware_update_opens_file_in_executor(
+    monkeypatch, tmp_path
+) -> None:
+    """Firmware uploads should not open local files on the event loop."""
+
+    class FakeResponse:
+        status = 302
+        headers = {"Location": "/login.fcgi"}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def text(self):
+            return ""
+
+    class FakeSession:
+        def post(self, url, *, data, allow_redirects, timeout):
+            return FakeResponse()
+
+    async def fake_poll(self, *, attempts=10, delay_seconds=1.0):
+        raise AssertionError("auth redirects must fail before polling")
+
+    calls = []
+
+    async def fake_executor(func, *args):
+        calls.append((func, args))
+        return func(*args)
+
+    monkeypatch.setattr(ModernKefClient, "_poll_firmware_update_status", fake_poll)
+
+    firmware_file = tmp_path / "firmware.swu"
+    firmware_file.write_bytes(b"firmware")
+
+    client = ModernKefClient(
+        TEST_HOST,
+        FakeSession(),
+        async_add_executor_job=fake_executor,
+    )
+
+    with pytest.raises(KefAuthenticationRequiredError):
+        await client.async_upload_firmware_update(str(firmware_file))
+
+    assert calls == [(builtins.open, (str(firmware_file), "rb"))]
 
 
 async def test_modern_upload_firmware_update_wraps_file_open_errors(
