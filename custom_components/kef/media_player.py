@@ -92,7 +92,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         """Return the current player state."""
         data = self.coordinator.data
         if not self.available:
-            return MediaPlayerState.UNAVAILABLE
+            return None
         if not data.is_power_on:
             return MediaPlayerState.OFF
         if data.playback is None or data.playback.state is None:
