@@ -12,6 +12,8 @@ from custom_components.kef.const import (
     AIRPLAY_ZEROCONF_TYPE,
     CONF_BACKEND,
     CONF_DEVICE_ID,
+    CONF_ENABLE_DIAGNOSTICS,
+    CONF_SCAN_INTERVAL,
     CONF_TCP_PORT,
     DOMAIN,
 )
@@ -124,6 +126,45 @@ async def test_user_flow_surfaces_invalid_auth(monkeypatch, hass) -> None:
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "invalid_auth"}
+
+
+async def test_options_flow_saves_settings(hass) -> None:
+    """Options should open and persist through Home Assistant's flow manager."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_DEVICE_INFO.unique_id,
+        data={
+            CONF_HOST: TEST_HOST,
+            CONF_PORT: 80,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: "modern",
+            CONF_DEVICE_ID: TEST_DEVICE_INFO.unique_id,
+            CONF_PASSWORD: "",
+        },
+        title=TEST_DEVICE_INFO.device_name,
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "init"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_PASSWORD: "new-secret",
+            CONF_SCAN_INTERVAL: 45,
+            CONF_ENABLE_DIAGNOSTICS: True,
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options == {
+        CONF_PASSWORD: "new-secret",
+        CONF_SCAN_INTERVAL: 45,
+        CONF_ENABLE_DIAGNOSTICS: True,
+    }
 
 
 async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) -> None:
