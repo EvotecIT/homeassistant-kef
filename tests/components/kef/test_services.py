@@ -36,7 +36,7 @@ async def test_install_firmware_file_service_uploads_to_update_entity(hass) -> N
     entity_entry = registry.async_get_or_create(
         Platform.UPDATE,
         DOMAIN,
-        "kef-84:17:15:04:43:8c_firmware",
+        "kef-02:00:00:00:00:01_firmware",
         config_entry=config_entry,
         suggested_object_id="kef_firmware",
     )
@@ -80,7 +80,7 @@ async def test_install_firmware_file_auth_failure_starts_reauth(hass) -> None:
     entity_entry = registry.async_get_or_create(
         Platform.UPDATE,
         DOMAIN,
-        "kef-84:17:15:04:43:8c_firmware",
+        "kef-02:00:00:00:00:01_firmware",
         config_entry=config_entry,
         suggested_object_id="kef_firmware",
     )

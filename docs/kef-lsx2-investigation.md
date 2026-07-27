@@ -2,6 +2,14 @@
 
 Last updated: 2026-04-09
 
+Network addresses, device names, and identifiers in this public note are
+anonymized. The behavior and firmware values remain representative of the
+device used for validation.
+
+Current verification: the modern client refresh was rechecked on 2026-07-27
+with LSX II firmware `3.0.137.0xf884312`. The historical findings below retain
+the firmware used during the original investigation.
+
 ## Goal
 
 Work out whether a modern Home Assistant custom integration can support both:
@@ -14,7 +22,7 @@ This note captures what was confirmed from:
 - the current Home Assistant KEF integration
 - the `aiokef` library
 - community research around the second-generation KEF HTTP API
-- a live KEF LSX II at `192.168.241.228`
+- a live KEF LSX II on a private network
 
 ## Short conclusion
 
@@ -78,7 +86,7 @@ This matches the current Home Assistant core integration.
 
 The live LSX II refused connections on TCP port `50001`:
 
-- `ConnectionRefusedError` on `192.168.241.228:50001`
+- `ConnectionRefusedError` on the speaker's private address at port `50001`
 
 At the same time, it exposed a local web UI and an HTTP API under `/api/*`.
 
@@ -86,14 +94,14 @@ This means LSX II is not a drop-in target for the current `aiokef` backend.
 
 ## Live LSX II device findings
 
-The built-in web UI at `http://192.168.241.228/` confirmed:
+The built-in web UI on the speaker's private address confirmed:
 
 - model: `LSX II`
 - release text: `LSXII_V26120`
 - version: `2.6.120.0xfb95307`
-- wireless IP: `192.168.241.228`
+- wireless IP: private address (anonymized)
 - AirPlay version: `366.0`
-- MAC address: `84:17:15:04:43:8C`
+- MAC address: anonymized
 
 Zeroconf / mDNS services on the device included:
 
@@ -165,8 +173,8 @@ This is a strong fit for a Home Assistant `DataUpdateCoordinator` plus event-ass
 
 These values were observed from the real speaker during investigation:
 
-- speaker name: `LSX II-04438c`
-- MAC: `84:17:15:04:43:8C`
+- speaker name: anonymized
+- MAC: anonymized
 - speaker status: `powerOn`
 - source: `usb`
 - volume: `80`

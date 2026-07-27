@@ -204,10 +204,10 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
     snapshot = await client.async_refresh()
 
-    assert snapshot.device.device_name == "LSX II-04438c"
+    assert snapshot.device.device_name == "LSX II-Test"
     assert snapshot.device.model == "LSXII"
-    assert snapshot.device.serial_number == "LSX2G38602R23R1G"
-    assert snapshot.device.kef_id == "283284c1-b02e-417d-b659-e6e1f4d5f2f5"
+    assert snapshot.device.serial_number == "TEST-LSX2-0001"
+    assert snapshot.device.kef_id == "00000000-0000-4000-8000-000000000001"
     assert snapshot.device.hardware_version == "0.0.0"
     assert snapshot.source == "usb"
     assert snapshot.cable_mode == "wired"
@@ -231,7 +231,7 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     assert snapshot.firmware_update.state == "newUpdateAvailable"
     assert snapshot.firmware_update.available_version == "3.0.135.0x60acbcf"
     assert snapshot.wifi_info is not None
-    assert snapshot.wifi_info.ssid == "EvotecLab"
+    assert snapshot.wifi_info.ssid == "TestNetwork"
     assert snapshot.wifi_info.signal_level == -49
     assert snapshot.standby_mode == "standby_none"
     assert snapshot.startup_tone_enabled is True

@@ -21,6 +21,9 @@ This checklist tracks what the repository already covers and what still needs wo
   - [x] subwoofer wake and KW1 wake
 - [x] Reusable `kef_client` Python package
 - [x] HACS-ready packaging and first GitHub release
+- [x] Current Home Assistant options-flow regression coverage
+- [x] Unavailable media-player state regression coverage
+- [x] Event-listener cancellation and polling fallback coverage
 
 ## High-Priority Next
 
