@@ -27,6 +27,16 @@ def _build_player(snapshot):
     return KefMediaPlayer(coordinator)
 
 
+def test_unavailable_player_has_no_media_state() -> None:
+    """Unavailable speakers should rely on entity availability, not a media state."""
+    player = _build_player(deepcopy(TEST_SNAPSHOT))
+    player.coordinator.last_update_success = False
+
+    assert player.available is False
+    assert player.state is None
+    assert player.entity_picture == player.media_image_url
+
+
 def test_modern_supported_features_hide_unsupported_transport_controls() -> None:
     """Modern sources should only expose transport controls when KEF says they work."""
     snapshot = deepcopy(TEST_SNAPSHOT)
