@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
+import pytest
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
 from homeassistant.data_entry_flow import FlowResultType
@@ -19,6 +22,19 @@ from custom_components.kef.const import (
 )
 from custom_components.kef.exceptions import KefAuthenticationRequiredError
 from tests.conftest import TEST_DEVICE_INFO, TEST_HOST
+
+
+@pytest.fixture(autouse=True)
+def mock_entry_lifecycle(monkeypatch) -> None:
+    """Keep config-flow tests focused on flow behavior across HA versions."""
+    monkeypatch.setattr(
+        "custom_components.kef.async_setup_entry",
+        AsyncMock(return_value=True),
+    )
+    monkeypatch.setattr(
+        "custom_components.kef.async_unload_entry",
+        AsyncMock(return_value=True),
+    )
 
 
 class _FakeClient:
@@ -57,13 +73,13 @@ async def test_user_flow_creates_modern_entry(monkeypatch, hass) -> None:
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "LSX II-04438c"
+    assert result["title"] == "LSX II-Test"
     assert result["data"] == {
         CONF_HOST: TEST_HOST,
         CONF_PORT: 80,
         CONF_TCP_PORT: 50001,
         CONF_BACKEND: "modern",
-        CONF_DEVICE_ID: "kef-84:17:15:04:43:8c",
+        CONF_DEVICE_ID: "kef-02:00:00:00:00:01",
         CONF_PASSWORD: "",
     }
 
@@ -383,7 +399,7 @@ async def test_zeroconf_updates_existing_entry_using_deviceid(hass) -> None:
         properties={
             "manufacturer": "KEF",
             "model": "LSX II",
-            "deviceid": "84:17:15:04:43:8C",
+            "deviceid": "02:00:00:00:00:01",
             "serialNumber": "AA-BB-CC",
         },
     )

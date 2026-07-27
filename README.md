@@ -64,6 +64,12 @@ Older first-generation KEF speakers matter too. This repo already includes a sep
 
 Current live validation is strongest on LSX II, but broad KEF coverage is the goal, not just the newest models.
 
+| Device family | Current evidence |
+| --- | --- |
+| LSX II | Live local refresh, event queue, and control-path validation |
+| LSX II LT, LS50 Wireless II, LS60, XIO | Modern API compatibility target; model-specific live validation is still welcome |
+| First-generation LSX / LS50 Wireless | Legacy transport implemented; current real-hardware validation is still needed |
+
 ## ✨ What You Get
 
 - zeroconf discovery and UI setup
@@ -113,6 +119,8 @@ reauthenticate the KEF integration.
 - firmware updates are exposed through the update entity, with `kef.install_firmware_file` for local `.swu` uploads
 - legacy KEF support is part of the design, not an afterthought
 - compatibility is handled by transport and capability detection, not just hardcoded firmware guesses
+- unavailable speakers keep polling and recover after a later successful refresh
+- CI covers Python 3.13 and the current Python 3.14 Home Assistant stack
 
 The current LSX II investigation notes are in `docs/kef-lsx2-investigation.md`.
 

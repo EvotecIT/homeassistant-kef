@@ -15,7 +15,7 @@ from custom_components.kef.const import (
     DOMAIN,
 )
 from custom_components.kef.coordinator import KefCoordinator
-from custom_components.kef.exceptions import KefAuthenticationRequiredError
+from custom_components.kef.exceptions import KefAuthenticationRequiredError, KefError
 from custom_components.kef.models import KefBackend
 from tests.conftest import TEST_HOST, TEST_PORT
 
@@ -60,6 +60,73 @@ async def test_event_listener_requests_refresh_on_events(hass) -> None:
         await coordinator._async_event_listener_loop()
 
     coordinator.async_request_refresh.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_event_listener_falls_back_after_device_error(monkeypatch, hass) -> None:
+    """Event queue failures should reset local state and retain polling fallback."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "host": TEST_HOST,
+            "port": TEST_PORT,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: "modern",
+        },
+        title="KEF",
+    )
+    coordinator = KefCoordinator(hass, entry)
+
+    class _FakeModernClient:
+        backend = KefBackend.MODERN
+        async_poll_events = AsyncMock(side_effect=KefError("offline"))
+        async_reset_event_queue = AsyncMock()
+
+    coordinator.client = _FakeModernClient()
+
+    async def cancel_after_fallback(delay: float) -> None:
+        assert delay == 5
+        raise asyncio.CancelledError
+
+    with monkeypatch.context() as patch_context:
+        patch_context.setattr(
+            "custom_components.kef.coordinator.asyncio.sleep",
+            cancel_after_fallback,
+        )
+        with pytest.raises(asyncio.CancelledError):
+            await coordinator._async_event_listener_loop()
+
+    coordinator.client.async_reset_event_queue.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
+async def test_stop_event_listener_cancels_and_clears_queue(hass) -> None:
+    """Unloading should cancel the listener and clear its local queue state."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "host": TEST_HOST,
+            "port": TEST_PORT,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: "modern",
+        },
+        title="KEF",
+    )
+    coordinator = KefCoordinator(hass, entry)
+
+    class _FakeModernClient:
+        backend = KefBackend.MODERN
+        async_reset_event_queue = AsyncMock()
+
+    coordinator.client = _FakeModernClient()
+    listener_task = asyncio.create_task(asyncio.Event().wait())
+    coordinator._event_listener_task = listener_task
+
+    await coordinator.async_stop_event_listener()
+
+    assert listener_task.cancelled()
+    assert coordinator._event_listener_task is None
+    coordinator.client.async_reset_event_queue.assert_awaited_once_with()
 
 
 @pytest.mark.asyncio

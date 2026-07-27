@@ -14,7 +14,6 @@ dependencies = ["aiohttp>=3.9", "cryptography>=42.0.0"]
 
 [project.optional-dependencies]
 test = [
-  "aioresponses>=0.7.8",
   "pytest>=8.3.0",
   "pytest-asyncio>=0.24.0",
   "pytest-cov>=6.0.0",
@@ -23,7 +22,7 @@ test = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["custom_components*", "kef_client*", "tests*"]
+include = ["custom_components*", "kef_client*"]
 
 [tool.setuptools.package-data]
 "custom_components.kef" = ["manifest.json", "services.yaml", "translations/*.json", "brand/*.png"]

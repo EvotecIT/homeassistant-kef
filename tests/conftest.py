@@ -19,13 +19,13 @@ from custom_components.kef.models import (
 TEST_HOST = "192.0.2.10"
 TEST_PORT = 80
 
-DEVICE_NAME_VALUE = {"type": "string_", "string_": "LSX II-04438c"}
+DEVICE_NAME_VALUE = {"type": "string_", "string_": "LSX II-Test"}
 VERSION_VALUE = {"type": "string_", "string_": "2.6.120.0xfb95307"}
 RELEASE_TEXT_VALUE = {"type": "string_", "string_": "LSXII_V26120"}
-MAC_VALUE = {"type": "string_", "string_": "84:17:15:04:43:8C"}
+MAC_VALUE = {"type": "string_", "string_": "02:00:00:00:00:01"}
 MODEL_CODE_VALUE = {"type": "string_", "string_": "SP4041"}
-SERIAL_NUMBER_VALUE = {"type": "string_", "string_": "LSX2G38602R23R1G"}
-KEF_ID_VALUE = {"type": "string_", "string_": "283284c1-b02e-417d-b659-e6e1f4d5f2f5"}
+SERIAL_NUMBER_VALUE = {"type": "string_", "string_": "TEST-LSX2-0001"}
+KEF_ID_VALUE = {"type": "string_", "string_": "00000000-0000-4000-8000-000000000001"}
 HARDWARE_VERSION_VALUE = {"type": "string_", "string_": "0.0.0"}
 SPEAKER_STATUS_VALUE = {"type": "kefSpeakerStatus", "kefSpeakerStatus": "powerOn"}
 SOURCE_VALUE = {"type": "kefPhysicalSource", "kefPhysicalSource": "usb"}
@@ -199,7 +199,7 @@ NETWORK_INFO_VALUE = {
     "networkInfo": {
         "wireless": {
             "signalLevel": -49,
-            "ssid": "EvotecLab",
+            "ssid": "TestNetwork",
             "frequency": 5180,
             "bssid": "AA:BB:CC:DD:EE:FF",
         }
@@ -208,15 +208,15 @@ NETWORK_INFO_VALUE = {
 
 TEST_DEVICE_INFO = KefDeviceInfo(
     backend=KefBackend.MODERN,
-    unique_id="kef-84:17:15:04:43:8c",
-    device_name="LSX II-04438c",
+    unique_id="kef-02:00:00:00:00:01",
+    device_name="LSX II-Test",
     model="LSXII",
-    mac_address="84:17:15:04:43:8C",
+    mac_address="02:00:00:00:00:01",
     firmware_version="2.6.120.0xfb95307",
     release_text="LSXII_V26120",
     model_code="SP4041",
-    serial_number="LSX2G38602R23R1G",
-    kef_id="283284c1-b02e-417d-b659-e6e1f4d5f2f5",
+    serial_number="TEST-LSX2-0001",
+    kef_id="00000000-0000-4000-8000-000000000001",
     hardware_version="0.0.0",
     host=TEST_HOST,
     port=TEST_PORT,
