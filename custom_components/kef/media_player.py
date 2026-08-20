@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
@@ -14,6 +16,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
+from .exceptions import KefError
+
+VOLUME_STEP = 4
 
 
 async def async_setup_entry(
@@ -52,6 +57,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         self._attr_unique_id = coordinator.data.device.unique_id
         self._attr_name = None
         self._last_volume_before_mute = coordinator.data.volume_raw or 15
+        self._volume_lock = asyncio.Lock()
 
     @property
     def available(self) -> bool:
@@ -291,30 +297,60 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         raw_volume = round(max(0.0, min(1.0, volume)) * 100)
         if raw_volume > 0:
             self._last_volume_before_mute = raw_volume
-        await self.async_call_kef(
-            lambda: self.coordinator.client.async_set_volume_raw(raw_volume)
-        )
-        await self.coordinator.async_request_refresh()
+        await self._async_write_volume(raw_volume)
 
     async def async_volume_up(self) -> None:
         """Raise the volume."""
-        current = self.coordinator.data.volume_raw or 0
-        await self.async_call_kef(
-            lambda: self.coordinator.client.async_set_volume_raw(
-                min(100, current + 4)
-            )
-        )
-        await self.coordinator.async_request_refresh()
+        await self._async_step_volume(VOLUME_STEP)
 
     async def async_volume_down(self) -> None:
         """Lower the volume."""
-        current = self.coordinator.data.volume_raw or 0
+        await self._async_step_volume(-VOLUME_STEP)
+
+    async def _async_step_volume(self, delta: int) -> None:
+        """Move the volume by delta, relative to the speaker's own level.
+
+        The level is read from the device rather than taken from cached state:
+        the KEF API has no relative command, so a step is really an absolute
+        write, and anything that moved the volume outside Home Assistant (the
+        KEF app, HDMI-CEC, a physical control) would otherwise be overwritten
+        by a step computed from a level the speaker no longer has.
+
+        The lock serializes the read-modify-write. Volume commands arrive in
+        bursts from remotes and repeat handlers, and without it two overlapping
+        steps read the same level and write the same target, silently dropping
+        one press.
+        """
+        async with self._volume_lock:
+            current = await self._async_live_volume()
+            target = max(0, min(100, current + delta))
+            if target == current:
+                return
+            await self._async_write_volume(target)
+
+    async def _async_live_volume(self) -> int:
+        """Read the level from the speaker, falling back to the last known one.
+
+        A failed read shouldn't fail the command outright -- the write that
+        follows will surface a device that is genuinely unreachable.
+        """
+        try:
+            live = await self.coordinator.client.async_get_volume_raw()
+        except KefError:
+            live = None
+        if live is None:
+            return self.coordinator.data.volume_raw or 0
+        return live
+
+    async def _async_write_volume(self, raw_volume: int) -> None:
+        """Write an absolute volume and publish it as the new known level."""
         await self.async_call_kef(
-            lambda: self.coordinator.client.async_set_volume_raw(
-                max(0, current - 4)
-            )
+            lambda: self.coordinator.client.async_set_volume_raw(raw_volume)
         )
-        await self.coordinator.async_request_refresh()
+        self.coordinator.async_apply_local_change(
+            volume_raw=raw_volume,
+            volume_level=raw_volume / 100,
+        )
 
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute or unmute the speaker."""
@@ -324,7 +360,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         await self.async_call_kef(
             lambda: self.coordinator.client.async_set_muted(mute)
         )
-        await self.coordinator.async_request_refresh()
+        self.coordinator.async_apply_local_change(is_muted=mute)
 
     async def async_select_source(self, source: str) -> None:
         """Select the input source."""

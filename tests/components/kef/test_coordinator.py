@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -17,7 +19,7 @@ from custom_components.kef.const import (
 from custom_components.kef.coordinator import KefCoordinator
 from custom_components.kef.exceptions import KefAuthenticationRequiredError, KefError
 from custom_components.kef.models import KefBackend
-from tests.conftest import TEST_HOST, TEST_PORT
+from tests.conftest import TEST_HOST, TEST_PORT, TEST_SNAPSHOT
 
 
 @pytest.mark.asyncio
@@ -151,3 +153,105 @@ async def test_update_data_raises_config_entry_auth_failed(hass) -> None:
 
     with pytest.raises(ConfigEntryAuthFailed):
         await coordinator._async_update_data()
+
+
+@pytest.mark.asyncio
+async def test_apply_local_change_publishes_updated_snapshot(hass) -> None:
+    """A local change should replace the snapshot and notify listeners."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "host": TEST_HOST,
+            "port": TEST_PORT,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: "modern",
+        },
+        title="KEF",
+    )
+    coordinator = KefCoordinator(hass, entry)
+    coordinator.data = replace(TEST_SNAPSHOT, volume_raw=40, volume_level=0.40)
+    updates: list[int | None] = []
+    coordinator.async_add_listener(lambda: updates.append(coordinator.data.volume_raw))
+
+    coordinator.async_apply_local_change(volume_raw=44, volume_level=0.44)
+
+    assert coordinator.data.volume_raw == 44
+    assert coordinator.data.volume_level == 0.44
+    assert updates == [44]
+
+
+@pytest.mark.asyncio
+async def test_apply_local_change_is_a_no_op_before_first_refresh(hass) -> None:
+    """No snapshot yet means nothing to patch."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "host": TEST_HOST,
+            "port": TEST_PORT,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: "modern",
+        },
+        title="KEF",
+    )
+    coordinator = KefCoordinator(hass, entry)
+
+    coordinator.async_apply_local_change(volume_raw=44)
+
+    assert coordinator.data is None
+
+
+def _coordinator(hass) -> KefCoordinator:
+    """Build a coordinator against a throwaway config entry."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "host": TEST_HOST,
+            "port": TEST_PORT,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: "modern",
+        },
+        title="KEF",
+    )
+    return KefCoordinator(hass, entry)
+
+
+@pytest.mark.asyncio
+async def test_local_change_survives_a_read_that_started_before_it(hass) -> None:
+    """An in-flight read is stale for a field written during it; keep the write."""
+    coordinator = _coordinator(hass)
+    coordinator.data = replace(TEST_SNAPSHOT, volume_raw=40, volume_level=0.40)
+    reading = asyncio.Event()
+    finish = asyncio.Event()
+
+    async def _slow_refresh():
+        reading.set()
+        await finish.wait()
+        # captured before the write below
+        return replace(TEST_SNAPSHOT, volume_raw=40, volume_level=0.40)
+
+    coordinator.client = SimpleNamespace(async_refresh=_slow_refresh)
+    task = asyncio.create_task(coordinator._async_update_data())
+    await reading.wait()
+    coordinator.async_apply_local_change(volume_raw=44, volume_level=0.44)
+    finish.set()
+
+    snapshot = await task
+    assert snapshot.volume_raw == 44
+    assert snapshot.volume_level == 0.44
+
+
+@pytest.mark.asyncio
+async def test_a_newer_read_replaces_the_local_change(hass) -> None:
+    """Once a read that started after the write lands, the device wins."""
+    coordinator = _coordinator(hass)
+    coordinator.data = replace(TEST_SNAPSHOT, volume_raw=40, volume_level=0.40)
+    coordinator.async_apply_local_change(volume_raw=44, volume_level=0.44)
+
+    async def _refresh():
+        return replace(TEST_SNAPSHOT, volume_raw=60, volume_level=0.60)
+
+    coordinator.client = SimpleNamespace(async_refresh=_refresh)
+
+    snapshot = await coordinator._async_update_data()
+    assert snapshot.volume_raw == 60
+    assert coordinator._local_changes == {}

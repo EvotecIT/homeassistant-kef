@@ -132,6 +132,10 @@ class BaseKefClient(ABC):
         """Set the raw 0..100 volume value."""
 
     @abstractmethod
+    async def async_get_volume_raw(self) -> int | None:
+        """Read the raw 0..100 volume value in a single round trip."""
+
+    @abstractmethod
     async def async_toggle_play_pause(self) -> None:
         """Toggle play/pause."""
 
@@ -816,6 +820,10 @@ class ModernKefClient(BaseKefClient):
             role="value",
             value={"type": "i32_", "i32_": max(0, min(100, volume))},
         )
+
+    async def async_get_volume_raw(self) -> int | None:
+        """Read just the volume level (one request, unlike async_refresh)."""
+        return await self._get_path_value(PROBE_PATHS["volume"], typed_key="i32_")
 
     async def async_toggle_play_pause(self) -> None:
         """Toggle play/pause."""
@@ -2232,6 +2240,16 @@ class LegacyBinaryClient(BaseKefClient):
         await self._send_command(
             bytes([_LEGACY_SET_START, ord("%"), _LEGACY_SET_MID, clamped])
         )
+
+    async def async_get_volume_raw(self) -> int | None:
+        """Read just the volume level (one command, unlike async_refresh)."""
+        response = await self._send_command(
+            bytes([_LEGACY_GET_START, ord("%"), _LEGACY_GET_END])
+        )
+        if response is None:
+            return None
+        # high bit carries mute, same as async_refresh
+        return response % 128
 
     async def async_toggle_play_pause(self) -> None:
         """Toggle play/pause."""

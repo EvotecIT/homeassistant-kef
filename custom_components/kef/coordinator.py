@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from dataclasses import replace
 from datetime import timedelta
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
+from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -37,6 +41,8 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
         self._session = async_get_clientsession(hass)
         self.client = None
         self._event_listener_task: asyncio.Task[None] | None = None
+        self._local_changes: dict[str, Any] = {}
+        self._local_change_at = 0.0
         super().__init__(
             hass,
             _LOGGER,
@@ -66,12 +72,52 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
                 async_add_executor_job=self.hass.async_add_executor_job,
             )
 
+        started_at = time.monotonic()
         try:
-            return await self.client.async_refresh()
+            snapshot = await self.client.async_refresh()
         except KefAuthenticationRequiredError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except KefError as err:
             raise UpdateFailed(str(err)) from err
+        return self._merge_local_changes(snapshot, started_at)
+
+    def _merge_local_changes(
+        self, snapshot: KefSnapshot, started_at: float
+    ) -> KefSnapshot:
+        """Stop an in-flight read from undoing a write that landed during it.
+
+        A refresh reads several paths and can take a second or more. If a write
+        lands while one is in flight, that read is already out of date for the
+        field it touched, and letting it publish would roll the value back --
+        and, because commands compute the next absolute value from this data,
+        the following command would then recompute from the rolled-back number.
+        Reads that started after the write are newer than anything we know, so
+        the device wins and the local values are dropped.
+        """
+        if not self._local_changes:
+            return snapshot
+        if self._local_change_at <= started_at:
+            self._local_changes.clear()
+            return snapshot
+        return replace(snapshot, **self._local_changes)
+
+    @callback
+    def async_apply_local_change(self, **changes: Any) -> None:
+        """Publish a state change this integration just made itself.
+
+        The KEF API has no relative commands, so entities compute the next
+        absolute value from ``self.data``. If a write is only reflected after a
+        poll, ``self.data`` stays stale for up to ``update_interval`` and
+        repeated commands keep recomputing from the same base. Publishing the
+        value we just wrote keeps ``self.data`` usable as the base for the next
+        command; the scheduled poll and the event listener still reconcile it
+        with the device (see _merge_local_changes for the in-flight case).
+        """
+        self._local_changes.update(changes)
+        self._local_change_at = time.monotonic()
+        if self.data is None:
+            return
+        self.async_set_updated_data(replace(self.data, **changes))
 
     async def async_start_event_listener(self) -> None:
         """Start the optional modern KEF event listener."""
