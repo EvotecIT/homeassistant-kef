@@ -204,8 +204,28 @@ async def test_set_volume_level_publishes_the_written_level() -> None:
     assert written == [70, 74]
 
 
+async def test_set_volume_level_publishes_the_level_the_speaker_accepted() -> None:
+    """Volume limits must not leave Home Assistant with an optimistic level."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.volume_raw = 40
+    player = _build_player(snapshot)
+    written, device = _wire_volume_writes(player)
+
+    async def _clamped_write(raw_volume: int) -> None:
+        written.append(raw_volume)
+        device["volume"] = min(raw_volume, 50)
+
+    player.coordinator.client.async_set_volume_raw.side_effect = _clamped_write
+
+    await player.async_set_volume_level(0.7)
+
+    assert written == [70]
+    assert player.coordinator.data.volume_raw == 50
+    assert player.coordinator.data.volume_level == 0.5
+
+
 async def test_mute_publishes_the_new_mute_state() -> None:
-    """Mute toggles read back their own write instead of a stale poll."""
+    """Modern mute toggles publish their accepted state immediately."""
     snapshot = deepcopy(TEST_SNAPSHOT)
     snapshot.is_muted = False
     player = _build_player(snapshot)
@@ -216,6 +236,20 @@ async def test_mute_publishes_the_new_mute_state() -> None:
 
     await player.async_mute_volume(False)
     assert player.coordinator.data.is_muted is False
+
+
+async def test_legacy_mute_keeps_full_snapshot_reconciliation() -> None:
+    """Legacy mute changes volume, so all correlated state must be refreshed."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.device.backend = snapshot.device.backend.LEGACY
+    player = _build_player(snapshot)
+    _wire_volume_writes(player)
+
+    await player.async_mute_volume(True)
+
+    player.coordinator.client.async_set_muted.assert_awaited_once_with(True)
+    player.coordinator.async_request_refresh.assert_awaited_once_with()
+    player.coordinator.async_apply_local_change.assert_not_called()
 
 
 async def test_steps_read_the_speaker_not_the_cached_level() -> None:
@@ -256,3 +290,26 @@ async def test_step_falls_back_to_the_cached_level_when_the_read_fails() -> None
     await player.async_volume_up()
 
     assert written == [44]
+
+
+async def test_step_auth_failure_at_limit_starts_reauth() -> None:
+    """Authentication failures must not become cached-limit no-ops."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.volume_raw = 100
+    player = _build_player(snapshot)
+    _wire_volume_writes(player)
+    player.coordinator.client.async_get_volume_raw = AsyncMock(
+        side_effect=KefAuthenticationRequiredError("bad password")
+    )
+
+    try:
+        await player.async_volume_up()
+    except HomeAssistantError as err:
+        assert "valid web UI password" in str(err)
+    else:
+        raise AssertionError("Expected HomeAssistantError")
+
+    player.coordinator.config_entry.async_start_reauth.assert_called_once_with(
+        player.coordinator.hass
+    )
+    player.coordinator.client.async_set_volume_raw.assert_not_awaited()

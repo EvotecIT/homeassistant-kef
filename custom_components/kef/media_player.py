@@ -11,12 +11,15 @@ from homeassistant.components.media_player import (
     MediaType,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import AUTH_FAILURE_MESSAGE
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
-from .exceptions import KefError
+from .exceptions import KefAuthenticationRequiredError, KefError
+from .models import KefBackend
 
 VOLUME_STEP = 4
 
@@ -297,7 +300,8 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         raw_volume = round(max(0.0, min(1.0, volume)) * 100)
         if raw_volume > 0:
             self._last_volume_before_mute = raw_volume
-        await self._async_write_volume(raw_volume)
+        async with self._volume_lock:
+            await self._async_write_volume(raw_volume)
 
     async def async_volume_up(self) -> None:
         """Raise the volume."""
@@ -328,28 +332,36 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
                 return
             await self._async_write_volume(target)
 
-    async def _async_live_volume(self) -> int:
+    async def _async_live_volume(self, fallback: int | None = None) -> int:
         """Read the level from the speaker, falling back to the last known one.
 
         A failed read shouldn't fail the command outright -- the write that
-        follows will surface a device that is genuinely unreachable.
+        follows will surface a device that is genuinely unreachable. An
+        authentication failure is different: it must start reauthentication
+        even when the cached level would otherwise make a step a no-op.
         """
         try:
             live = await self.coordinator.client.async_get_volume_raw()
+        except KefAuthenticationRequiredError as err:
+            self.coordinator.config_entry.async_start_reauth(self.coordinator.hass)
+            raise HomeAssistantError(AUTH_FAILURE_MESSAGE) from err
         except KefError:
             live = None
         if live is None:
+            if fallback is not None:
+                return fallback
             return self.coordinator.data.volume_raw or 0
         return live
 
     async def _async_write_volume(self, raw_volume: int) -> None:
-        """Write an absolute volume and publish it as the new known level."""
+        """Write an absolute volume and publish the level the speaker accepted."""
         await self.async_call_kef(
             lambda: self.coordinator.client.async_set_volume_raw(raw_volume)
         )
+        accepted_volume = await self._async_live_volume(fallback=raw_volume)
         self.coordinator.async_apply_local_change(
-            volume_raw=raw_volume,
-            volume_level=raw_volume / 100,
+            volume_raw=accepted_volume,
+            volume_level=accepted_volume / 100,
         )
 
     async def async_mute_volume(self, mute: bool) -> None:
@@ -357,10 +369,14 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         current = self.coordinator.data.volume_raw or 0
         if not mute and current == 0:
             self._last_volume_before_mute = max(1, self._last_volume_before_mute)
-        await self.async_call_kef(
-            lambda: self.coordinator.client.async_set_muted(mute)
-        )
-        self.coordinator.async_apply_local_change(is_muted=mute)
+        async with self._volume_lock:
+            await self.async_call_kef(
+                lambda: self.coordinator.client.async_set_muted(mute)
+            )
+            if self.coordinator.data.device.backend is KefBackend.LEGACY:
+                await self.coordinator.async_request_refresh()
+                return
+            self.coordinator.async_apply_local_change(is_muted=mute)
 
     async def async_select_source(self, source: str) -> None:
         """Select the input source."""
