@@ -24,7 +24,7 @@ jobs:
     steps:
       - name: Start trusted PR-head validation check
         id: check
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { data: check } = await github.rest.checks.create({
@@ -115,7 +115,7 @@ jobs:
       checks: write
     steps:
       - name: Complete trusted PR-head validation check
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           CHECK_ID: ${{ needs.start.outputs.check-id }}
           HACS_RESULT: ${{ needs.validate_hacs.result }}
