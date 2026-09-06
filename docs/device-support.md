@@ -29,4 +29,4 @@ personal information. A report that identifies one working action does not
 establish every setting for the model.
 
 Contributor references: [LSX II investigation](kef-lsx2-investigation.md) and
-[feature checklist](feature-checklist.md).
+[open work](feature-checklist.md).
