@@ -1,170 +1,98 @@
 # KEF for Home Assistant
 
-![KEF for Home Assistant — illustrative artwork](assets/homeassistant-kef-social.png)
-
-*Illustrative artwork. Available controls depend on the device and integration support.*
+![KEF for Home Assistant](assets/homeassistant-kef-social.png)
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://hacs.xyz/)
-[![Validate](https://img.shields.io/github/actions/workflow/status/EvotecIT/homeassistant-kef/validate.yml?branch=main&style=for-the-badge&label=Validate)](https://github.com/EvotecIT/homeassistant-kef/actions/workflows/validate.yml)
-[![Hassfest](https://img.shields.io/github/actions/workflow/status/EvotecIT/homeassistant-kef/hassfest.yml?branch=main&style=for-the-badge&label=Hassfest)](https://github.com/EvotecIT/homeassistant-kef/actions/workflows/hassfest.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/EvotecIT/homeassistant-kef/validate.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/EvotecIT/homeassistant-kef/actions/workflows/validate.yml)
+[![License](https://img.shields.io/github/license/EvotecIT/homeassistant-kef?style=for-the-badge)](LICENSE)
 
-Local-first KEF support for Home Assistant, built to support both newer KEF speakers and older generations in one integration.
+## Overview
 
-![KEF integration overview](assets/kef-overview.png)
+Control KEF speakers over your local network from Home Assistant. The
+integration brings together modern and first-generation speaker families with
+discovery, a media player, and the settings each device exposes.
+
+- Volume, mute, source selection, and supported playback controls.
+- Startup volume, standby, wake sources, LEDs, and other supported device settings.
+- Firmware update controls and optional diagnostics.
+
+LSX II has the strongest real-device validation. LSX II LT, LS50 Wireless II,
+LS60, and XIO are modern-API compatibility targets; first-generation LSX and
+LS50 Wireless use a separate legacy connection. Check the
+[device support guide](docs/device-support.md) for the evidence and limitations.
+
+## Sponsor
+
+Support development and maintenance through
+[GitHub Sponsors](https://github.com/sponsors/PrzemyslawKlys).
+Sponsorship is optional; these projects remain open source.
 
 ## More for your Home Assistant home
 
-Other projects we maintain for the same setup:
+Other integrations and dashboards we maintain:
 
-- [Dreame & MOVA mowers](https://github.com/EvotecIT/homeassistant-dreamelawnmower) — mowing controls, maps, schedules, and supported cameras.
-- [Lawn Mower Card](https://github.com/EvotecIT/lovelace-lawn-mower-card) — a visual dashboard for mower state, maps, and controls.
-- [Devialet](https://github.com/EvotecIT/homeassistant-devialet) — local speaker control, with Dione support.
-- [Siegenia](https://github.com/EvotecIT/homeassistant-siegenia) — local control for supported window controllers.
-- [EasyControlX](https://github.com/EvotecIT/homeassistant-easycontrolx) — connect supported Windows and macOS hosts.
+- [Dreame & MOVA mowers](https://github.com/EvotecIT/homeassistant-dreamelawnmower) — Mowing controls, maps, schedules, and supported cameras.
+- [Lawn Mower Card](https://github.com/EvotecIT/lovelace-lawn-mower-card) — A dashboard for mower state, maps, and controls.
+- [Devialet](https://github.com/EvotecIT/homeassistant-devialet) — Local speaker control, with Dione support.
+- [Siegenia](https://github.com/EvotecIT/homeassistant-siegenia) — Local control for supported window controllers.
+- [EasyControlX](https://github.com/EvotecIT/homeassistant-easycontrolx) — Connect supported Windows and macOS hosts.
 
-Prefer a native app for everyday control? [CasaRay](https://casaray.dev/)
-brings rooms, devices, cameras, and home activity together on iPhone, iPad, and
-Mac. [Tactra Remote](https://tactra.dev/) puts media players, speakers, and TV
-controls in a focused remote for iPhone, iPad, Apple Watch, and Mac.
+For a native app connected to the same Home Assistant setup:
 
-Both connect to your Home Assistant setup. Neither is required to use this
-project.
+- [CasaRay](https://casaray.dev/) — rooms, devices, cameras, and home activity on
+  iPhone, iPad, and Mac.
+- [Tactra Remote](https://tactra.dev/) — media players, speakers, and TV controls
+  on iPhone, iPad, Apple Watch, and Mac.
 
-## 🎯 What This Is
+Neither app is required to use this project.
 
-This project is a custom KEF integration for Home Assistant with a strong bias toward:
-
-- local control
-- clean Home Assistant setup
-- no dependency on external KEF transport libraries
-- one codebase for modern and legacy KEF families
-
-## 🔊 Device Support Direction
-
-### Modern KEF family
-
-The most mature support today is for speakers using KEF's newer local HTTP API, including:
-
-- LSX II
-- LSX II LT
-- LS50 Wireless II
-- LS60
-- XIO
-
-### Older KEF family
-
-Older first-generation KEF speakers matter too. This repo already includes a separate legacy transport path so the integration can support earlier LSX / LS50 Wireless-style devices without forcing them through the newer API model.
-
-Current live validation is strongest on LSX II, but broad KEF coverage is the goal, not just the newest models.
-
-| Device family | Current evidence |
-| --- | --- |
-| LSX II | Live local refresh, event queue, and control-path validation |
-| LSX II LT, LS50 Wireless II, LS60, XIO | Modern API compatibility target; model-specific live validation is still welcome |
-| First-generation LSX / LS50 Wireless | Legacy transport implemented; current real-hardware validation is still needed |
-
-## ✨ What You Get
-
-- zeroconf discovery and UI setup
-- media player controls
-- source selection
-- volume and mute
-- source-aware playback controls on modern KEF sources
-- startup-volume controls
-- standby and wake-source settings
-- LED and hardware behavior controls where supported
-- privacy, streaming-quality, and regional settings where supported
-- event-assisted refresh on modern KEF speakers
-- optional diagnostics
-
-## 🏠 Installation
+## Installation
 
 ### HACS
 
-Click the button below to open this repository inside HACS. If the button does not open your Home Assistant instance, add `https://github.com/EvotecIT/homeassistant-kef` manually as a custom repository of type `Integration`.
+[![Open this repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=EvotecIT&repository=homeassistant-kef&category=integration)
 
-[![Open your Home Assistant instance and open the KEF repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=EvotecIT&repository=homeassistant-kef&category=integration)
-
-1. Download `KEF` from HACS.
-2. Restart Home Assistant.
-3. Add the integration from `Settings -> Devices & services`, or use the button below.
-
-[![Open your Home Assistant instance and start setting up a new KEF integration instance.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=kef)
+1. Open the repository with the button above. Alternatively, in HACS choose
+   **Custom repositories**, add `https://github.com/EvotecIT/homeassistant-kef`,
+   and select **Integration**.
+2. Download **KEF** and restart Home Assistant.
+3. Open **Settings → Devices & services → Add integration**, then choose
+   **KEF**.
 
 ### Manual
 
-1. Copy the `custom_components/kef` folder into your Home Assistant `config/custom_components` directory.
+1. Download the repository and copy `custom_components/kef` into your
+   Home Assistant `config/custom_components` directory.
 2. Restart Home Assistant.
-3. Add the integration from `Settings -> Devices & services`.
+3. Add **KEF** from **Settings → Devices & services**.
 
-### KEF Web UI Passwords
+## Configuration
 
-Recent KEF firmware can require a password for the speaker web interface and
-local API writes. If your speaker has web UI password protection enabled, enter
-that password when adding or reconfiguring the integration. If the speaker starts
-requiring a password after a firmware update, Home Assistant will ask you to
-reauthenticate the KEF integration.
+Accept a discovered speaker or enter its host/IP address. If the speaker's web
+interface is password-protected, enter that password during setup. A later
+firmware change may require reauthentication.
 
-## ✅ Current Status
+Open the speaker's device page to use its media player and supported settings.
+Use **Configure** to adjust polling and diagnostic options; use **Reconfigure**
+if its network address changes.
 
-- strongest real-device validation today: LSX II
-- modern KEF support is already practical and expanding, including event-assisted refresh on LSX II-era devices
-- firmware updates are exposed through the update entity, with `kef.install_firmware_file` for local `.swu` uploads
-- legacy KEF support is part of the design, not an afterthought
-- compatibility is handled by transport and capability detection, not just hardcoded firmware guesses
-- unavailable speakers keep polling and recover after a later successful refresh
-- CI covers Python 3.13 and the current Python 3.14 Home Assistant stack
+## Documentation
 
-The current LSX II investigation notes are in `docs/kef-lsx2-investigation.md`.
+| I want to… | Guide |
+| --- | --- |
+| Check modern and legacy model support | [Device support](docs/device-support.md) |
+| Configure the speaker, password, or settings | [Configuration and troubleshooting](docs/configuration.md) |
+| Add playback or volume automations | [Automations](docs/automations.md) |
+| Use KEF from Python | [Python library](docs/python-library.md) |
+| Contribute or investigate a device | [Development](docs/development.md) · [Feature checklist](docs/feature-checklist.md) |
 
-Feature tracking checklist: `docs/feature-checklist.md`
+## Screenshots
 
-## 🧱 Reusable Python Package
+![KEF integration overview](assets/kef-overview.png)
 
-This repository now ships two usable layers:
+## Support
 
-- `kef_client` for direct Python access to KEF local APIs
-- the Home Assistant integration in `custom_components/kef`
-
-Library docs: `docs/python-library.md`
-
-Runnable example: `examples/python_client.py`
-
-Example:
-
-```python
-from aiohttp import ClientSession
-from kef_client import ModernKefClient
-
-async with ClientSession() as session:
-    client = ModernKefClient("192.168.1.20", session)
-    snapshot = await client.async_refresh()
-    print(snapshot.device.device_name, snapshot.source)
-```
-
-That keeps the protocol layer reusable for scripts and apps while the integration stays focused on Home Assistant setup and entities.
-
-## 🛣️ Roadmap
-
-- next tracked work lives in `docs/feature-checklist.md`
-- top priorities are older-device validation, newer firmware auth/password coverage, and continued capability polishing
-- the long-term direction remains one integration with strong modern and legacy support
-
-## 🛠️ Development
-
-```bash
-python -m pip install -e .[test]
-ruff check .
-python -m compileall kef_client custom_components tests examples
-pytest
-```
-
-Note:
-
-- the full Home Assistant pytest stack runs best in Linux CI
-- on Windows, `pytest-homeassistant-custom-component` imports `fcntl`, so complete local HA pytest runs are limited
-
-## ❤️ Support
-
-- Issues: [GitHub Issues](https://github.com/EvotecIT/homeassistant-kef/issues)
-- Source: [GitHub Repository](https://github.com/EvotecIT/homeassistant-kef)
+[Report an issue](https://github.com/EvotecIT/homeassistant-kef/issues) with the
+speaker model, firmware, integration version, and steps to reproduce. Download
+integration diagnostics and review attachments before posting. Never include
+the speaker password or other credentials.
