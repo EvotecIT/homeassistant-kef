@@ -51,6 +51,9 @@ jobs:
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
+          # This job is isolated on a GitHub-hosted runner with read-only contents
+          # permission, no secrets, no cache, and no persisted checkout credentials.
+          allow-unsafe-pr-checkout: true
           persist-credentials: false
 
       - name: HACS validation
@@ -73,6 +76,9 @@ jobs:
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
+          # This job is isolated on a GitHub-hosted runner with read-only contents
+          # permission, no secrets, no cache, and no persisted checkout credentials.
+          allow-unsafe-pr-checkout: true
           persist-credentials: false
 
       - name: Set up Python
@@ -102,6 +108,9 @@ jobs:
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
+          # This job is isolated on a GitHub-hosted runner with read-only contents
+          # permission, no secrets, no cache, and no persisted checkout credentials.
+          allow-unsafe-pr-checkout: true
           persist-credentials: false
 
       - name: Run hassfest
