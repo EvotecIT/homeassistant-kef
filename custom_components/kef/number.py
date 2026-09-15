@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from homeassistant.components.number import NumberEntity, NumberEntityDescription
 from homeassistant.const import EntityCategory
@@ -333,6 +333,14 @@ class KefNumber(KefEntity, CoordinatorEntity[KefCoordinator], NumberEntity):
         """Initialize the number entity."""
         CoordinatorEntity.__init__(self, coordinator)
         KefEntity.__init__(self, coordinator)
+        eq_profile = coordinator.data.eq_profile
+        if eq_profile is not None and eq_profile.api_version == "v1":
+            if description.key == "treble_amount":
+                description = replace(description, native_step=0.375)
+            elif description.key == "high_pass_frequency":
+                description = replace(description, native_max_value=100.0)
+            elif description.key == "sub_out_low_pass_frequency":
+                description = replace(description, native_step=10.0)
         self.entity_description = description
         self._attr_unique_id = (
             f"{coordinator.data.device.unique_id}_{description.key}"
