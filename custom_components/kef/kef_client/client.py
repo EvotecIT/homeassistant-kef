@@ -54,6 +54,8 @@ from .models import (
     KefPlaybackInfo,
     KefSnapshot,
     KefWifiInfo,
+    _legacy_eq_profile_to_native,
+    _native_eq_profile_to_legacy,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -244,27 +246,39 @@ class BaseKefClient(ABC):
 
     @abstractmethod
     async def async_set_balance(self, value: int) -> None:
-        """Set the EQ balance."""
+        """Set the EQ balance (-30 full left to +30 full right, 0 = center)."""
 
     @abstractmethod
     async def async_set_bass_extension(self, value: str) -> None:
         """Set the EQ bass extension."""
 
     @abstractmethod
-    async def async_set_treble_amount(self, value: int) -> None:
-        """Set the EQ treble amount."""
+    async def async_set_treble_amount(self, value: float) -> None:
+        """Set the EQ treble amount in dB (-3.0 to +3.0, 0.25 dB steps)."""
 
     @abstractmethod
     async def async_set_subwoofer_gain(self, value: int) -> None:
-        """Set the EQ subwoofer gain."""
+        """Set the EQ subwoofer gain in dB (-10 to +10)."""
+
+    @abstractmethod
+    async def async_set_sub_out_low_pass_frequency(self, value: float) -> None:
+        """Set the subwoofer output low-pass crossover frequency in Hz (40.0-250.0)."""
 
     @abstractmethod
     async def async_set_desk_mode_enabled(self, enabled: bool) -> None:
         """Enable or disable desk mode."""
 
     @abstractmethod
+    async def async_set_desk_mode_db(self, value: float) -> None:
+        """Set the desk mode attenuation in dB (-10.0 to 0.0)."""
+
+    @abstractmethod
     async def async_set_wall_mode_enabled(self, enabled: bool) -> None:
         """Enable or disable wall mode."""
+
+    @abstractmethod
+    async def async_set_wall_mode_db(self, value: float) -> None:
+        """Set the wall mode attenuation in dB (-10.0 to 0.0)."""
 
     @abstractmethod
     async def async_set_phase_correction_enabled(self, enabled: bool) -> None:
@@ -275,8 +289,8 @@ class BaseKefClient(ABC):
         """Enable or disable high-pass mode."""
 
     @abstractmethod
-    async def async_set_high_pass_frequency(self, value: int) -> None:
-        """Set the high-pass frequency step."""
+    async def async_set_high_pass_frequency(self, value: float) -> None:
+        """Set the high-pass filter frequency in Hz (50.0-120.0)."""
 
     @abstractmethod
     async def async_set_master_channel(self, channel: str) -> None:
@@ -1037,7 +1051,7 @@ class ModernKefClient(BaseKefClient):
     async def async_set_balance(self, value: int) -> None:
         """Set the EQ balance."""
         await self._update_eq_profile(
-            lambda dsp: dsp.__setitem__("balance", max(0, min(60, value)))
+            lambda dsp: dsp.__setitem__("balance", max(-30, min(30, value)))
         )
 
     async def async_set_bass_extension(self, value: str) -> None:
@@ -1046,16 +1060,24 @@ class ModernKefClient(BaseKefClient):
             lambda dsp: dsp.__setitem__("bassExtension", value)
         )
 
-    async def async_set_treble_amount(self, value: int) -> None:
+    async def async_set_treble_amount(self, value: float) -> None:
         """Set the EQ treble amount."""
         await self._update_eq_profile(
-            lambda dsp: dsp.__setitem__("trebleAmount", max(0, min(16, value)))
+            lambda dsp: dsp.__setitem__("trebleAmount", max(-3.0, min(3.0, value)))
         )
 
     async def async_set_subwoofer_gain(self, value: int) -> None:
         """Set the EQ subwoofer gain."""
         await self._update_eq_profile(
-            lambda dsp: dsp.__setitem__("subwooferGain", max(0, min(20, value)))
+            lambda dsp: dsp.__setitem__("subwooferGain", max(-10, min(10, value)))
+        )
+
+    async def async_set_sub_out_low_pass_frequency(self, value: float) -> None:
+        """Set the subwoofer output low-pass crossover frequency."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__(
+                "subOutLPFreq", max(40.0, min(250.0, value))
+            )
         )
 
     async def async_set_desk_mode_enabled(self, enabled: bool) -> None:
@@ -1064,10 +1086,26 @@ class ModernKefClient(BaseKefClient):
             lambda dsp: dsp.__setitem__("deskMode", enabled)
         )
 
+    async def async_set_desk_mode_db(self, value: float) -> None:
+        """Set the desk mode attenuation."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__(
+                "deskModeSetting", max(-10.0, min(0.0, value))
+            )
+        )
+
     async def async_set_wall_mode_enabled(self, enabled: bool) -> None:
         """Enable or disable wall mode."""
         await self._update_eq_profile(
             lambda dsp: dsp.__setitem__("wallMode", enabled)
+        )
+
+    async def async_set_wall_mode_db(self, value: float) -> None:
+        """Set the wall mode attenuation."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__(
+                "wallModeSetting", max(-10.0, min(0.0, value))
+            )
         )
 
     async def async_set_phase_correction_enabled(self, enabled: bool) -> None:
@@ -1082,10 +1120,12 @@ class ModernKefClient(BaseKefClient):
             lambda dsp: dsp.__setitem__("highPassMode", enabled)
         )
 
-    async def async_set_high_pass_frequency(self, value: int) -> None:
-        """Set the high-pass frequency step."""
+    async def async_set_high_pass_frequency(self, value: float) -> None:
+        """Set the high-pass filter frequency."""
         await self._update_eq_profile(
-            lambda dsp: dsp.__setitem__("highPassModeFreq", max(0, min(10, value)))
+            lambda dsp: dsp.__setitem__(
+                "highPassModeFreq", max(50.0, min(120.0, value))
+            )
         )
 
     async def async_set_master_channel(self, channel: str) -> None:
@@ -1405,7 +1445,23 @@ class ModernKefClient(BaseKefClient):
         if not isinstance(dsp_info, dict):
             raise KefResponseError("Unexpected KEF EQ dspInfo payload")
 
-        mutator(dsp_info)
+        original_native_profile = _legacy_eq_profile_to_native(dsp_info)
+        native_profile = dict(original_native_profile)
+        mutator(native_profile)
+        encoded_profile = _native_eq_profile_to_legacy(native_profile)
+        changed_keys = original_native_profile.keys() | native_profile.keys()
+        for key in changed_keys:
+            original_has_key = key in original_native_profile
+            updated_has_key = key in native_profile
+            if original_has_key == updated_has_key and (
+                not updated_has_key
+                or original_native_profile[key] == native_profile[key]
+            ):
+                continue
+            if updated_has_key:
+                dsp_info[key] = encoded_profile[key]
+            else:
+                dsp_info.pop(key, None)
         await self._set_data(PROBE_PATHS["eq_profile"], role="value", value=wrapper)
 
     async def _update_eq_profile_v2(self, mutator) -> None:
@@ -1419,9 +1475,7 @@ class ModernKefClient(BaseKefClient):
         if not isinstance(profile, dict):
             raise KefResponseError("Unexpected KEF EQ profile v2 wrapper")
 
-        compat_dsp = self._eq_profile_v2_to_legacy_dsp(profile)
-        mutator(compat_dsp)
-        self._apply_legacy_dsp_to_eq_profile_v2(compat_dsp, profile)
+        mutator(profile)
         await self._set_data(PROBE_PATHS["eq_profile_v2"], role="value", value=wrapper)
 
     async def _get_optional_path_item(self, path: str, *, roles: str = "value") -> Any:
@@ -1430,74 +1484,6 @@ class ModernKefClient(BaseKefClient):
             return await self._get_path_item(path, roles=roles)
         except KefError:
             return None
-
-    @staticmethod
-    def _eq_profile_v2_to_legacy_dsp(profile: dict[str, Any]) -> dict[str, Any]:
-        """Map v2 direct dB/Hz values to the existing HA control scale."""
-        return {
-            "balance": ModernKefClient._v2_balance_to_legacy(profile.get("balance")),
-            "bassExtension": profile.get("bassExtension"),
-            "trebleAmount": ModernKefClient._v2_treble_to_legacy(
-                profile.get("trebleAmount")
-            ),
-            "subwooferGain": ModernKefClient._v2_gain_to_legacy(
-                profile.get("subwooferGain")
-            ),
-            "deskMode": profile.get("deskMode"),
-            "wallMode": profile.get("wallMode"),
-            "phaseCorrection": profile.get("phaseCorrection"),
-            "highPassMode": profile.get("highPassMode"),
-            "highPassModeFreq": ModernKefClient._v2_high_pass_to_legacy(
-                profile.get("highPassModeFreq")
-            ),
-        }
-
-    @staticmethod
-    def _apply_legacy_dsp_to_eq_profile_v2(
-        compat_dsp: dict[str, Any],
-        profile: dict[str, Any],
-    ) -> None:
-        """Apply existing HA control-scale values back to a v2 EQ profile."""
-        if compat_dsp.get("balance") is not None:
-            profile["balance"] = max(0, min(60, compat_dsp["balance"])) - 30
-        if compat_dsp.get("bassExtension") is not None:
-            profile["bassExtension"] = compat_dsp["bassExtension"]
-        if compat_dsp.get("trebleAmount") is not None:
-            legacy = max(0, min(16, compat_dsp["trebleAmount"]))
-            profile["trebleAmount"] = round(((legacy / 16.0) * 6.0) - 3.0, 2)
-        if compat_dsp.get("subwooferGain") is not None:
-            profile["subwooferGain"] = max(0, min(20, compat_dsp["subwooferGain"])) - 10
-        if compat_dsp.get("deskMode") is not None:
-            profile["deskMode"] = compat_dsp["deskMode"]
-        if compat_dsp.get("wallMode") is not None:
-            profile["wallMode"] = compat_dsp["wallMode"]
-        if compat_dsp.get("phaseCorrection") is not None:
-            profile["phaseCorrection"] = compat_dsp["phaseCorrection"]
-        if compat_dsp.get("highPassMode") is not None:
-            profile["highPassMode"] = compat_dsp["highPassMode"]
-        if compat_dsp.get("highPassModeFreq") is not None:
-            legacy = max(0, min(10, compat_dsp["highPassModeFreq"]))
-            profile["highPassModeFreq"] = 50 + legacy * 5
-
-    @staticmethod
-    def _v2_balance_to_legacy(value: Any) -> int | None:
-        """Convert v2 -30..30 balance into the existing 0..60 UI scale."""
-        return None if value is None else round(float(value)) + 30
-
-    @staticmethod
-    def _v2_treble_to_legacy(value: Any) -> int | None:
-        """Convert v2 -3..3 dB treble into the existing 0..16 UI scale."""
-        return None if value is None else round((float(value) + 3.0) / 6.0 * 16)
-
-    @staticmethod
-    def _v2_gain_to_legacy(value: Any) -> int | None:
-        """Convert v2 -10..10 dB gain into the existing 0..20 UI scale."""
-        return None if value is None else round(float(value)) + 10
-
-    @staticmethod
-    def _v2_high_pass_to_legacy(value: Any) -> int | None:
-        """Convert v2 Hz high-pass frequency into the existing 0..10 step."""
-        return None if value is None else round((float(value) - 50.0) / 5.0)
 
     async def _set_data(self, path: str, *, role: str, value: Any) -> None:
         """Set a value on the speaker."""
@@ -2406,7 +2392,7 @@ class LegacyBinaryClient(BaseKefClient):
             "Bass extension is not supported for legacy KEF"
         )
 
-    async def async_set_treble_amount(self, value: int) -> None:
+    async def async_set_treble_amount(self, value: float) -> None:
         """Legacy speakers do not expose treble configuration."""
         raise KefUnsupportedDeviceError(
             "Treble amount is not supported for legacy KEF"
@@ -2418,11 +2404,25 @@ class LegacyBinaryClient(BaseKefClient):
             "Subwoofer gain is not supported for legacy KEF"
         )
 
+    async def async_set_sub_out_low_pass_frequency(self, value: float) -> None:
+        """Legacy speakers do not expose subwoofer low-pass configuration."""
+        raise KefUnsupportedDeviceError(
+            "Subwoofer low-pass frequency is not supported for legacy KEF"
+        )
+
     async def async_set_desk_mode_enabled(self, enabled: bool) -> None:
         """Legacy speakers do not expose desk-mode configuration."""
         raise KefUnsupportedDeviceError("Desk mode is not supported for legacy KEF")
 
+    async def async_set_desk_mode_db(self, value: float) -> None:
+        """Legacy speakers do not expose desk-mode configuration."""
+        raise KefUnsupportedDeviceError("Desk mode is not supported for legacy KEF")
+
     async def async_set_wall_mode_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose wall-mode configuration."""
+        raise KefUnsupportedDeviceError("Wall mode is not supported for legacy KEF")
+
+    async def async_set_wall_mode_db(self, value: float) -> None:
         """Legacy speakers do not expose wall-mode configuration."""
         raise KefUnsupportedDeviceError("Wall mode is not supported for legacy KEF")
 
@@ -2438,7 +2438,7 @@ class LegacyBinaryClient(BaseKefClient):
             "High-pass mode is not supported for legacy KEF"
         )
 
-    async def async_set_high_pass_frequency(self, value: int) -> None:
+    async def async_set_high_pass_frequency(self, value: float) -> None:
         """Legacy speakers do not expose high-pass-frequency configuration."""
         raise KefUnsupportedDeviceError(
             "High-pass frequency is not supported for legacy KEF"

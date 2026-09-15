@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import builtins
 import copy
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -25,6 +27,7 @@ from custom_components.kef.exceptions import (
     KefConnectionError,
     KefResponseError,
 )
+from custom_components.kef.number import NUMBERS, KefNumber
 from tests.conftest import (
     ALERT_SNOOZE_TIME_VALUE,
     ALERTS_LIST_VALUE,
@@ -77,6 +80,7 @@ from tests.conftest import (
     SUBWOOFER_FORCE_ON_KW1_VALUE,
     SUBWOOFER_FORCE_ON_VALUE,
     TEST_HOST,
+    TEST_SNAPSHOT,
     TOP_PANEL_LED_VALUE,
     TOP_PANEL_STANDBY_LED_VALUE,
     UI_LANGUAGE_VALUE,
@@ -87,6 +91,45 @@ from tests.conftest import (
     VOLUME_VALUE,
     WAKE_UP_SOURCE_VALUE,
 )
+
+
+@pytest.mark.parametrize(
+    ("key", "v1_step", "v1_max", "v2_step", "v2_max"),
+    [
+        ("treble_amount", 0.375, 3.0, 0.25, 3.0),
+        ("high_pass_frequency", 5.0, 100.0, 5.0, 120.0),
+        ("sub_out_low_pass_frequency", 10.0, 250.0, 5.0, 250.0),
+    ],
+)
+def test_eq_number_constraints_follow_wire_version(
+    key,
+    v1_step,
+    v1_max,
+    v2_step,
+    v2_max,
+) -> None:
+    """Number controls should advertise values each EQ generation can encode."""
+    description = next(item for item in NUMBERS if item.key == key)
+
+    def entity_for_version(api_version: str) -> KefNumber:
+        snapshot = copy.deepcopy(TEST_SNAPSHOT)
+        assert snapshot.eq_profile is not None
+        snapshot.eq_profile.api_version = api_version
+        coordinator = Mock()
+        coordinator.data = snapshot
+        coordinator.last_update_success = True
+        coordinator.config_entry = SimpleNamespace(domain="kef")
+        coordinator.hass = Mock()
+        return KefNumber(coordinator, description)
+
+    v1_entity = entity_for_version("v1")
+    v2_entity = entity_for_version("v2")
+
+    assert v1_entity.entity_description.native_step == v1_step
+    assert v1_entity.entity_description.native_max_value == v1_max
+    assert v2_entity.entity_description.native_step == v2_step
+    assert v2_entity.entity_description.native_max_value == v2_max
+
 
 SOURCE_VOLUME_RESPONSES = {
     "settings:/kef/host/defaultVolumeWifi": 30,
@@ -222,11 +265,16 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     assert snapshot.playback.stream_channels == "2.0"
     assert snapshot.eq_profile is not None
     assert snapshot.eq_profile.profile_id is None
-    assert snapshot.eq_profile.balance == 30
+    assert snapshot.eq_profile.balance == 0
+    assert snapshot.eq_profile.treble_amount == 0
+    assert snapshot.eq_profile.subwoofer_gain == 0
+    assert snapshot.eq_profile.high_pass_frequency == 95
+    assert snapshot.eq_profile.desk_mode_setting == -3
+    assert snapshot.eq_profile.wall_mode_setting == -3
     assert snapshot.eq_profile.audio_polarity == "normal"
     assert snapshot.eq_profile.subwoofer_polarity == "normal"
     assert snapshot.eq_profile.subwoofer_preset == "custom"
-    assert snapshot.eq_profile.sub_out_low_pass_frequency == 8
+    assert snapshot.eq_profile.sub_out_low_pass_frequency == 80
     assert snapshot.firmware_update is not None
     assert snapshot.firmware_update.state == "newUpdateAvailable"
     assert snapshot.firmware_update.available_version == "3.0.135.0x60acbcf"
@@ -1155,7 +1203,101 @@ async def test_modern_set_balance_posts_typed_eq_wrapper(monkeypatch, hass) -> N
     client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
     await client.async_set_balance(15)
 
-    assert captured["value"]["kefEqProfile"]["dspInfo"]["balance"] == 15
+    assert captured["value"]["kefEqProfile"]["dspInfo"]["balance"] == 45
+
+
+@pytest.mark.parametrize(
+    ("method", "native_value", "wire_key", "expected_wire_value"),
+    [
+        ("async_set_balance", -1, "balance", 29),
+        ("async_set_treble_amount", 0.25, "trebleAmount", 9),
+        ("async_set_subwoofer_gain", -2, "subwooferGain", 8),
+        ("async_set_high_pass_frequency", 95, "highPassModeFreq", 9),
+        ("async_set_sub_out_low_pass_frequency", 80, "subOutLPFreq", 8),
+        ("async_set_desk_mode_db", -3, "deskModeSetting", 14),
+        ("async_set_wall_mode_db", -3.5, "wallModeSetting", 13),
+    ],
+)
+async def test_modern_v1_eq_writes_translate_native_units(
+    monkeypatch,
+    hass,
+    method,
+    native_value,
+    wire_key,
+    expected_wire_value,
+) -> None:
+    """Physical HA units should be translated to the v1 EQ wire scale."""
+    captured = {}
+    original_dsp_info = copy.deepcopy(EQ_PROFILE_VALUE["kefEqProfile"]["dspInfo"])
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile"]
+        return {
+            "type": "kefEqProfile",
+            "kefEqProfile": copy.deepcopy(EQ_PROFILE_VALUE["kefEqProfile"]),
+        }
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["path"] = path
+        captured["role"] = role
+        captured["value"] = value
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await getattr(client, method)(native_value)
+
+    assert captured["path"] == PROBE_PATHS["eq_profile"]
+    assert captured["role"] == "value"
+    dsp_info = captured["value"]["kefEqProfile"]["dspInfo"]
+    expected_dsp_info = copy.deepcopy(original_dsp_info)
+    expected_dsp_info[wire_key] = expected_wire_value
+    assert dsp_info == expected_dsp_info
+
+
+async def test_modern_v1_eq_write_preserves_noncanonical_unrelated_fields(
+    monkeypatch,
+    hass,
+) -> None:
+    """A v1 write should leave every unrelated wire value exactly unchanged."""
+    captured = {}
+    original_dsp_info = copy.deepcopy(EQ_PROFILE_VALUE["kefEqProfile"]["dspInfo"])
+    original_dsp_info["trebleAmount"] = 8.5
+    original_dsp_info["subOutLPFreq"] = None
+    original_dsp_info["futureFirmwareCode"] = {"value": 999}
+    original_dsp_info.pop("wallModeSetting")
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile"]
+        return {
+            "type": "kefEqProfile",
+            "kefEqProfile": {
+                **copy.deepcopy(EQ_PROFILE_VALUE["kefEqProfile"]),
+                "dspInfo": copy.deepcopy(original_dsp_info),
+            },
+        }
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["value"] = value
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_balance(-1)
+
+    expected_dsp_info = copy.deepcopy(original_dsp_info)
+    expected_dsp_info["balance"] = 29
+    assert captured["value"]["kefEqProfile"]["dspInfo"] == expected_dsp_info
 
 
 async def test_modern_set_bass_extension_posts_typed_eq_wrapper(
@@ -1223,10 +1365,13 @@ async def test_modern_refresh_falls_back_to_eq_profile_v2(
 
     assert snapshot.eq_profile is not None
     assert snapshot.eq_profile.api_version == "v2"
-    assert snapshot.eq_profile.balance == 30
-    assert snapshot.eq_profile.treble_amount == 8
-    assert snapshot.eq_profile.subwoofer_gain == 10
-    assert snapshot.eq_profile.high_pass_frequency == 9
+    assert snapshot.eq_profile.balance == 0
+    assert snapshot.eq_profile.treble_amount == 0
+    assert snapshot.eq_profile.subwoofer_gain == 0
+    assert snapshot.eq_profile.high_pass_frequency == 95
+    assert snapshot.eq_profile.desk_mode_setting == -3
+    assert snapshot.eq_profile.wall_mode_setting == -3
+    assert snapshot.eq_profile.sub_out_low_pass_frequency == 80
     assert snapshot.eq_profile.sound_profile == "default"
 
 
@@ -1264,7 +1409,7 @@ async def test_modern_set_treble_updates_eq_profile_v2(
     assert captured["path"] == PROBE_PATHS["eq_profile_v2"]
     assert captured["role"] == "value"
     assert captured["value"]["type"] == "kefEqProfileV2"
-    assert captured["value"]["kefEqProfileV2"]["trebleAmount"] == 0
+    assert captured["value"]["kefEqProfileV2"]["trebleAmount"] == 3.0
 
 
 async def test_modern_get_firmware_update_status_parses_payload(
