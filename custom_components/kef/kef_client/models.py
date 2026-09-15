@@ -212,6 +212,11 @@ class KefEqProfile:
             sub_enable_stereo=native_dsp_info.get("subEnableStereo"),
             subwoofer_preset=native_dsp_info.get("subwooferPreset"),
             sub_out_low_pass_frequency=native_dsp_info.get("subOutLPFreq"),
+            subwoofer_out=(
+                native_dsp_info["subwooferCount"] > 0
+                if isinstance(native_dsp_info.get("subwooferCount"), (int, float))
+                else None
+            ),
             raw=profile,
         )
 

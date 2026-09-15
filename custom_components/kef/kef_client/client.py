@@ -1092,8 +1092,13 @@ class ModernKefClient(BaseKefClient):
         """Enable or disable subwoofer output."""
 
         def _mutate(dsp: dict[str, Any]) -> None:
-            dsp["subwooferOut"] = enabled
-            dsp["subwooferCount"] = 1 if enabled else 0
+            if "subwooferOut" in dsp:
+                dsp["subwooferOut"] = enabled
+            current_count = dsp.get("subwooferCount")
+            if not enabled:
+                dsp["subwooferCount"] = 0
+            elif not isinstance(current_count, int) or current_count < 1:
+                dsp["subwooferCount"] = 1
 
         await self._update_eq_profile(_mutate)
 
