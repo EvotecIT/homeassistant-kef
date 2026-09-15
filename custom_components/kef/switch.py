@@ -160,6 +160,28 @@ async def _async_set_kw1_wake(
     await client.async_set_kw1_wake_enabled(enabled)
 
 
+async def _async_set_subwoofer_enabled(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Enable or disable subwoofer output."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_subwoofer_enabled(enabled)
+
+
+async def _async_set_kw1_adapter(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Enable or disable the KW1 wireless subwoofer adapter."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_kw1_enabled(enabled)
+
+
 async def _async_set_remote_ir(
     coordinator: KefCoordinator,
     enabled: bool,
@@ -249,7 +271,7 @@ class KefSwitchDescription(SwitchEntityDescription):
 SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="startup_tone",
-        name="Startup tone",
+        name="SYS: Startup tone",
         icon="mdi:music-note",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.startup_tone_enabled,
@@ -257,7 +279,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="auto_switch_hdmi",
-        name="Auto-switch to HDMI",
+        name="HW: Auto-switch to HDMI",
         icon="mdi:video-switch",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.auto_switch_hdmi,
@@ -265,7 +287,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="front_led",
-        name="Front LED",
+        name="LED: Front",
         icon="mdi:led-strip-variant",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.front_led_enabled,
@@ -274,7 +296,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="standby_led",
-        name="Standby LED",
+        name="LED: Standby",
         icon="mdi:led-outline",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.standby_led_enabled,
@@ -282,7 +304,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="top_panel",
-        name="Top touch panel",
+        name="LED: Top touch panel",
         icon="mdi:gesture-tap-button",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_enabled,
@@ -291,7 +313,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="top_panel_led",
-        name="Top panel LED",
+        name="LED: Top panel",
         icon="mdi:led-on",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_led_enabled,
@@ -300,7 +322,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="top_panel_standby_led",
-        name="Top panel standby LED",
+        name="LED: Top panel standby",
         icon="mdi:led-outline",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_standby_led_enabled,
@@ -309,15 +331,16 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="usb_charging",
-        name="USB charging",
+        name="HW: USB charging",
         icon="mdi:usb-port",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.usb_charging_enabled,
         async_set_fn=_async_set_usb_charging,
+        model_feature="usb_charging",
     ),
     KefSwitchDescription(
         key="startup_volume",
-        name="Use startup volume",
+        name="VOL: Use startup volume",
         icon="mdi:volume-source",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.startup_volume_enabled,
@@ -325,7 +348,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="per_input_startup_volume",
-        name="Per-input startup volumes",
+        name="VOL: Per-input startup volumes",
         icon="mdi:tune-variant",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.per_input_startup_volume_enabled,
@@ -333,7 +356,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="volume_limit",
-        name="Volume limiter",
+        name="VOL: Limiter",
         icon="mdi:volume-off",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.volume_limit_enabled,
@@ -341,7 +364,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="subwoofer_wake",
-        name="Wake subwoofer on startup",
+        name="SW: Wake on startup",
         icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.subwoofer_wake_enabled,
@@ -349,15 +372,33 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="kw1_wake",
-        name="Wake KW1 subwoofer on startup",
+        name="SW: KW1 wake on startup",
         icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.kw1_wake_enabled,
         async_set_fn=_async_set_kw1_wake,
     ),
     KefSwitchDescription(
+        key="subwoofer",
+        name="SW: Enabled",
+        icon="mdi:speaker-wireless",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: (
+            data.eq_profile.subwoofer_out if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_subwoofer_enabled,
+    ),
+    KefSwitchDescription(
+        key="kw1_adapter",
+        name="SW: KW1 adapter",
+        icon="mdi:speaker-wireless",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.eq_profile.is_kw1 if data.eq_profile else None,
+        async_set_fn=_async_set_kw1_adapter,
+    ),
+    KefSwitchDescription(
         key="remote_ir",
-        name="IR remote",
+        name="IR: Remote",
         icon="mdi:remote",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.remote_ir_enabled,
@@ -365,7 +406,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="analytics",
-        name="KEF analytics",
+        name="SYS: KEF analytics",
         icon="mdi:chart-line",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.analytics_enabled,
@@ -373,7 +414,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="app_analytics",
-        name="App analytics",
+        name="SYS: App analytics",
         icon="mdi:cellphone-cog",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.app_analytics_enabled,
@@ -381,7 +422,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="desk_mode",
-        name="Desk mode",
+        name="DSP: Desk mode",
         icon="mdi:desk",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_profile.desk_mode if data.eq_profile else None,
@@ -390,7 +431,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="wall_mode",
-        name="Wall mode",
+        name="DSP: Wall mode",
         icon="mdi:wall",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_profile.wall_mode if data.eq_profile else None,
@@ -399,7 +440,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="phase_correction",
-        name="Phase correction",
+        name="DSP: Phase correction",
         icon="mdi:waveform",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
@@ -409,7 +450,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="high_pass_mode",
-        name="High-pass mode",
+        name="SW: High-pass mode",
         icon="mdi:chart-bell-curve-cumulative",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (

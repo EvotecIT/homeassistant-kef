@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import WAKE_SOURCE_OPTIONS
+from .const import WAKE_SOURCE_OPTIONS, model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend, KefSnapshot
@@ -80,7 +80,7 @@ async def _async_set_treble_amount(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_treble_amount(round(value))
+    await client.async_set_treble_amount(value)
 
 
 async def _async_set_subwoofer_gain(
@@ -102,7 +102,40 @@ async def _async_set_high_pass_frequency(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_high_pass_frequency(round(value))
+    await client.async_set_high_pass_frequency(value)
+
+
+async def _async_set_sub_out_low_pass_frequency(
+    coordinator: KefCoordinator,
+    value: float,
+) -> None:
+    """Set the subwoofer output low-pass crossover frequency."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_sub_out_low_pass_frequency(value)
+
+
+async def _async_set_desk_mode_db(
+    coordinator: KefCoordinator,
+    value: float,
+) -> None:
+    """Set the desk mode attenuation."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_desk_mode_db(value)
+
+
+async def _async_set_wall_mode_db(
+    coordinator: KefCoordinator,
+    value: float,
+) -> None:
+    """Set the wall mode attenuation."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_wall_mode_db(value)
 
 
 def _friendly_source_name(source: str) -> str:
@@ -114,14 +147,15 @@ def _friendly_source_name(source: str) -> str:
 class KefNumberDescription(NumberEntityDescription):
     """Describe a KEF configuration number."""
 
-    value_fn: Callable[[KefSnapshot], int | None]
+    value_fn: Callable[[KefSnapshot], int | float | None]
     async_set_fn: Callable[[KefCoordinator, float], Awaitable[None]]
+    model_feature: str | None = None
 
 
 NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="default_volume_global",
-        name="Startup volume",
+        name="VOL: Startup volume",
         icon="mdi:volume-medium",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
@@ -132,7 +166,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="maximum_volume",
-        name="Maximum volume",
+        name="VOL: Maximum volume",
         icon="mdi:volume-high",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
@@ -143,7 +177,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="volume_step",
-        name="Volume step",
+        name="VOL: Step",
         icon="mdi:stairs",
         entity_category=EntityCategory.CONFIG,
         native_min_value=1,
@@ -154,7 +188,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="fixed_volume_level",
-        name="Fixed volume level",
+        name="VOL: Fixed level",
         icon="mdi:volume-equal",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
@@ -165,23 +199,25 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="balance",
-        name="Balance",
+        name="DSP: Balance",
         icon="mdi:arrow-left-right",
         entity_category=EntityCategory.CONFIG,
-        native_min_value=0,
-        native_max_value=60,
+        native_min_value=-30,
+        native_max_value=30,
         native_step=1,
         value_fn=lambda data: data.eq_profile.balance if data.eq_profile else None,
         async_set_fn=_async_set_balance,
+        model_feature="stereo_pair",
     ),
     KefNumberDescription(
         key="treble_amount",
-        name="Treble amount",
+        name="DSP: Treble amount",
         icon="mdi:tune-vertical",
         entity_category=EntityCategory.CONFIG,
-        native_min_value=0,
-        native_max_value=16,
-        native_step=1,
+        native_unit_of_measurement="dB",
+        native_min_value=-3.0,
+        native_max_value=3.0,
+        native_step=0.25,
         value_fn=lambda data: (
             data.eq_profile.treble_amount if data.eq_profile else None
         ),
@@ -189,11 +225,12 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="subwoofer_gain",
-        name="Subwoofer gain",
+        name="SW: Gain",
         icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
-        native_min_value=0,
-        native_max_value=20,
+        native_unit_of_measurement="dB",
+        native_min_value=-10,
+        native_max_value=10,
         native_step=1,
         value_fn=lambda data: (
             data.eq_profile.subwoofer_gain if data.eq_profile else None
@@ -202,16 +239,61 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="high_pass_frequency",
-        name="High-pass frequency",
+        name="SW: High-pass frequency",
         icon="mdi:sine-wave",
         entity_category=EntityCategory.CONFIG,
-        native_min_value=0,
-        native_max_value=10,
-        native_step=1,
+        native_unit_of_measurement="Hz",
+        native_min_value=50.0,
+        native_max_value=120.0,
+        native_step=5.0,
         value_fn=lambda data: (
             data.eq_profile.high_pass_frequency if data.eq_profile else None
         ),
         async_set_fn=_async_set_high_pass_frequency,
+    ),
+    KefNumberDescription(
+        key="sub_out_low_pass_frequency",
+        name="SW: Low-pass frequency",
+        icon="mdi:sine-wave",
+        entity_category=EntityCategory.CONFIG,
+        native_unit_of_measurement="Hz",
+        native_min_value=40.0,
+        native_max_value=250.0,
+        native_step=5.0,
+        value_fn=lambda data: (
+            data.eq_profile.sub_out_low_pass_frequency if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_sub_out_low_pass_frequency,
+    ),
+    KefNumberDescription(
+        key="desk_mode_db",
+        name="DSP: Desk mode attenuation",
+        icon="mdi:desk",
+        entity_category=EntityCategory.CONFIG,
+        native_unit_of_measurement="dB",
+        native_min_value=-10.0,
+        native_max_value=0.0,
+        native_step=0.5,
+        value_fn=lambda data: (
+            data.eq_profile.desk_mode_setting if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_desk_mode_db,
+        model_feature="desk_mode",
+    ),
+    KefNumberDescription(
+        key="wall_mode_db",
+        name="DSP: Wall mode attenuation",
+        icon="mdi:wall",
+        entity_category=EntityCategory.CONFIG,
+        native_unit_of_measurement="dB",
+        native_min_value=-10.0,
+        native_max_value=0.0,
+        native_step=0.5,
+        value_fn=lambda data: (
+            data.eq_profile.wall_mode_setting if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_wall_mode_db,
+        model_feature="wall_mode",
     ),
 )
 
@@ -230,6 +312,9 @@ async def async_setup_entry(
         KefNumber(coordinator, description)
         for description in NUMBERS
         if description.value_fn(coordinator.data) is not None
+        and model_supports_feature(
+            coordinator.data.device.model, description.model_feature
+        )
     ]
     for source, value in coordinator.data.default_volume_by_source.items():
         entities.append(
@@ -298,7 +383,7 @@ class KefSourceVolumeNumber(KefEntity, CoordinatorEntity[KefCoordinator], Number
         self._attr_unique_id = (
             f"{coordinator.data.device.unique_id}_default_volume_{source}"
         )
-        self._attr_name = f"{_friendly_source_name(source)} startup volume"
+        self._attr_name = f"VOL: {_friendly_source_name(source)} startup volume"
 
     @property
     def available(self) -> bool:

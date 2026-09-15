@@ -65,11 +65,15 @@ async def test_xio_keeps_top_panel_controls_and_hides_pair_controls() -> None:
     assert {"master_channel", "cable_mode"}.isdisjoint(selects)
 
 
-async def test_unverified_ls60_placement_controls_remain_visible() -> None:
-    """Do not hide settings solely from form-factor assumptions."""
-    switches, selects = await _entity_keys_for_model("LS60")
+@pytest.mark.parametrize("model", ["LS60", "LS60W"])
+async def test_ls60_hides_desk_mode_but_keeps_unverified_controls_visible(
+    model: str,
+) -> None:
+    """Hide only the confirmed-unsupported desk_mode; leave the rest visible."""
+    switches, selects = await _entity_keys_for_model(model)
 
-    assert {"desk_mode", "wall_mode", "front_led"} <= switches
+    assert "desk_mode" not in switches
+    assert {"wall_mode", "front_led"} <= switches
     assert {"top_panel", "top_panel_led", "top_panel_standby_led"}.isdisjoint(
         switches
     )

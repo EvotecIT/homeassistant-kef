@@ -131,6 +131,7 @@ async def _async_cleanup_optional_entities(
     coordinator: KefCoordinator,
 ) -> None:
     """Remove stale registry entries for optional or retired entities."""
+    from .number import NUMBERS
     from .select import SELECTS
     from .switch import SWITCHES
 
@@ -168,6 +169,9 @@ async def _async_cleanup_optional_entities(
         },
         "switch": {
             description.key: description.model_feature for description in SWITCHES
+        },
+        "number": {
+            description.key: description.model_feature for description in NUMBERS
         },
     }
 
