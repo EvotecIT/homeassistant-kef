@@ -49,7 +49,7 @@ class KefTextDescription(TextEntityDescription):
 TEXTS: tuple[KefTextDescription, ...] = (
     KefTextDescription(
         key="ui_language",
-        name="UI language",
+        name="SYS: UI language",
         icon="mdi:translate",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.ui_language,
@@ -57,7 +57,7 @@ TEXTS: tuple[KefTextDescription, ...] = (
     ),
     KefTextDescription(
         key="speaker_location",
-        name="Speaker location",
+        name="SYS: Speaker location",
         icon="mdi:map-marker",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.speaker_location,
