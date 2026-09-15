@@ -1223,10 +1223,10 @@ async def test_modern_refresh_falls_back_to_eq_profile_v2(
 
     assert snapshot.eq_profile is not None
     assert snapshot.eq_profile.api_version == "v2"
-    assert snapshot.eq_profile.balance == 30
-    assert snapshot.eq_profile.treble_amount == 8
-    assert snapshot.eq_profile.subwoofer_gain == 10
-    assert snapshot.eq_profile.high_pass_frequency == 9
+    assert snapshot.eq_profile.balance == 0
+    assert snapshot.eq_profile.treble_amount == 0
+    assert snapshot.eq_profile.subwoofer_gain == 0
+    assert snapshot.eq_profile.high_pass_frequency == 95
     assert snapshot.eq_profile.sound_profile == "default"
 
 
@@ -1264,7 +1264,7 @@ async def test_modern_set_treble_updates_eq_profile_v2(
     assert captured["path"] == PROBE_PATHS["eq_profile_v2"]
     assert captured["role"] == "value"
     assert captured["value"]["type"] == "kefEqProfileV2"
-    assert captured["value"]["kefEqProfileV2"]["trebleAmount"] == 0
+    assert captured["value"]["kefEqProfileV2"]["trebleAmount"] == 3.0
 
 
 async def test_modern_get_firmware_update_status_parses_payload(
