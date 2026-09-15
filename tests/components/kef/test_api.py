@@ -572,6 +572,17 @@ async def test_modern_unknown_model_uses_default_sources(monkeypatch, hass) -> N
     )
 
 
+def test_lsxiilt_model_uses_the_limited_source_set() -> None:
+    """Real LSX II LT firmware identifiers must not fall back to extra inputs."""
+    assert ModernKefClient._source_list_for_model("LSXIILT") == (
+        "wifi",
+        "bluetooth",
+        "tv",
+        "optical",
+        "usb",
+    )
+
+
 async def test_modern_optional_network_info_is_absent_when_unavailable(
     monkeypatch, hass
 ) -> None:
