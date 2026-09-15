@@ -63,11 +63,17 @@ MODERN_MODEL_SOURCE_MAP: dict[str, tuple[str, ...]] = {
 # Only list capabilities known to be unsupported. Models and capabilities that
 # have not been verified remain visible instead of being hidden by inference.
 MODEL_UNSUPPORTED_FEATURES: dict[str, frozenset[str]] = {
-    "LSX2": frozenset({"front_led", "top_panel"}),
-    "LSXII": frozenset({"front_led", "top_panel"}),
-    "LSX2LT": frozenset({"cable_mode", "front_led", "top_panel"}),
-    "LSXIILT": frozenset({"cable_mode", "front_led", "top_panel"}),
-    "LS60": frozenset({"top_panel"}),
+    "LSX2": frozenset({"front_led", "top_panel", "xio_audio_info"}),
+    "LSXII": frozenset({"front_led", "top_panel", "xio_audio_info"}),
+    "LSX2LT": frozenset(
+        {"cable_mode", "front_led", "top_panel", "xio_audio_info"}
+    ),
+    "LSXIILT": frozenset(
+        {"cable_mode", "front_led", "top_panel", "xio_audio_info"}
+    ),
+    "LS50W2": frozenset({"xio_audio_info"}),
+    "LS50WII": frozenset({"xio_audio_info"}),
+    "LS60": frozenset({"top_panel", "xio_audio_info"}),
     "XIO": frozenset(
         {"cable_mode", "desk_mode", "front_led", "stereo_pair", "wall_mode"}
     ),
