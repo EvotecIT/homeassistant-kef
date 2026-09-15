@@ -34,15 +34,12 @@ MODERN_MODEL_SOURCE_MAP: dict[str, tuple[str, ...]] = {
     "LSXII": ("wifi", "bluetooth", "tv", "optical", "analog", "usb"),
     "LS50W2": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
     "LS50WII": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
+    # Older LS60 firmware reports the model as "LS60"; newer firmware
+    # renamed it to "LS60W". Both are listed so either firmware generation
+    # matches, without relying on normalization happening elsewhere.
+    "LS60": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
     "LS60W": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
     "XIO": ("wifi", "bluetooth", "tv", "optical"),
-}
-
-# Older LS60 firmware reports the model as "LS60", newer firmware renamed it
-# to "LS60W". Normalized to the canonical "LS60W" key at parse time so every
-# downstream lookup (source list, feature gating) only needs one entry.
-MODEL_ALIASES: dict[str, str] = {
-    "LS60": "LS60W",
 }
 
 DEFAULT_VOLUME_SOURCE_SUFFIX = {

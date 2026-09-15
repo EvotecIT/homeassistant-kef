@@ -34,7 +34,6 @@ from .const import (
     EVENT_SUBSCRIPTIONS,
     GET_DATA_ENDPOINT,
     LEGACY_SOURCE_LIST,
-    MODEL_ALIASES,
     MODERN_MODEL_SOURCE_MAP,
     PROBE_PATHS,
     SET_DATA_ENDPOINT,
@@ -415,7 +414,6 @@ class ModernKefClient(BaseKefClient):
             if release_value and "_" in release_value
             else "KEF"
         )
-        model = MODEL_ALIASES.get(model, model)
         mac_value = self._extract_string(mac_address)
         unique_id = (
             f"kef-{mac_value.lower()}" if mac_value else f"kef-modern-{self._host}"

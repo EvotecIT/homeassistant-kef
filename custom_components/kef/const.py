@@ -48,6 +48,7 @@ MODEL_UNSUPPORTED_FEATURES: dict[str, frozenset[str]] = {
     "LSXIILT": frozenset({"cable_mode", "eq_button", "front_led", "top_panel"}),
     "LS50W2": frozenset({"eq_button"}),
     "LS50WII": frozenset({"eq_button"}),
+    "LS60": frozenset({"desk_mode", "eq_button", "top_panel"}),
     "LS60W": frozenset({"desk_mode", "eq_button", "top_panel"}),
     "XIO": frozenset(
         {
