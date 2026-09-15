@@ -7,6 +7,52 @@ from enum import StrEnum
 from typing import Any
 
 
+def _legacy_eq_profile_to_native(dsp_info: dict[str, Any]) -> dict[str, Any]:
+    """Convert v1 EQ wire values to the physical units exposed by HA."""
+    profile = dict(dsp_info)
+
+    if (value := profile.get("balance")) is not None:
+        profile["balance"] = round(float(value)) - 30
+    if (value := profile.get("trebleAmount")) is not None:
+        profile["trebleAmount"] = round((float(value) / 16.0 * 6.0) - 3.0, 3)
+    if (value := profile.get("subwooferGain")) is not None:
+        profile["subwooferGain"] = round(float(value)) - 10
+    if (value := profile.get("highPassModeFreq")) is not None:
+        profile["highPassModeFreq"] = 50 + round(float(value)) * 5
+    for key in ("deskModeSetting", "wallModeSetting"):
+        if (value := profile.get(key)) is not None:
+            profile[key] = round((float(value) / 2.0) - 10.0, 1)
+    if (value := profile.get("subOutLPFreq")) is not None:
+        profile["subOutLPFreq"] = round(float(value) * 10.0)
+
+    return profile
+
+
+def _native_eq_profile_to_legacy(profile: dict[str, Any]) -> dict[str, Any]:
+    """Convert physical EQ units back to the v1 wire representation."""
+    dsp_info = dict(profile)
+
+    if (value := dsp_info.get("balance")) is not None:
+        dsp_info["balance"] = max(0, min(60, round(float(value) + 30)))
+    if (value := dsp_info.get("trebleAmount")) is not None:
+        legacy = round((float(value) + 3.0) / 6.0 * 16.0)
+        dsp_info["trebleAmount"] = max(0, min(16, legacy))
+    if (value := dsp_info.get("subwooferGain")) is not None:
+        dsp_info["subwooferGain"] = max(0, min(20, round(float(value) + 10)))
+    if (value := dsp_info.get("highPassModeFreq")) is not None:
+        legacy = round((float(value) - 50.0) / 5.0)
+        dsp_info["highPassModeFreq"] = max(0, min(10, legacy))
+    for key in ("deskModeSetting", "wallModeSetting"):
+        if (value := dsp_info.get(key)) is not None:
+            legacy = round((float(value) + 10.0) * 2.0)
+            dsp_info[key] = max(0, min(20, legacy))
+    if (value := dsp_info.get("subOutLPFreq")) is not None:
+        legacy = round(float(value) / 10.0)
+        dsp_info["subOutLPFreq"] = max(4, min(25, legacy))
+
+    return dsp_info
+
+
 class KefBackend(StrEnum):
     """Supported KEF backends."""
 
@@ -142,29 +188,30 @@ class KefEqProfile:
 
         profile = value.get("kefEqProfile", {})
         dsp_info = profile.get("dspInfo", {})
+        native_dsp_info = _legacy_eq_profile_to_native(dsp_info)
         return cls(
             api_version="v1",
             is_expert_mode=profile.get("isExpertMode"),
             profile_name=profile.get("profileName") or None,
             profile_id=profile.get("profileId") or None,
-            balance=dsp_info.get("balance"),
-            bass_extension=dsp_info.get("bassExtension"),
-            treble_amount=dsp_info.get("trebleAmount"),
-            subwoofer_gain=dsp_info.get("subwooferGain"),
-            high_pass_mode=dsp_info.get("highPassMode"),
-            high_pass_frequency=dsp_info.get("highPassModeFreq"),
-            desk_mode=dsp_info.get("deskMode"),
-            desk_mode_setting=dsp_info.get("deskModeSetting"),
-            wall_mode=dsp_info.get("wallMode"),
-            wall_mode_setting=dsp_info.get("wallModeSetting"),
-            phase_correction=dsp_info.get("phaseCorrection"),
-            audio_polarity=dsp_info.get("audioPolarity"),
-            subwoofer_polarity=dsp_info.get("subwooferPolarity"),
-            is_kw1=dsp_info.get("isKW1"),
-            subwoofer_count=dsp_info.get("subwooferCount"),
-            sub_enable_stereo=dsp_info.get("subEnableStereo"),
-            subwoofer_preset=dsp_info.get("subwooferPreset"),
-            sub_out_low_pass_frequency=dsp_info.get("subOutLPFreq"),
+            balance=native_dsp_info.get("balance"),
+            bass_extension=native_dsp_info.get("bassExtension"),
+            treble_amount=native_dsp_info.get("trebleAmount"),
+            subwoofer_gain=native_dsp_info.get("subwooferGain"),
+            high_pass_mode=native_dsp_info.get("highPassMode"),
+            high_pass_frequency=native_dsp_info.get("highPassModeFreq"),
+            desk_mode=native_dsp_info.get("deskMode"),
+            desk_mode_setting=native_dsp_info.get("deskModeSetting"),
+            wall_mode=native_dsp_info.get("wallMode"),
+            wall_mode_setting=native_dsp_info.get("wallModeSetting"),
+            phase_correction=native_dsp_info.get("phaseCorrection"),
+            audio_polarity=native_dsp_info.get("audioPolarity"),
+            subwoofer_polarity=native_dsp_info.get("subwooferPolarity"),
+            is_kw1=native_dsp_info.get("isKW1"),
+            subwoofer_count=native_dsp_info.get("subwooferCount"),
+            sub_enable_stereo=native_dsp_info.get("subEnableStereo"),
+            subwoofer_preset=native_dsp_info.get("subwooferPreset"),
+            sub_out_low_pass_frequency=native_dsp_info.get("subOutLPFreq"),
             raw=profile,
         )
 

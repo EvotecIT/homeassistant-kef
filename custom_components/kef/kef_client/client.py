@@ -54,6 +54,8 @@ from .models import (
     KefPlaybackInfo,
     KefSnapshot,
     KefWifiInfo,
+    _legacy_eq_profile_to_native,
+    _native_eq_profile_to_legacy,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -1466,7 +1468,23 @@ class ModernKefClient(BaseKefClient):
         if not isinstance(dsp_info, dict):
             raise KefResponseError("Unexpected KEF EQ dspInfo payload")
 
-        mutator(dsp_info)
+        original_native_profile = _legacy_eq_profile_to_native(dsp_info)
+        native_profile = dict(original_native_profile)
+        mutator(native_profile)
+        encoded_profile = _native_eq_profile_to_legacy(native_profile)
+        changed_keys = original_native_profile.keys() | native_profile.keys()
+        for key in changed_keys:
+            original_has_key = key in original_native_profile
+            updated_has_key = key in native_profile
+            if original_has_key == updated_has_key and (
+                not updated_has_key
+                or original_native_profile[key] == native_profile[key]
+            ):
+                continue
+            if updated_has_key:
+                dsp_info[key] = encoded_profile[key]
+            else:
+                dsp_info.pop(key, None)
         await self._set_data(PROBE_PATHS["eq_profile"], role="value", value=wrapper)
 
     async def _update_eq_profile_v2(self, mutator) -> None:
