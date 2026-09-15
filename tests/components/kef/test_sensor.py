@@ -13,10 +13,19 @@ from custom_components.kef.const import (
     CONF_BACKEND,
     CONF_ENABLE_DIAGNOSTICS,
     DOMAIN,
+    model_supports_feature,
 )
 from custom_components.kef.coordinator import KefCoordinator
 from custom_components.kef.sensor import SENSORS
 from tests.conftest import TEST_HOST, TEST_SNAPSHOT
+
+EXPECTED_SENSORS = tuple(
+    description
+    for description in SENSORS
+    if model_supports_feature(
+        TEST_SNAPSHOT.device.model, description.model_feature
+    )
+)
 
 
 async def _async_publish_test_snapshot(coordinator: KefCoordinator) -> None:
@@ -53,10 +62,12 @@ async def test_sensor_platform_registers_distinct_names_and_metadata(hass) -> No
         if entity_entry.domain == "sensor"
     }
 
-    assert len(sensor_entries) == len(SENSORS)
-    assert len({item.entity_id for item in sensor_entries.values()}) == len(SENSORS)
+    assert len(sensor_entries) == len(EXPECTED_SENSORS)
+    assert len(
+        {item.entity_id for item in sensor_entries.values()}
+    ) == len(EXPECTED_SENSORS)
 
-    for description in SENSORS:
+    for description in EXPECTED_SENSORS:
         unique_id = f"{TEST_SNAPSHOT.device.unique_id}_{description.key}"
         entity_entry = sensor_entries[unique_id]
 
