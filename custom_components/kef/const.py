@@ -39,37 +39,26 @@ EVENT_POLL_QUEUE_ENDPOINT = "/event/pollQueue"
 STATE_ON = "powerOn"
 STATE_OFF = "standby"
 
-DEFAULT_MODERN_SOURCE_LIST = (
-    "wifi",
-    "bluetooth",
-    "tv",
-    "optical",
-    "coaxial",
-    "analog",
-    "usb",
-)
-
-MODERN_MODEL_SOURCE_MAP: dict[str, tuple[str, ...]] = {
-    "LSX2": ("wifi", "bluetooth", "tv", "optical", "analog", "usb"),
-    "LSX2LT": ("wifi", "bluetooth", "tv", "optical", "usb"),
-    "LSXIILT": ("wifi", "bluetooth", "tv", "optical", "usb"),
-    "LSXII": ("wifi", "bluetooth", "tv", "optical", "analog", "usb"),
-    "LS50W2": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
-    "LS50WII": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
-    "LS60": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
-    "XIO": ("wifi", "bluetooth", "tv", "optical"),
-}
-
 # Only list capabilities known to be unsupported. Models and capabilities that
 # have not been verified remain visible instead of being hidden by inference.
 MODEL_UNSUPPORTED_FEATURES: dict[str, frozenset[str]] = {
-    "LSX2": frozenset({"front_led", "top_panel"}),
-    "LSXII": frozenset({"front_led", "top_panel"}),
-    "LSX2LT": frozenset({"cable_mode", "front_led", "top_panel"}),
-    "LSXIILT": frozenset({"cable_mode", "front_led", "top_panel"}),
-    "LS60": frozenset({"top_panel"}),
+    "LSX2": frozenset({"eq_button", "front_led", "top_panel"}),
+    "LSXII": frozenset({"eq_button", "front_led", "top_panel"}),
+    "LSX2LT": frozenset({"cable_mode", "eq_button", "front_led", "top_panel"}),
+    "LSXIILT": frozenset({"cable_mode", "eq_button", "front_led", "top_panel"}),
+    "LS50W2": frozenset({"eq_button"}),
+    "LS50WII": frozenset({"eq_button"}),
+    "LS60": frozenset({"desk_mode", "eq_button", "top_panel"}),
+    "LS60W": frozenset({"desk_mode", "eq_button", "top_panel"}),
     "XIO": frozenset(
-        {"cable_mode", "desk_mode", "front_led", "stereo_pair", "wall_mode"}
+        {
+            "cable_mode",
+            "desk_mode",
+            "front_led",
+            "stereo_pair",
+            "usb_charging",
+            "wall_mode",
+        }
     ),
 }
 

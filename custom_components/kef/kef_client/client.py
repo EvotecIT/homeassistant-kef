@@ -265,6 +265,14 @@ class BaseKefClient(ABC):
         """Set the subwoofer output low-pass crossover frequency in Hz (40.0-250.0)."""
 
     @abstractmethod
+    async def async_set_subwoofer_enabled(self, enabled: bool) -> None:
+        """Enable or disable subwoofer output."""
+
+    @abstractmethod
+    async def async_set_kw1_enabled(self, enabled: bool) -> None:
+        """Enable or disable the KW1 wireless subwoofer adapter."""
+
+    @abstractmethod
     async def async_set_desk_mode_enabled(self, enabled: bool) -> None:
         """Enable or disable desk mode."""
 
@@ -1078,6 +1086,26 @@ class ModernKefClient(BaseKefClient):
             lambda dsp: dsp.__setitem__(
                 "subOutLPFreq", max(40.0, min(250.0, value))
             )
+        )
+
+    async def async_set_subwoofer_enabled(self, enabled: bool) -> None:
+        """Enable or disable subwoofer output."""
+
+        def _mutate(dsp: dict[str, Any]) -> None:
+            if "subwooferOut" in dsp:
+                dsp["subwooferOut"] = enabled
+            current_count = dsp.get("subwooferCount")
+            if not enabled:
+                dsp["subwooferCount"] = 0
+            elif not isinstance(current_count, int) or current_count < 1:
+                dsp["subwooferCount"] = 1
+
+        await self._update_eq_profile(_mutate)
+
+    async def async_set_kw1_enabled(self, enabled: bool) -> None:
+        """Enable or disable the KW1 wireless subwoofer adapter."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("isKW1", enabled)
         )
 
     async def async_set_desk_mode_enabled(self, enabled: bool) -> None:
@@ -2408,6 +2436,18 @@ class LegacyBinaryClient(BaseKefClient):
         """Legacy speakers do not expose subwoofer low-pass configuration."""
         raise KefUnsupportedDeviceError(
             "Subwoofer low-pass frequency is not supported for legacy KEF"
+        )
+
+    async def async_set_subwoofer_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose subwoofer output configuration."""
+        raise KefUnsupportedDeviceError(
+            "Subwoofer output is not supported for legacy KEF"
+        )
+
+    async def async_set_kw1_enabled(self, enabled: bool) -> None:
+        """Legacy speakers do not expose KW1 adapter configuration."""
+        raise KefUnsupportedDeviceError(
+            "KW1 wireless subwoofer adapter is not supported for legacy KEF"
         )
 
     async def async_set_desk_mode_enabled(self, enabled: bool) -> None:

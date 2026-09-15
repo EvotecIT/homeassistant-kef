@@ -275,6 +275,7 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
     assert snapshot.eq_profile.subwoofer_polarity == "normal"
     assert snapshot.eq_profile.subwoofer_preset == "custom"
     assert snapshot.eq_profile.sub_out_low_pass_frequency == 80
+    assert snapshot.eq_profile.subwoofer_out is False
     assert snapshot.firmware_update is not None
     assert snapshot.firmware_update.state == "newUpdateAvailable"
     assert snapshot.firmware_update.available_version == "3.0.135.0x60acbcf"
@@ -1216,6 +1217,7 @@ async def test_modern_set_balance_posts_typed_eq_wrapper(monkeypatch, hass) -> N
         ("async_set_sub_out_low_pass_frequency", 80, "subOutLPFreq", 8),
         ("async_set_desk_mode_db", -3, "deskModeSetting", 14),
         ("async_set_wall_mode_db", -3.5, "wallModeSetting", 13),
+        ("async_set_kw1_enabled", True, "isKW1", True),
     ],
 )
 async def test_modern_v1_eq_writes_translate_native_units(
@@ -1410,6 +1412,129 @@ async def test_modern_set_treble_updates_eq_profile_v2(
     assert captured["role"] == "value"
     assert captured["value"]["type"] == "kefEqProfileV2"
     assert captured["value"]["kefEqProfileV2"]["trebleAmount"] == 3.0
+
+
+@pytest.mark.parametrize(
+    ("initial_count", "enabled", "expected_count"),
+    [(0, True, 1), (2, True, 2), (2, False, 0)],
+)
+async def test_modern_set_subwoofer_updates_v2_profile_without_losing_count(
+    monkeypatch,
+    hass,
+    initial_count,
+    enabled,
+    expected_count,
+) -> None:
+    """Subwoofer toggles should preserve an existing positive speaker count."""
+    captured = {}
+    profile = copy.deepcopy(EQ_PROFILE_V2_VALUE)
+    profile["kefEqProfileV2"]["subwooferCount"] = initial_count
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile"]
+        return None
+
+    async def fake_get_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile_v2"]
+        return copy.deepcopy(profile)
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["path"] = path
+        captured["role"] = role
+        captured["value"] = value
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_get_path_item", fake_get_path_item)
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_subwoofer_enabled(enabled)
+
+    assert captured["path"] == PROBE_PATHS["eq_profile_v2"]
+    assert captured["role"] == "value"
+    written_profile = captured["value"]["kefEqProfileV2"]
+    assert written_profile["subwooferOut"] is enabled
+    assert written_profile["subwooferCount"] == expected_count
+
+
+@pytest.mark.parametrize(
+    ("initial_count", "enabled", "expected_count"),
+    [(0, True, 1), (2, True, 2), (2, False, 0)],
+)
+async def test_modern_set_subwoofer_updates_v1_count_without_v2_field(
+    monkeypatch,
+    hass,
+    initial_count,
+    enabled,
+    expected_count,
+) -> None:
+    """The v1 subwoofer control should only use its supported count field."""
+    captured = {}
+    eq_profile = copy.deepcopy(EQ_PROFILE_VALUE)
+    dsp_info = eq_profile["kefEqProfile"]["dspInfo"]
+    dsp_info["subwooferCount"] = initial_count
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile"]
+        return copy.deepcopy(eq_profile)
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["path"] = path
+        captured["role"] = role
+        captured["value"] = value
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_subwoofer_enabled(enabled)
+
+    expected_dsp_info = copy.deepcopy(dsp_info)
+    expected_dsp_info["subwooferCount"] = expected_count
+    written_dsp_info = captured["value"]["kefEqProfile"]["dspInfo"]
+    assert captured["path"] == PROBE_PATHS["eq_profile"]
+    assert captured["role"] == "value"
+    assert "subwooferOut" not in written_dsp_info
+    assert written_dsp_info == expected_dsp_info
+
+
+async def test_modern_set_kw1_updates_v2_profile(monkeypatch, hass) -> None:
+    """The KW1 switch should update the v2 EQ profile without other changes."""
+    captured = {}
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile"]
+        return None
+
+    async def fake_get_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile_v2"]
+        return copy.deepcopy(EQ_PROFILE_V2_VALUE)
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["value"] = value
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_get_path_item", fake_get_path_item)
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_set_kw1_enabled(True)
+
+    expected_profile = copy.deepcopy(EQ_PROFILE_V2_VALUE["kefEqProfileV2"])
+    expected_profile["isKW1"] = True
+    assert captured["value"]["kefEqProfileV2"] == expected_profile
 
 
 async def test_modern_get_firmware_update_status_parses_payload(
