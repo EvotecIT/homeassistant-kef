@@ -21,6 +21,7 @@ from custom_components.kef.const import (
     DOMAIN,
 )
 from custom_components.kef.exceptions import KefAuthenticationRequiredError
+from custom_components.kef.models import KefBackend, KefDeviceInfo
 from tests.conftest import TEST_DEVICE_INFO, TEST_HOST
 
 
@@ -40,9 +41,13 @@ def mock_entry_lifecycle(monkeypatch) -> None:
 class _FakeClient:
     """Fake client for config-flow tests."""
 
+    def __init__(self, device: KefDeviceInfo = TEST_DEVICE_INFO) -> None:
+        """Initialize the fake client."""
+        self.device = device
+
     async def async_identify(self):
         """Return canned device information."""
-        return TEST_DEVICE_INFO
+        return self.device
 
 
 async def test_user_flow_creates_modern_entry(monkeypatch, hass) -> None:
@@ -186,6 +191,24 @@ async def test_options_flow_saves_settings(hass) -> None:
 async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) -> None:
     """Discovered setup should provide the translated confirm placeholder."""
 
+    async def fake_create_client(
+        host,
+        session,
+        *,
+        backend=None,
+        port=None,
+        password=None,
+        tcp_port=None,
+    ):
+        assert host == "192.0.2.11"
+        assert password == ""
+        return _FakeClient()
+
+    monkeypatch.setattr(
+        "custom_components.kef.config_flow.async_create_client",
+        fake_create_client,
+    )
+
     discovery_info = ZeroconfServiceInfo(
         ip_address="192.0.2.11",
         ip_addresses=["192.0.2.11"],
@@ -208,11 +231,24 @@ async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) ->
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "confirm"
-    assert result["description_placeholders"] == {"title": "Living Room LSX II"}
+    assert result["description_placeholders"] == {
+        "title": "LSX II-Test (LSXII)"
+    }
 
 
-async def test_zeroconf_confirm_accepts_web_password(monkeypatch, hass) -> None:
-    """Discovered setup should let users enter a web UI password."""
+async def test_zeroconf_preserves_title_for_generic_legacy_identity(
+    monkeypatch,
+    hass,
+) -> None:
+    """A generic legacy API identity should not replace the AirPlay name."""
+    legacy_device = KefDeviceInfo(
+        backend=KefBackend.LEGACY,
+        unique_id="kef-legacy-192.0.2.11",
+        device_name="KEF",
+        model="KEF Legacy",
+        host="192.0.2.11",
+        port=50001,
+    )
 
     async def fake_create_client(
         host,
@@ -224,6 +260,57 @@ async def test_zeroconf_confirm_accepts_web_password(monkeypatch, hass) -> None:
         tcp_port=None,
     ):
         assert host == "192.0.2.11"
+        assert password == ""
+        return _FakeClient(legacy_device)
+
+    monkeypatch.setattr(
+        "custom_components.kef.config_flow.async_create_client",
+        fake_create_client,
+    )
+
+    discovery_info = ZeroconfServiceInfo(
+        ip_address="192.0.2.11",
+        ip_addresses=["192.0.2.11"],
+        hostname="lsx.local.",
+        type=AIRPLAY_ZEROCONF_TYPE,
+        name="Living Room LSX._airplay._tcp.local.",
+        port=7000,
+        properties={
+            "manufacturer": "KEF",
+            "model": "LSX",
+            "serialNumber": "AA-BB-CC",
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_ZEROCONF},
+        data=discovery_info,
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "confirm"
+    assert result["description_placeholders"] == {"title": "Living Room LSX"}
+
+
+async def test_zeroconf_confirm_accepts_web_password(monkeypatch, hass) -> None:
+    """Discovered setup should let users enter a web UI password."""
+
+    passwords: list[str | None] = []
+
+    async def fake_create_client(
+        host,
+        session,
+        *,
+        backend=None,
+        port=None,
+        password=None,
+        tcp_port=None,
+    ):
+        assert host == "192.0.2.11"
+        passwords.append(password)
+        if password == "":
+            raise KefAuthenticationRequiredError("password required")
         assert password == "secret"
         return _FakeClient()
 
@@ -252,6 +339,9 @@ async def test_zeroconf_confirm_accepts_web_password(monkeypatch, hass) -> None:
         data=discovery_info,
     )
 
+    assert result["type"] is FlowResultType.FORM
+    assert result["description_placeholders"] == {"title": "Living Room LSX II"}
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {CONF_PASSWORD: "secret"},
@@ -259,6 +349,7 @@ async def test_zeroconf_confirm_accepts_web_password(monkeypatch, hass) -> None:
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_PASSWORD] == "secret"
+    assert passwords == ["", "secret"]
 
 
 async def test_reconfigure_updates_password_options(monkeypatch, hass) -> None:

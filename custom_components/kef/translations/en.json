@@ -1,5 +1,6 @@
 {
   "config": {
+    "flow_title": "{title}",
     "step": {
       "user": {
         "title": "Add KEF speaker",
@@ -10,8 +11,8 @@
         }
       },
       "confirm": {
-        "title": "Set up KEF speaker",
-        "description": "Do you want to set up this KEF speaker?"
+        "title": "Set up {title}",
+        "description": "Do you want to set up {title}?"
       },
       "reconfigure": {
         "title": "Reconfigure KEF",
