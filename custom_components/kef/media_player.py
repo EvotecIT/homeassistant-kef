@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
@@ -168,6 +169,16 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         if playback is None or playback.position_ms is None or playback.position_ms < 0:
             return None
         return playback.position_ms // 1000
+
+    @property
+    def media_position_updated_at(self) -> datetime | None:
+        """Return when the current playback position was fetched."""
+        if self.media_position is None or self.state not in {
+            MediaPlayerState.PLAYING,
+            MediaPlayerState.PAUSED,
+        }:
+            return None
+        return self.coordinator.last_device_update_at
 
     @property
     def media_duration(self) -> int | None:

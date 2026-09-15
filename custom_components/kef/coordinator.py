@@ -6,7 +6,7 @@ import asyncio
 import logging
 import time
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -15,6 +15,7 @@ from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .api import async_create_client
 from .const import (
@@ -43,6 +44,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
         self._event_listener_task: asyncio.Task[None] | None = None
         self._local_changes: dict[str, Any] = {}
         self._local_change_at = 0.0
+        self.last_device_update_at: datetime | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -79,6 +81,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
             raise ConfigEntryAuthFailed(str(err)) from err
         except KefError as err:
             raise UpdateFailed(str(err)) from err
+        self.last_device_update_at = dt_util.utcnow()
         return self._merge_local_changes(snapshot, started_at)
 
     def _merge_local_changes(

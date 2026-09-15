@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -255,3 +256,23 @@ async def test_a_newer_read_replaces_the_local_change(hass) -> None:
     snapshot = await coordinator._async_update_data()
     assert snapshot.volume_raw == 60
     assert coordinator._local_changes == {}
+
+
+@pytest.mark.asyncio
+async def test_successful_refresh_records_when_device_data_was_fetched(
+    monkeypatch, hass
+) -> None:
+    """Media position timestamps should represent the successful device refresh."""
+    coordinator = _coordinator(hass)
+    coordinator.client = SimpleNamespace(
+        async_refresh=AsyncMock(return_value=TEST_SNAPSHOT)
+    )
+    refreshed_at = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
+    monkeypatch.setattr(
+        "custom_components.kef.coordinator.dt_util.utcnow",
+        lambda: refreshed_at,
+    )
+
+    await coordinator._async_update_data()
+
+    assert coordinator.last_device_update_at == refreshed_at
