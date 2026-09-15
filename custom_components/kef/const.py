@@ -52,7 +52,6 @@ DEFAULT_MODERN_SOURCE_LIST = (
 MODERN_MODEL_SOURCE_MAP: dict[str, tuple[str, ...]] = {
     "LSX2": ("wifi", "bluetooth", "tv", "optical", "analog", "usb"),
     "LSX2LT": ("wifi", "bluetooth", "tv", "optical", "usb"),
-    "LSXIILT": ("wifi", "bluetooth", "tv", "optical", "usb"),
     "LSXII": ("wifi", "bluetooth", "tv", "optical", "analog", "usb"),
     "LS50W2": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
     "LS50WII": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
@@ -67,8 +66,6 @@ MODEL_UNSUPPORTED_FEATURES: dict[str, frozenset[str]] = {
     "LSXII": frozenset({"front_led", "top_panel"}),
     "LSX2LT": frozenset({"cable_mode", "front_led", "top_panel"}),
     "LSXIILT": frozenset({"cable_mode", "front_led", "top_panel"}),
-    "LS50W2": frozenset({"top_panel"}),
-    "LS50WII": frozenset({"top_panel"}),
     "LS60": frozenset({"top_panel"}),
     "XIO": frozenset(
         {"cable_mode", "desk_mode", "front_led", "stereo_pair", "wall_mode"}
