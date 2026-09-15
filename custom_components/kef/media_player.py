@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import AUTH_FAILURE_MESSAGE
 from .coordinator import KefConfigEntry, KefCoordinator
@@ -168,6 +169,13 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         if playback is None or playback.position_ms is None or playback.position_ms < 0:
             return None
         return playback.position_ms // 1000
+
+    @property
+    def media_position_updated_at(self):
+        """Return when the position was last valid, so the frontend can animate it."""
+        if self.media_position is None or self.state != MediaPlayerState.PLAYING:
+            return None
+        return dt_util.utcnow()
 
     @property
     def media_duration(self) -> int | None:
