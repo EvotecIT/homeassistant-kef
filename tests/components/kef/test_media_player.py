@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 from dataclasses import replace
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -24,12 +25,31 @@ def _build_player(snapshot):
     coordinator = Mock()
     coordinator.data = snapshot
     coordinator.last_update_success = True
+    coordinator.last_device_update_at = datetime(2026, 9, 15, 12, 0, tzinfo=UTC)
     coordinator.config_entry = SimpleNamespace(
         domain="kef",
         async_start_reauth=Mock(),
     )
     coordinator.hass = Mock()
     return KefMediaPlayer(coordinator)
+
+
+def test_media_position_uses_stable_device_refresh_timestamp() -> None:
+    """The interpolation timestamp must not drift between state serializations."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    assert snapshot.playback is not None
+    snapshot.playback.position_ms = 42_000
+    player = _build_player(snapshot)
+
+    expected = player.coordinator.last_device_update_at
+    assert player.media_position_updated_at == expected
+    assert player.media_position_updated_at == expected
+
+    snapshot.playback.state = "paused"
+    assert player.media_position_updated_at == expected
+
+    snapshot.playback.position_ms = None
+    assert player.media_position_updated_at is None
 
 
 def _wire_volume_writes(player, device_volume=None):
