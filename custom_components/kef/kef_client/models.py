@@ -112,14 +112,14 @@ class KefEqProfile:
     profile_id: str | None = None
     balance: int | None = None
     bass_extension: str | None = None
-    treble_amount: int | None = None
+    treble_amount: float | None = None
     subwoofer_gain: int | None = None
     high_pass_mode: bool | None = None
-    high_pass_frequency: int | None = None
+    high_pass_frequency: float | None = None
     desk_mode: bool | None = None
-    desk_mode_setting: int | None = None
+    desk_mode_setting: float | None = None
     wall_mode: bool | None = None
-    wall_mode_setting: int | None = None
+    wall_mode_setting: float | None = None
     phase_correction: bool | None = None
     audio_polarity: str | None = None
     subwoofer_polarity: str | None = None
@@ -127,7 +127,7 @@ class KefEqProfile:
     subwoofer_count: int | None = None
     sub_enable_stereo: bool | None = None
     subwoofer_preset: str | None = None
-    sub_out_low_pass_frequency: int | None = None
+    sub_out_low_pass_frequency: float | None = None
     subwoofer_out: bool | None = None
     sound_profile: str | None = None
     dialogue_mode: bool | None = None
@@ -179,14 +179,12 @@ class KefEqProfile:
             is_expert_mode=profile.get("isExpertMode"),
             profile_name=profile.get("profileName") or None,
             profile_id=profile.get("profileId") or None,
-            balance=cls._balance_to_legacy_scale(profile.get("balance")),
+            balance=profile.get("balance"),
             bass_extension=profile.get("bassExtension"),
-            treble_amount=cls._treble_to_legacy_scale(profile.get("trebleAmount")),
-            subwoofer_gain=cls._gain_to_legacy_scale(profile.get("subwooferGain")),
+            treble_amount=profile.get("trebleAmount"),
+            subwoofer_gain=profile.get("subwooferGain"),
             high_pass_mode=profile.get("highPassMode"),
-            high_pass_frequency=cls._high_pass_to_legacy_step(
-                profile.get("highPassModeFreq")
-            ),
+            high_pass_frequency=profile.get("highPassModeFreq"),
             desk_mode=profile.get("deskMode"),
             desk_mode_setting=profile.get("deskModeSetting"),
             wall_mode=profile.get("wallMode"),
@@ -205,26 +203,6 @@ class KefEqProfile:
             wall_mounted=profile.get("wallMounted"),
             raw=profile,
         )
-
-    @staticmethod
-    def _balance_to_legacy_scale(value: Any) -> int | None:
-        """Convert v2 -30..30 balance into the existing 0..60 UI scale."""
-        return None if value is None else round(float(value)) + 30
-
-    @staticmethod
-    def _treble_to_legacy_scale(value: Any) -> int | None:
-        """Convert v2 -3..3 dB treble into the existing 0..16 UI scale."""
-        return None if value is None else round((float(value) + 3.0) / 6.0 * 16)
-
-    @staticmethod
-    def _gain_to_legacy_scale(value: Any) -> int | None:
-        """Convert v2 -10..10 dB gain into the existing 0..20 UI scale."""
-        return None if value is None else round(float(value)) + 10
-
-    @staticmethod
-    def _high_pass_to_legacy_step(value: Any) -> int | None:
-        """Convert v2 Hz high-pass frequency into the existing 0..10 step."""
-        return None if value is None else round((float(value) - 50.0) / 5.0)
 
 
 @dataclass(slots=True)
