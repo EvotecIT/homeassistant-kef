@@ -42,14 +42,26 @@ STATE_OFF = "standby"
 # Only list capabilities known to be unsupported. Models and capabilities that
 # have not been verified remain visible instead of being hidden by inference.
 MODEL_UNSUPPORTED_FEATURES: dict[str, frozenset[str]] = {
-    "LSX2": frozenset({"eq_button", "front_led", "top_panel"}),
-    "LSXII": frozenset({"eq_button", "front_led", "top_panel"}),
-    "LSX2LT": frozenset({"cable_mode", "eq_button", "front_led", "top_panel"}),
-    "LSXIILT": frozenset({"cable_mode", "eq_button", "front_led", "top_panel"}),
-    "LS50W2": frozenset({"eq_button"}),
-    "LS50WII": frozenset({"eq_button"}),
-    "LS60": frozenset({"desk_mode", "eq_button", "top_panel"}),
-    "LS60W": frozenset({"desk_mode", "eq_button", "top_panel"}),
+    "LSX2": frozenset(
+        {"eq_button", "front_led", "top_panel", "xio_audio_info"}
+    ),
+    "LSXII": frozenset(
+        {"eq_button", "front_led", "top_panel", "xio_audio_info"}
+    ),
+    "LSX2LT": frozenset(
+        {"cable_mode", "eq_button", "front_led", "top_panel", "xio_audio_info"}
+    ),
+    "LSXIILT": frozenset(
+        {"cable_mode", "eq_button", "front_led", "top_panel", "xio_audio_info"}
+    ),
+    "LS50W2": frozenset({"eq_button", "xio_audio_info"}),
+    "LS50WII": frozenset({"eq_button", "xio_audio_info"}),
+    "LS60": frozenset(
+        {"desk_mode", "eq_button", "top_panel", "xio_audio_info"}
+    ),
+    "LS60W": frozenset(
+        {"desk_mode", "eq_button", "top_panel", "xio_audio_info"}
+    ),
     "XIO": frozenset(
         {
             "cable_mode",

@@ -142,6 +142,9 @@ async def _async_cleanup_optional_entities(
         CONF_ENABLE_DIAGNOSTICS,
         DEFAULT_ENABLE_DIAGNOSTICS,
     )
+    xio_audio_info_supported = model_supports_feature(
+        device_model, "xio_audio_info"
+    )
     expected_sensor_keys = {"backend", "speaker_status", "play_mode"}
     if diagnostics_enabled:
         expected_sensor_keys.update(
@@ -160,6 +163,22 @@ async def _async_cleanup_optional_entities(
                 "alert_alarm_count",
                 "alert_timer_count",
                 "alert_snooze_time",
+            }
+        )
+        if xio_audio_info_supported:
+            expected_sensor_keys.update(
+                {
+                    "audio_codec_raw",
+                    "audio_source_channels",
+                    "audio_playback_channels",
+                }
+            )
+    if xio_audio_info_supported:
+        expected_sensor_keys.update(
+            {
+                "audio_codec",
+                "audio_virtualizer",
+                "audio_sample_rate",
             }
         )
     expected_binary_sensor_keys = set(_ACTIVE_BINARY_SENSOR_ENTITY_KEYS)
