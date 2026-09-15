@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import WAKE_SOURCE_OPTIONS
+from .const import WAKE_SOURCE_OPTIONS, model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend, KefSnapshot
@@ -149,6 +149,7 @@ class KefNumberDescription(NumberEntityDescription):
 
     value_fn: Callable[[KefSnapshot], int | float | None]
     async_set_fn: Callable[[KefCoordinator, float], Awaitable[None]]
+    model_feature: str | None = None
 
 
 NUMBERS: tuple[KefNumberDescription, ...] = (
@@ -206,6 +207,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
         native_step=1,
         value_fn=lambda data: data.eq_profile.balance if data.eq_profile else None,
         async_set_fn=_async_set_balance,
+        model_feature="stereo_pair",
     ),
     KefNumberDescription(
         key="treble_amount",
@@ -276,6 +278,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
             data.eq_profile.desk_mode_setting if data.eq_profile else None
         ),
         async_set_fn=_async_set_desk_mode_db,
+        model_feature="desk_mode",
     ),
     KefNumberDescription(
         key="wall_mode_db",
@@ -290,6 +293,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
             data.eq_profile.wall_mode_setting if data.eq_profile else None
         ),
         async_set_fn=_async_set_wall_mode_db,
+        model_feature="wall_mode",
     ),
 )
 
@@ -308,6 +312,9 @@ async def async_setup_entry(
         KefNumber(coordinator, description)
         for description in NUMBERS
         if description.value_fn(coordinator.data) is not None
+        and model_supports_feature(
+            coordinator.data.device.model, description.model_feature
+        )
     ]
     for source, value in coordinator.data.default_volume_by_source.items():
         entities.append(

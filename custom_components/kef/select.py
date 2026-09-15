@@ -233,6 +233,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
         value_fn=lambda data: data.eq_button_1,
         async_set_fn=_async_set_eq_button_1,
         options_map=EQ_BUTTON_OPTIONS,
+        model_feature="eq_button",
     ),
     KefSelectDescription(
         key="eq_button_2",
@@ -242,6 +243,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
         value_fn=lambda data: data.eq_button_2,
         async_set_fn=_async_set_eq_button_2,
         options_map=EQ_BUTTON_OPTIONS,
+        model_feature="eq_button",
     ),
 )
 

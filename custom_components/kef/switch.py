@@ -314,6 +314,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.usb_charging_enabled,
         async_set_fn=_async_set_usb_charging,
+        model_feature="usb_charging",
     ),
     KefSwitchDescription(
         key="startup_volume",
