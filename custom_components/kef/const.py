@@ -103,7 +103,8 @@ MODEL_FEATURE_MAP: dict[str, dict[str, bool]] = {
         "cable_mode": True,
         "stereo_pair": True,
         "top_panel": False,
-        "front_led": True,  # unverified - no LS50 Wireless II hardware to test against, left visible rather than assumed hidden
+        # Unverified - no LS50 Wireless II hardware to test against.
+        "front_led": True,
     },
     "LS50WII": {
         "desk_mode": True,
@@ -111,7 +112,8 @@ MODEL_FEATURE_MAP: dict[str, dict[str, bool]] = {
         "cable_mode": True,
         "stereo_pair": True,
         "top_panel": False,
-        "front_led": True,  # unverified - no LS50 Wireless II hardware to test against, left visible rather than assumed hidden
+        # Unverified - no LS50 Wireless II hardware to test against.
+        "front_led": True,
     },
     "LS60": {
         "desk_mode": False,  # floorstanding, no desk placement
@@ -119,7 +121,8 @@ MODEL_FEATURE_MAP: dict[str, dict[str, bool]] = {
         "cable_mode": True,
         "stereo_pair": True,
         "top_panel": False,
-        "front_led": True,  # unverified - no LS60 hardware to test against, left visible rather than assumed hidden
+        # Unverified - no LS60 hardware to test against.
+        "front_led": True,
     },
     "XIO": {
         "desk_mode": False,  # soundbar, no desk placement
