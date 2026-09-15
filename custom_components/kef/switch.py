@@ -160,6 +160,28 @@ async def _async_set_kw1_wake(
     await client.async_set_kw1_wake_enabled(enabled)
 
 
+async def _async_set_subwoofer_enabled(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Enable or disable subwoofer output."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_subwoofer_enabled(enabled)
+
+
+async def _async_set_kw1_adapter(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Enable or disable the KW1 wireless subwoofer adapter."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_kw1_enabled(enabled)
+
+
 async def _async_set_remote_ir(
     coordinator: KefCoordinator,
     enabled: bool,
@@ -355,6 +377,24 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.kw1_wake_enabled,
         async_set_fn=_async_set_kw1_wake,
+    ),
+    KefSwitchDescription(
+        key="subwoofer",
+        name="SW: Enabled",
+        icon="mdi:speaker-wireless",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: (
+            data.eq_profile.subwoofer_out if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_subwoofer_enabled,
+    ),
+    KefSwitchDescription(
+        key="kw1_adapter",
+        name="SW: KW1 adapter",
+        icon="mdi:speaker-wireless",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.eq_profile.is_kw1 if data.eq_profile else None,
+        async_set_fn=_async_set_kw1_adapter,
     ),
     KefSwitchDescription(
         key="remote_ir",
