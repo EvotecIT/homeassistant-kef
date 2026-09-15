@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import MODEL_FEATURE_MAP
+from .const import model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend, KefSnapshot
@@ -430,12 +430,13 @@ async def async_setup_entry(
     if coordinator.data.device.backend is not KefBackend.MODERN:
         return
 
-    model_features = MODEL_FEATURE_MAP.get(coordinator.data.device.model, {})
     entities = [
         KefSwitch(coordinator, description)
         for description in SWITCHES
         if description.value_fn(coordinator.data) is not None
-        and model_features.get(description.model_feature, True)
+        and model_supports_feature(
+            coordinator.data.device.model, description.model_feature
+        )
     ]
     async_add_entities(entities)
 

@@ -18,10 +18,10 @@ from .const import (
     FAVOURITE_BUTTON_OPTIONS,
     IR_CODE_OPTIONS,
     MASTER_CHANNEL_OPTIONS,
-    MODEL_FEATURE_MAP,
     STANDBY_MODE_OPTIONS,
     STREAMING_QUALITY_OPTIONS,
     WAKE_SOURCE_OPTIONS,
+    model_supports_feature,
 )
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
@@ -256,12 +256,13 @@ async def async_setup_entry(
     if coordinator.data.device.backend is not KefBackend.MODERN:
         return
 
-    model_features = MODEL_FEATURE_MAP.get(coordinator.data.device.model, {})
     entities = [
         KefSelect(coordinator, description)
         for description in SELECTS
         if description.value_fn(coordinator.data) is not None
-        and model_features.get(description.model_feature, True)
+        and model_supports_feature(
+            coordinator.data.device.model, description.model_feature
+        )
     ]
     async_add_entities(entities)
 

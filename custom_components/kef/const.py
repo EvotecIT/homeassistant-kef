@@ -60,79 +60,27 @@ MODERN_MODEL_SOURCE_MAP: dict[str, tuple[str, ...]] = {
     "XIO": ("wifi", "bluetooth", "tv", "optical"),
 }
 
-# Per-model UI capability gating: some config entities return a real value
-# from the API on models where the setting has no functional effect (e.g.
-# desk_mode on a soundbar). Keyed by device.model; both naming styles are
-# hedged where MODERN_MODEL_SOURCE_MAP above does the same.
-MODEL_FEATURE_MAP: dict[str, dict[str, bool]] = {
-    "LSX2": {
-        "desk_mode": True,
-        "wall_mode": True,
-        "cable_mode": True,
-        "stereo_pair": True,
-        "top_panel": False,
-        "front_led": False,  # confirmed non-functional on real hardware
-    },
-    "LSXII": {
-        "desk_mode": True,
-        "wall_mode": True,
-        "cable_mode": True,
-        "stereo_pair": True,
-        "top_panel": False,
-        "front_led": False,  # confirmed non-functional on real hardware
-    },
-    "LSX2LT": {
-        "desk_mode": True,
-        "wall_mode": True,
-        "cable_mode": False,  # USB-C only, no wireless option to switch between
-        "stereo_pair": True,
-        "top_panel": False,
-        "front_led": False,  # confirmed non-functional on real hardware
-    },
-    "LSXIILT": {
-        "desk_mode": True,
-        "wall_mode": True,
-        "cable_mode": False,  # USB-C only, no wireless option to switch between
-        "stereo_pair": True,
-        "top_panel": False,
-        "front_led": False,  # confirmed non-functional on real hardware
-    },
-    "LS50W2": {
-        "desk_mode": True,
-        "wall_mode": True,
-        "cable_mode": True,
-        "stereo_pair": True,
-        "top_panel": False,
-        # Unverified - no LS50 Wireless II hardware to test against.
-        "front_led": True,
-    },
-    "LS50WII": {
-        "desk_mode": True,
-        "wall_mode": True,
-        "cable_mode": True,
-        "stereo_pair": True,
-        "top_panel": False,
-        # Unverified - no LS50 Wireless II hardware to test against.
-        "front_led": True,
-    },
-    "LS60": {
-        "desk_mode": False,  # floorstanding, no desk placement
-        "wall_mode": False,  # floorstanding, no wall placement
-        "cable_mode": True,
-        "stereo_pair": True,
-        "top_panel": False,
-        # Unverified - no LS60 hardware to test against.
-        "front_led": True,
-    },
-    "XIO": {
-        "desk_mode": False,  # soundbar, no desk placement
-        "wall_mode": False,  # soundbar, has wall_mounted instead
-        "cable_mode": False,  # soundbar, no external speaker pair to link
-        "stereo_pair": False,  # soundbar, not a paired stereo speaker
-        "top_panel": True,  # has physical top touch panel
-        "front_led": False,  # confirmed non-functional on real hardware
-    },
+# Only list capabilities known to be unsupported. Models and capabilities that
+# have not been verified remain visible instead of being hidden by inference.
+MODEL_UNSUPPORTED_FEATURES: dict[str, frozenset[str]] = {
+    "LSX2": frozenset({"front_led", "top_panel"}),
+    "LSXII": frozenset({"front_led", "top_panel"}),
+    "LSX2LT": frozenset({"cable_mode", "front_led", "top_panel"}),
+    "LSXIILT": frozenset({"cable_mode", "front_led", "top_panel"}),
+    "LS50W2": frozenset({"top_panel"}),
+    "LS50WII": frozenset({"top_panel"}),
+    "LS60": frozenset({"top_panel"}),
+    "XIO": frozenset(
+        {"cable_mode", "desk_mode", "front_led", "stereo_pair", "wall_mode"}
+    ),
 }
+
+
+def model_supports_feature(model: str, feature: str | None) -> bool:
+    """Return whether a model should expose an optional configuration feature."""
+    return feature is None or feature not in MODEL_UNSUPPORTED_FEATURES.get(
+        model.upper(), frozenset()
+    )
 
 STANDBY_MODE_OPTIONS = {
     "standby_none": "Never",
