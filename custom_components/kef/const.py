@@ -52,11 +52,83 @@ DEFAULT_MODERN_SOURCE_LIST = (
 MODERN_MODEL_SOURCE_MAP: dict[str, tuple[str, ...]] = {
     "LSX2": ("wifi", "bluetooth", "tv", "optical", "analog", "usb"),
     "LSX2LT": ("wifi", "bluetooth", "tv", "optical", "usb"),
+    "LSXIILT": ("wifi", "bluetooth", "tv", "optical", "usb"),
     "LSXII": ("wifi", "bluetooth", "tv", "optical", "analog", "usb"),
     "LS50W2": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
     "LS50WII": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
     "LS60": ("wifi", "bluetooth", "tv", "optical", "coaxial", "analog"),
     "XIO": ("wifi", "bluetooth", "tv", "optical"),
+}
+
+# Per-model UI capability gating: some config entities return a real value
+# from the API on models where the setting has no functional effect (e.g.
+# desk_mode on a soundbar). Keyed by device.model; both naming styles are
+# hedged where MODERN_MODEL_SOURCE_MAP above does the same.
+MODEL_FEATURE_MAP: dict[str, dict[str, bool]] = {
+    "LSX2": {
+        "desk_mode": True,
+        "wall_mode": True,
+        "cable_mode": True,
+        "stereo_pair": True,
+        "top_panel": False,
+        "front_led": False,  # confirmed non-functional on real hardware
+    },
+    "LSXII": {
+        "desk_mode": True,
+        "wall_mode": True,
+        "cable_mode": True,
+        "stereo_pair": True,
+        "top_panel": False,
+        "front_led": False,  # confirmed non-functional on real hardware
+    },
+    "LSX2LT": {
+        "desk_mode": True,
+        "wall_mode": True,
+        "cable_mode": False,  # USB-C only, no wireless option to switch between
+        "stereo_pair": True,
+        "top_panel": False,
+        "front_led": False,  # confirmed non-functional on real hardware
+    },
+    "LSXIILT": {
+        "desk_mode": True,
+        "wall_mode": True,
+        "cable_mode": False,  # USB-C only, no wireless option to switch between
+        "stereo_pair": True,
+        "top_panel": False,
+        "front_led": False,  # confirmed non-functional on real hardware
+    },
+    "LS50W2": {
+        "desk_mode": True,
+        "wall_mode": True,
+        "cable_mode": True,
+        "stereo_pair": True,
+        "top_panel": False,
+        "front_led": True,  # unverified - no LS50 Wireless II hardware to test against, left visible rather than assumed hidden
+    },
+    "LS50WII": {
+        "desk_mode": True,
+        "wall_mode": True,
+        "cable_mode": True,
+        "stereo_pair": True,
+        "top_panel": False,
+        "front_led": True,  # unverified - no LS50 Wireless II hardware to test against, left visible rather than assumed hidden
+    },
+    "LS60": {
+        "desk_mode": False,  # floorstanding, no desk placement
+        "wall_mode": False,  # floorstanding, no wall placement
+        "cable_mode": True,
+        "stereo_pair": True,
+        "top_panel": False,
+        "front_led": True,  # unverified - no LS60 hardware to test against, left visible rather than assumed hidden
+    },
+    "XIO": {
+        "desk_mode": False,  # soundbar, no desk placement
+        "wall_mode": False,  # soundbar, has wall_mounted instead
+        "cable_mode": False,  # soundbar, no external speaker pair to link
+        "stereo_pair": False,  # soundbar, not a paired stereo speaker
+        "top_panel": True,  # has physical top touch panel
+        "front_led": False,  # confirmed non-functional on real hardware
+    },
 }
 
 STANDBY_MODE_OPTIONS = {
