@@ -14,6 +14,7 @@ from .const import (
     CONF_ENABLE_DIAGNOSTICS,
     DEFAULT_ENABLE_DIAGNOSTICS,
     DOMAIN,
+    model_supports_feature,
 )
 from .coordinator import KefConfigEntry, KefCoordinator
 from .exceptions import KefAuthenticationRequiredError, KefError
@@ -130,8 +131,12 @@ async def _async_cleanup_optional_entities(
     coordinator: KefCoordinator,
 ) -> None:
     """Remove stale registry entries for optional or retired entities."""
+    from .select import SELECTS
+    from .switch import SWITCHES
+
     registry = er.async_get(hass)
     device_unique_id = coordinator.data.device.unique_id
+    device_model = coordinator.data.device.model
     diagnostics_enabled = entry.options.get(
         CONF_ENABLE_DIAGNOSTICS,
         DEFAULT_ENABLE_DIAGNOSTICS,
@@ -157,10 +162,29 @@ async def _async_cleanup_optional_entities(
             }
         )
     expected_binary_sensor_keys = set(_ACTIVE_BINARY_SENSOR_ENTITY_KEYS)
+    model_features_by_platform = {
+        "select": {
+            description.key: description.model_feature for description in SELECTS
+        },
+        "switch": {
+            description.key: description.model_feature for description in SWITCHES
+        },
+    }
 
     for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
         platform = entity_entry.entity_id.split(".", 1)[0]
         unique_id = entity_entry.unique_id
+        if platform in model_features_by_platform:
+            if not unique_id.startswith(f"{device_unique_id}_"):
+                continue
+            key = unique_id.removeprefix(f"{device_unique_id}_")
+            feature = model_features_by_platform[platform].get(key)
+            if feature is not None and not model_supports_feature(
+                device_model, feature
+            ):
+                registry.async_remove(entity_entry.entity_id)
+            continue
+
         if platform not in {"sensor", "binary_sensor"}:
             continue
 

@@ -21,6 +21,7 @@ from .const import (
     STANDBY_MODE_OPTIONS,
     STREAMING_QUALITY_OPTIONS,
     WAKE_SOURCE_OPTIONS,
+    model_supports_feature,
 )
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
@@ -144,6 +145,7 @@ class KefSelectDescription(SelectEntityDescription):
     value_fn: Callable[[KefSnapshot], str | None]
     async_set_fn: Callable[[KefCoordinator, str], Awaitable[None]]
     options_map: dict[str, str]
+    model_feature: str | None = None
 
 
 SELECTS: tuple[KefSelectDescription, ...] = (
@@ -173,6 +175,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
         value_fn=lambda data: data.master_channel,
         async_set_fn=_async_set_master_channel,
         options_map=MASTER_CHANNEL_OPTIONS,
+        model_feature="stereo_pair",
     ),
     KefSelectDescription(
         key="cable_mode",
@@ -182,6 +185,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
         value_fn=lambda data: data.cable_mode,
         async_set_fn=_async_set_cable_mode,
         options_map=CABLE_MODE_OPTIONS,
+        model_feature="cable_mode",
     ),
     KefSelectDescription(
         key="bass_extension",
@@ -256,6 +260,9 @@ async def async_setup_entry(
         KefSelect(coordinator, description)
         for description in SELECTS
         if description.value_fn(coordinator.data) is not None
+        and model_supports_feature(
+            coordinator.data.device.model, description.model_feature
+        )
     ]
     async_add_entities(entities)
 

@@ -60,6 +60,26 @@ MODERN_MODEL_SOURCE_MAP: dict[str, tuple[str, ...]] = {
     "XIO": ("wifi", "bluetooth", "tv", "optical"),
 }
 
+# Only list capabilities known to be unsupported. Models and capabilities that
+# have not been verified remain visible instead of being hidden by inference.
+MODEL_UNSUPPORTED_FEATURES: dict[str, frozenset[str]] = {
+    "LSX2": frozenset({"front_led", "top_panel"}),
+    "LSXII": frozenset({"front_led", "top_panel"}),
+    "LSX2LT": frozenset({"cable_mode", "front_led", "top_panel"}),
+    "LSXIILT": frozenset({"cable_mode", "front_led", "top_panel"}),
+    "LS60": frozenset({"top_panel"}),
+    "XIO": frozenset(
+        {"cable_mode", "desk_mode", "front_led", "stereo_pair", "wall_mode"}
+    ),
+}
+
+
+def model_supports_feature(model: str, feature: str | None) -> bool:
+    """Return whether a model should expose an optional configuration feature."""
+    return feature is None or feature not in MODEL_UNSUPPORTED_FEATURES.get(
+        model.upper(), frozenset()
+    )
+
 STANDBY_MODE_OPTIONS = {
     "standby_none": "Never",
     "standby_20mins": "20 minutes",

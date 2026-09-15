@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend, KefSnapshot
@@ -242,6 +243,7 @@ class KefSwitchDescription(SwitchEntityDescription):
 
     value_fn: Callable[[KefSnapshot], bool | None]
     async_set_fn: Callable[[KefCoordinator, bool], Awaitable[None]]
+    model_feature: str | None = None
 
 
 SWITCHES: tuple[KefSwitchDescription, ...] = (
@@ -268,6 +270,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.front_led_enabled,
         async_set_fn=_async_set_front_led,
+        model_feature="front_led",
     ),
     KefSwitchDescription(
         key="standby_led",
@@ -284,6 +287,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_enabled,
         async_set_fn=_async_set_top_panel,
+        model_feature="top_panel",
     ),
     KefSwitchDescription(
         key="top_panel_led",
@@ -292,6 +296,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_led_enabled,
         async_set_fn=_async_set_top_panel_led,
+        model_feature="top_panel",
     ),
     KefSwitchDescription(
         key="top_panel_standby_led",
@@ -300,6 +305,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_standby_led_enabled,
         async_set_fn=_async_set_top_panel_standby_led,
+        model_feature="top_panel",
     ),
     KefSwitchDescription(
         key="usb_charging",
@@ -380,6 +386,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_profile.desk_mode if data.eq_profile else None,
         async_set_fn=_async_set_desk_mode,
+        model_feature="desk_mode",
     ),
     KefSwitchDescription(
         key="wall_mode",
@@ -388,6 +395,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_profile.wall_mode if data.eq_profile else None,
         async_set_fn=_async_set_wall_mode,
+        model_feature="wall_mode",
     ),
     KefSwitchDescription(
         key="phase_correction",
@@ -426,6 +434,9 @@ async def async_setup_entry(
         KefSwitch(coordinator, description)
         for description in SWITCHES
         if description.value_fn(coordinator.data) is not None
+        and model_supports_feature(
+            coordinator.data.device.model, description.model_feature
+        )
     ]
     async_add_entities(entities)
 
