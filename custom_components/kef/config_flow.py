@@ -183,12 +183,25 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         # the speaker's real name via its local API for a usable discovery card.
         session = async_get_clientsession(self.hass)
         try:
-            client = await async_create_client(self._host, session, password=self._password)
+            client = await async_create_client(
+                self._host,
+                session,
+                password=self._password,
+            )
             device = await client.async_identify()
         except KefError as err:
-            _LOGGER.debug("Could not resolve speaker identity for %s: %s", self._host, err)
+            _LOGGER.debug(
+                "Could not resolve speaker identity for %s: %s",
+                self._host,
+                err,
+            )
         else:
-            self._title = f"{device.device_name} ({device.model})"
+            resolved_name = device.device_name.strip()
+            resolved_model = device.model.strip()
+            if resolved_name.casefold() != "kef":
+                self._title = resolved_name
+                if resolved_model.casefold() not in {"", "kef", "kef legacy"}:
+                    self._title = f"{resolved_name} ({resolved_model})"
 
         self.context["title_placeholders"] = {"title": self._title}
         return await self.async_step_confirm()
