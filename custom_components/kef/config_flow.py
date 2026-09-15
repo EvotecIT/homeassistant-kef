@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -36,6 +37,8 @@ from .exceptions import (
     KefError,
     KefUnsupportedDeviceError,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class KefConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -175,6 +178,17 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         if discovery_unique_id:
             await self.async_set_unique_id(discovery_unique_id)
             self._abort_if_unique_id_configured(updates={CONF_HOST: self._host})
+
+        # AirPlay TXT records don't reliably carry a per-device name, so resolve
+        # the speaker's real name via its local API for a usable discovery card.
+        session = async_get_clientsession(self.hass)
+        try:
+            client = await async_create_client(self._host, session, password=self._password)
+            device = await client.async_identify()
+        except KefError as err:
+            _LOGGER.debug("Could not resolve speaker identity for %s: %s", self._host, err)
+        else:
+            self._title = f"{device.device_name} ({device.model})"
 
         self.context["title_placeholders"] = {"title": self._title}
         return await self.async_step_confirm()
