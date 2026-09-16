@@ -28,6 +28,7 @@ from .const import (
 )
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity, apply_eq_profile_change
+from .kef_client.const import model_has_subwoofer_preset_values
 from .models import KefBackend, KefSnapshot
 
 
@@ -204,6 +205,7 @@ class KefSelectDescription(SelectEntityDescription):
     async_set_fn: Callable[[KefCoordinator, str], Awaitable[None]]
     options_map: dict[str, str]
     model_feature: str | None = None
+    model_available_fn: Callable[[str], bool] = lambda _model: True
 
 
 SELECTS: tuple[KefSelectDescription, ...] = (
@@ -335,6 +337,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
         ),
         async_set_fn=_async_set_subwoofer_preset,
         options_map=SUBWOOFER_PRESET_OPTIONS,
+        model_available_fn=model_has_subwoofer_preset_values,
     ),
     KefSelectDescription(
         key="sound_profile",
@@ -364,6 +367,7 @@ async def async_setup_entry(
         KefSelect(coordinator, description)
         for description in SELECTS
         if description.value_fn(coordinator.data) is not None
+        and description.model_available_fn(coordinator.data.device.model)
         and model_supports_feature(
             coordinator.data.device.model, description.model_feature
         )

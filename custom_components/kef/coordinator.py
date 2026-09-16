@@ -44,6 +44,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
         self._event_listener_task: asyncio.Task[None] | None = None
         self._local_changes: dict[str, Any] = {}
         self._local_change_at = 0.0
+        self._local_change_refreshes_remaining = 0
         self.last_device_update_at: datetime | None = None
         super().__init__(
             hass,
@@ -94,15 +95,28 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
         field it touched, and letting it publish would roll the value back --
         and, because commands compute the next absolute value from this data,
         the following command would then recompute from the rolled-back number.
-        Reads that started after the write are newer than anything we know, so
-        the device wins and the local values are dropped.
+        The first read that starts after the write gets one grace cycle when
+        the device still reports the old value. That covers speakers which
+        acknowledge a write before their read API reflects it. A matching read
+        settles immediately; after the grace cycle, the device wins.
         """
         if not self._local_changes:
             return snapshot
-        if self._local_change_at <= started_at:
+        device_matches = all(
+            getattr(snapshot, key) == value
+            for key, value in self._local_changes.items()
+        )
+        if device_matches:
             self._local_changes.clear()
+            self._local_change_refreshes_remaining = 0
             return snapshot
-        return replace(snapshot, **self._local_changes)
+        if self._local_change_at > started_at:
+            return replace(snapshot, **self._local_changes)
+        if self._local_change_refreshes_remaining > 0:
+            self._local_change_refreshes_remaining -= 1
+            return replace(snapshot, **self._local_changes)
+        self._local_changes.clear()
+        return snapshot
 
     @callback
     def async_apply_local_change(self, **changes: Any) -> None:
@@ -118,6 +132,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
         """
         self._local_changes.update(changes)
         self._local_change_at = time.monotonic()
+        self._local_change_refreshes_remaining = 1
         if self.data is None:
             return
         self.async_set_updated_data(replace(self.data, **changes))

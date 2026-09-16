@@ -187,6 +187,7 @@ async def _async_cleanup_optional_entities(
             description.key: description.model_feature for description in NUMBERS
         },
     }
+    selects_by_key = {description.key: description for description in SELECTS}
 
     for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
         platform = entity_entry.entity_id.split(".", 1)[0]
@@ -196,8 +197,14 @@ async def _async_cleanup_optional_entities(
                 continue
             key = unique_id.removeprefix(f"{device_unique_id}_")
             feature = model_features_by_platform[platform].get(key)
-            if feature is not None and not model_supports_feature(
-                device_model, feature
+            select_unavailable = (
+                platform == "select"
+                and key in selects_by_key
+                and not selects_by_key[key].model_available_fn(device_model)
+            )
+            if select_unavailable or (
+                feature is not None
+                and not model_supports_feature(device_model, feature)
             ):
                 registry.async_remove(entity_entry.entity_id)
             continue

@@ -1440,6 +1440,13 @@ async def test_modern_set_subwoofer_preset_updates_complete_v2_profile(
     assert updated["highPassModeFreq"] == 67.5
     assert updated["futureFirmwareCode"] == {"value": 999}
 
+    applied["gain"] = 999
+    assert await client.async_set_subwoofer_preset("kc62", "XIO") == {
+        "gain": -1.0,
+        "lowpass": 55.0,
+        "highpass": 67.5,
+    }
+
 
 @pytest.mark.parametrize("model", ["LSX2", "LSXII", "LSX2LT", "LSXIILT"])
 async def test_subwoofer_preset_table_supports_observed_lsx_aliases(
@@ -1650,6 +1657,39 @@ async def test_unknown_model_preset_updates_v1_label_without_guessing_values(
     assert updated == original_dsp
 
 
+async def test_known_model_preset_reports_v1_quantized_values(
+    monkeypatch,
+    hass,
+) -> None:
+    """Optimistic v1 values should match what its coarse wire format can store."""
+    captured = {}
+    profile = copy.deepcopy(EQ_PROFILE_VALUE)
+    profile["kefEqProfile"]["dspInfo"]["isKW1"] = False
+    profile["kefEqProfile"]["dspInfo"]["subwooferCount"] = 1
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        return copy.deepcopy(profile)
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["value"] = value
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    applied = await client.async_set_subwoofer_preset("kc62", "LSXII")
+
+    assert applied == {"gain": -1.0, "lowpass": 60.0, "highpass": 70.0}
+    updated = captured["value"]["kefEqProfile"]["dspInfo"]
+    assert updated["subwooferGain"] == 9
+    assert updated["subOutLPFreq"] == 6
+    assert updated["highPassModeFreq"] == 4
+
+
 async def test_modern_start_calibration_activates_xio_path(
     monkeypatch,
     hass,
@@ -1667,6 +1707,38 @@ async def test_modern_start_calibration_activates_xio_path(
     await client.async_start_calibration()
 
     assert captured == {"path": PROBE_PATHS["calibration_start"], "value": None}
+
+
+async def test_modern_calibration_getters_decode_typed_values(
+    monkeypatch,
+    hass,
+) -> None:
+    """Direct calibration getters should unwrap their typed API payloads."""
+    calibration_status = {
+        "isCalibrated": True,
+        "year": 2026,
+        "month": 9,
+        "day": 16,
+        "stability": 95,
+    }
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        if path == PROBE_PATHS["calibration_status"]:
+            return {"kefDspCalibrationStatus": calibration_status}
+        if path == PROBE_PATHS["calibration_result"]:
+            return {"double_": -2.5}
+        raise AssertionError(f"Unexpected path: {path}")
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+
+    assert await client.async_get_calibration_status() == calibration_status
+    assert await client.async_get_calibration_result() == -2.5
 
 
 async def test_modern_set_treble_updates_eq_profile_v2(

@@ -97,6 +97,7 @@ async def test_lsx_ii_lt_hides_only_known_unsupported_controls(model: str) -> No
     assert "cable_mode" not in selects
     assert {"eq_button_1", "eq_button_2"}.isdisjoint(selects)
     assert "master_channel" in selects
+    assert "subwoofer_preset" in selects
 
 
 async def test_xio_keeps_top_panel_controls_and_hides_pair_controls() -> None:
@@ -114,7 +115,12 @@ async def test_xio_keeps_top_panel_controls_and_hides_pair_controls() -> None:
     }.isdisjoint(switches)
     assert {"balance", "desk_mode_db", "wall_mode_db"}.isdisjoint(numbers)
     assert {"master_channel", "cable_mode"}.isdisjoint(selects)
-    assert {"eq_button_1", "eq_button_2", "sound_profile"} <= selects
+    assert {
+        "eq_button_1",
+        "eq_button_2",
+        "sound_profile",
+        "subwoofer_preset",
+    } <= selects
 
 
 @pytest.mark.parametrize("model", ["LS60", "LS60W"])
@@ -133,6 +139,7 @@ async def test_ls60_hides_desk_mode_but_keeps_unverified_controls_visible(
     )
     assert {"master_channel", "cable_mode"} <= selects
     assert {"eq_button_1", "eq_button_2", "sound_profile"}.isdisjoint(selects)
+    assert "subwoofer_preset" not in selects
 
 
 @pytest.mark.parametrize("model", ["LS50W2", "LS50WII"])
@@ -144,6 +151,7 @@ async def test_ls50_wireless_ii_keeps_top_panel_controls(model: str) -> None:
     assert "sub_enable_stereo" in switches
     assert "standby_led" in switches
     assert {"eq_button_1", "eq_button_2", "sound_profile"}.isdisjoint(selects)
+    assert "subwoofer_preset" not in selects
 
 
 async def test_unknown_models_keep_all_reported_controls() -> None:
@@ -161,6 +169,7 @@ async def test_unknown_models_keep_all_reported_controls() -> None:
     assert {"balance", "desk_mode_db", "wall_mode_db"} <= numbers
     assert {"master_channel", "cable_mode"} <= selects
     assert {"eq_button_1", "eq_button_2", "sound_profile"} <= selects
+    assert "subwoofer_preset" not in selects
 
 
 async def test_xio_audio_sensors_follow_model_and_diagnostics_gates() -> None:
@@ -331,12 +340,19 @@ async def test_cleanup_removes_xio_audio_sensors_from_legacy_devices(hass) -> No
         f"{unique_id_prefix}start_calibration",
         config_entry=entry,
     )
+    subwoofer_preset = registry.async_get_or_create(
+        Platform.SELECT,
+        DOMAIN,
+        f"{unique_id_prefix}subwoofer_preset",
+        config_entry=entry,
+    )
 
     await _async_cleanup_optional_entities(hass, entry, coordinator)
 
     assert registry.async_get(audio_codec.entity_id) is None
     assert registry.async_get(audio_codec_raw.entity_id) is None
     assert registry.async_get(start_calibration.entity_id) is None
+    assert registry.async_get(subwoofer_preset.entity_id) is None
     assert registry.async_get(speaker_status.entity_id) is not None
 
 

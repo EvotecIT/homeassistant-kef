@@ -72,6 +72,11 @@ SUBWOOFER_PRESET_VALUES: dict[str, _SubwooferPresetTable] = {
     "LSXIILT": _XIO_SUBWOOFER_PRESET_VALUES,
 }
 
+
+def model_has_subwoofer_preset_values(model: str) -> bool:
+    """Return whether preset selection has verified tuning values for a model."""
+    return model.upper() in SUBWOOFER_PRESET_VALUES
+
 API_ROOT = "/api"
 GET_DATA_ENDPOINT = "/getData"
 SET_DATA_ENDPOINT = "/setData"

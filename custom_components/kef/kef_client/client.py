@@ -1222,10 +1222,10 @@ class ModernKefClient(BaseKefClient):
         than guessing values.
         """
         preset_table = SUBWOOFER_PRESET_VALUES.get(model.upper(), {}).get(value, {})
-        applied_values: dict[str, float] | None = None
+        matched_preset = False
 
         def _mutate(dsp: dict[str, Any]) -> None:
-            nonlocal applied_values
+            nonlocal matched_preset
             dsp["subwooferPreset"] = value
             lookup_key = (
                 bool(dsp.get("isKW1", False)),
@@ -1236,10 +1236,16 @@ class ModernKefClient(BaseKefClient):
                 dsp["subwooferGain"] = values["gain"]
                 dsp["subOutLPFreq"] = values["lowpass"]
                 dsp["highPassModeFreq"] = values["highpass"]
-                applied_values = values
+                matched_preset = True
 
-        await self._update_eq_profile(_mutate)
-        return applied_values
+        updated_profile = await self._update_eq_profile(_mutate)
+        if not matched_preset:
+            return None
+        return {
+            "gain": float(updated_profile["subwooferGain"]),
+            "lowpass": float(updated_profile["subOutLPFreq"]),
+            "highpass": float(updated_profile["highPassModeFreq"]),
+        }
 
     async def async_set_sub_enable_stereo(self, enabled: bool) -> None:
         """Enable or disable dual-subwoofer stereo channel separation."""
@@ -1625,15 +1631,14 @@ class ModernKefClient(BaseKefClient):
             raise KefResponseError(f"Unexpected KEF payload for {path}")
         return payload[0]
 
-    async def _update_eq_profile(self, mutator) -> None:
+    async def _update_eq_profile(self, mutator) -> dict[str, Any]:
         """Fetch, mutate, and write back the typed EQ profile wrapper."""
         payload = await self._get_optional_path_item(
             PROBE_PATHS["eq_profile"],
             roles="value",
         )
         if payload is None:
-            await self._update_eq_profile_v2(mutator)
-            return
+            return await self._update_eq_profile_v2(mutator)
 
         if not isinstance(payload, dict) or payload.get("type") != "kefEqProfile":
             raise KefResponseError("Unexpected KEF EQ profile payload")
@@ -1665,8 +1670,9 @@ class ModernKefClient(BaseKefClient):
             else:
                 dsp_info.pop(key, None)
         await self._set_data(PROBE_PATHS["eq_profile"], role="value", value=wrapper)
+        return _legacy_eq_profile_to_native(dsp_info)
 
-    async def _update_eq_profile_v2(self, mutator) -> None:
+    async def _update_eq_profile_v2(self, mutator) -> dict[str, Any]:
         """Fetch, mutate, and write back the modern v2 EQ profile wrapper."""
         payload = await self._get_path_item(PROBE_PATHS["eq_profile_v2"], roles="value")
         if not isinstance(payload, dict) or payload.get("type") != "kefEqProfileV2":
@@ -1679,6 +1685,7 @@ class ModernKefClient(BaseKefClient):
 
         mutator(profile)
         await self._set_data(PROBE_PATHS["eq_profile_v2"], role="value", value=wrapper)
+        return dict(profile)
 
     async def _get_optional_path_item(self, path: str, *, roles: str = "value") -> Any:
         """Fetch an optional raw item from a KEF API path."""
