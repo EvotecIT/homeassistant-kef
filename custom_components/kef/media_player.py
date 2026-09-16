@@ -16,6 +16,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .audio import audio_codec_value, audio_virtualizer_value
 from .const import AUTH_FAILURE_MESSAGE, model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
@@ -23,6 +24,12 @@ from .exceptions import KefAuthenticationRequiredError, KefError
 from .models import KefBackend
 
 VOLUME_STEP = 4
+
+# Sources with no real track metadata, where the speaker just passes audio
+# through from an external device. The codec/virtualizer info is worth
+# appending to the title here since otherwise the card shows a bare source
+# label (e.g. "TV eARC") with no indication of what's actually playing.
+_PASSTHROUGH_SOURCES = frozenset({"tv", "optical", "coaxial", "analog"})
 
 # Attributes tied to a capability that MODEL_UNSUPPORTED_FEATURES can hide.
 # Unlike the entity platforms (switch/number/select/sensor), this attribute
@@ -44,6 +51,8 @@ _ATTRIBUTE_MODEL_FEATURES: dict[str, str] = {
     "eq_button_1": "eq_button",
     "eq_button_2": "eq_button",
     "codec": "xio_audio_info",
+    "audio_codec": "xio_audio_info",
+    "audio_virtualizer": "xio_audio_info",
     "sample_frequency": "xio_audio_info",
     "stream_sample_rate": "xio_audio_info",
     "stream_channels": "xio_audio_info",
@@ -156,9 +165,24 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
 
     @property
     def media_title(self) -> str | None:
-        """Return the current title."""
+        """Return the current title.
+
+        On passthrough sources the speaker reports no real track, just a
+        generic label like "TV eARC". Appending the decoded codec and
+        channel format there (e.g. "TV eARC - Dolby Digital Plus 5.1")
+        surfaces what's actually playing instead of a bare source name.
+        """
         playback = self.coordinator.data.playback
-        return playback.title if playback is not None else None
+        title = playback.title if playback is not None else None
+        snapshot = self.coordinator.data
+        if self.source not in _PASSTHROUGH_SOURCES or not model_supports_feature(
+            snapshot.device.model, "xio_audio_info"
+        ):
+            return title
+        codec = audio_codec_value(snapshot)
+        if not codec:
+            return title
+        return f"{title} - {codec}" if title else codec
 
     @property
     def media_artist(self) -> str | None:
@@ -231,6 +255,8 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
             "service_id": playback.service_id if playback else None,
             "album_artist": playback.album_artist if playback else None,
             "codec": playback.codec if playback else None,
+            "audio_codec": audio_codec_value(snapshot),
+            "audio_virtualizer": audio_virtualizer_value(snapshot),
             "sample_frequency": playback.sample_frequency if playback else None,
             "stream_sample_rate": playback.stream_sample_rate if playback else None,
             "stream_channels": playback.stream_channels if playback else None,

@@ -99,6 +99,8 @@ def test_extra_state_attributes_hide_unsupported_model_features() -> None:
     assert "cable_mode" not in attrs
     assert "standby_led_enabled" not in attrs
     assert "front_led_enabled" not in attrs
+    assert attrs["audio_codec"] == "pcm 2.0"
+    assert attrs["audio_virtualizer"] == "Direct 2.0"
     assert "eq_button_1" in attrs
     assert "top_panel_enabled" in attrs
 
@@ -114,6 +116,52 @@ def test_extra_state_attributes_keep_supported_model_features() -> None:
     assert "standby_led_enabled" in attrs
     assert "front_led_enabled" not in attrs
     assert "eq_button_1" not in attrs
+    assert "codec" not in attrs
+    assert "audio_codec" not in attrs
+    assert "audio_virtualizer" not in attrs
+
+
+def test_xio_passthrough_title_includes_decoded_audio_format() -> None:
+    """XIO passthrough titles should describe the decoded input format."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.device.model = "XIO"
+    snapshot.source = "tv"
+    assert snapshot.playback is not None
+    snapshot.playback.title = "TV eARC"
+    snapshot.playback.codec = "Dolby Digital Plus - Direct"
+    snapshot.playback.stream_channels = 6
+
+    assert _build_player(snapshot).media_title == "TV eARC - Dolby Digital Plus 5.1"
+
+
+def test_xio_passthrough_title_can_use_audio_format_alone() -> None:
+    """A missing passthrough label should still expose the XIO audio format."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.device.model = "XIO"
+    snapshot.source = "optical"
+    assert snapshot.playback is not None
+    snapshot.playback.title = None
+    snapshot.playback.codec = "Dolby PCM - Direct"
+    snapshot.playback.stream_channels = 2
+
+    assert _build_player(snapshot).media_title == "PCM 2.0"
+
+
+def test_audio_format_does_not_change_other_media_titles() -> None:
+    """Decoded XIO audio must not leak to other models or regular sources."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.source = "tv"
+    assert snapshot.playback is not None
+    snapshot.playback.title = "TV eARC"
+    snapshot.playback.codec = "Dolby Digital Plus - Direct"
+    snapshot.playback.stream_channels = 6
+
+    assert _build_player(snapshot).media_title == "TV eARC"
+
+    snapshot.device.model = "XIO"
+    snapshot.source = "wifi"
+    snapshot.playback.title = "A real track"
+    assert _build_player(snapshot).media_title == "A real track"
 
 
 def test_unavailable_player_has_no_media_state() -> None:
