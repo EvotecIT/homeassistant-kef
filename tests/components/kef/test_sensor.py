@@ -11,6 +11,11 @@ from homeassistant.const import CONF_HOST
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.kef.audio import (
+    audio_codec_value,
+    audio_virtualizer_value,
+    format_channels,
+)
 from custom_components.kef.const import (
     CONF_BACKEND,
     CONF_ENABLE_DIAGNOSTICS,
@@ -18,12 +23,8 @@ from custom_components.kef.const import (
     model_supports_feature,
 )
 from custom_components.kef.coordinator import KefCoordinator
-from custom_components.kef.sensor import (
-    SENSORS,
-    _audio_codec_value,
-    _audio_virtualizer_value,
-    _format_channels,
-)
+from custom_components.kef.models import KefCalibrationStatus
+from custom_components.kef.sensor import SENSORS, _room_calibration_value
 from tests.conftest import TEST_HOST, TEST_SNAPSHOT
 
 EXPECTED_SENSORS = tuple(
@@ -57,7 +58,7 @@ def test_format_channels_accepts_numeric_and_wire_string_values(
     expected: str | None,
 ) -> None:
     """Channel formatting should tolerate both observed payload shapes."""
-    assert _format_channels(channel_count) == expected
+    assert format_channels(channel_count) == expected
 
 
 @pytest.mark.parametrize(
@@ -96,8 +97,37 @@ def test_audio_sensor_values_decode_codec_and_channel_contract(
     snapshot.playback.stream_channels = stream_channels
     snapshot.playback.audio_channels = audio_channels
 
-    assert _audio_codec_value(snapshot) == expected_codec
-    assert _audio_virtualizer_value(snapshot) == expected_virtualizer
+    assert audio_codec_value(snapshot) == expected_codec
+    assert audio_virtualizer_value(snapshot) == expected_virtualizer
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        (None, None),
+        (KefCalibrationStatus(is_calibrated=None), None),
+        (KefCalibrationStatus(is_calibrated=False), "Not calibrated"),
+        (KefCalibrationStatus(is_calibrated=True), "Calibrated"),
+        (
+            KefCalibrationStatus(
+                is_calibrated=True,
+                year=2026,
+                month=9,
+                day=16,
+            ),
+            "2026-09-16",
+        ),
+    ],
+)
+def test_room_calibration_value_distinguishes_unknown_and_uncalibrated(
+    status: KefCalibrationStatus | None,
+    expected: str | None,
+) -> None:
+    """Missing calibration state must not be reported as a negative result."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.calibration_status = status
+
+    assert _room_calibration_value(snapshot) == expected
 
 
 async def _async_publish_test_snapshot(coordinator: KefCoordinator) -> None:

@@ -1346,6 +1346,16 @@ async def test_modern_refresh_falls_back_to_eq_profile_v2(
         PROBE_PATHS["mute"]: MUTE_VALUE["bool_"],
         PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
         PROBE_PATHS["eq_profile_v2"]: EQ_PROFILE_V2_VALUE,
+        PROBE_PATHS["calibration_status"]: {
+            "kefDspCalibrationStatus": {
+                "isCalibrated": True,
+                "year": 2026,
+                "month": 9,
+                "day": 16,
+                "stability": 95,
+            }
+        },
+        PROBE_PATHS["calibration_result"]: {"double_": -2.5},
     }
 
     async def fake_get_path_value(self, path, *, typed_key=None):
@@ -1375,6 +1385,288 @@ async def test_modern_refresh_falls_back_to_eq_profile_v2(
     assert snapshot.eq_profile.wall_mode_setting == -3
     assert snapshot.eq_profile.sub_out_low_pass_frequency == 80
     assert snapshot.eq_profile.sound_profile == "default"
+    assert snapshot.calibration_status is not None
+    assert snapshot.calibration_status.is_calibrated is True
+    assert snapshot.calibration_status.year == 2026
+    assert snapshot.calibration_status.month == 9
+    assert snapshot.calibration_status.day == 16
+    assert snapshot.calibration_status.stability == 95
+    assert snapshot.calibration_result == -2.5
+
+
+async def test_modern_set_subwoofer_preset_updates_complete_v2_profile(
+    monkeypatch,
+    hass,
+) -> None:
+    """A known preset should atomically update its label and tuning values."""
+    captured = {}
+    profile = copy.deepcopy(EQ_PROFILE_V2_VALUE)
+    profile_value = profile["kefEqProfileV2"]
+    profile_value["isKW1"] = False
+    profile_value["subwooferCount"] = 1
+    profile_value["futureFirmwareCode"] = {"value": 999}
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile"]
+        return None
+
+    async def fake_get_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile_v2"]
+        return copy.deepcopy(profile)
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["path"] = path
+        captured["role"] = role
+        captured["value"] = value
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_get_path_item", fake_get_path_item)
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    applied = await client.async_set_subwoofer_preset("kc62", "XIO")
+
+    assert applied == {"gain": -1.0, "lowpass": 55.0, "highpass": 67.5}
+    assert captured["path"] == PROBE_PATHS["eq_profile_v2"]
+    assert captured["role"] == "value"
+    updated = captured["value"]["kefEqProfileV2"]
+    assert updated["subwooferPreset"] == "kc62"
+    assert updated["subwooferGain"] == -1.0
+    assert updated["subOutLPFreq"] == 55.0
+    assert updated["highPassModeFreq"] == 67.5
+    assert updated["futureFirmwareCode"] == {"value": 999}
+
+
+@pytest.mark.parametrize("model", ["LSX2", "LSXII", "LSX2LT", "LSXIILT"])
+async def test_subwoofer_preset_table_supports_observed_lsx_aliases(
+    monkeypatch,
+    hass,
+    model,
+) -> None:
+    """Equivalent LSX II model identifiers should apply the same preset."""
+    profile = copy.deepcopy(EQ_PROFILE_V2_VALUE)
+    profile["kefEqProfileV2"]["isKW1"] = False
+    profile["kefEqProfileV2"]["subwooferCount"] = 1
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        return None
+
+    async def fake_get_path_item(self, path, *, roles="value"):
+        return copy.deepcopy(profile)
+
+    async def fake_set_data(self, path, *, role, value):
+        return None
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_get_path_item", fake_get_path_item)
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+
+    assert await client.async_set_subwoofer_preset("kc62", model) == {
+        "gain": -1.0,
+        "lowpass": 55.0,
+        "highpass": 67.5,
+    }
+
+
+@pytest.mark.parametrize(
+    ("method_name", "input_value", "wire_key", "expected_value"),
+    [
+        ("async_set_subwoofer_gain", -2, "subwooferGain", -2),
+        (
+            "async_set_sub_out_low_pass_frequency",
+            57.5,
+            "subOutLPFreq",
+            57.5,
+        ),
+        ("async_set_high_pass_frequency", 65.0, "highPassModeFreq", 65.0),
+    ],
+)
+async def test_manual_subwoofer_tuning_resets_named_preset(
+    monkeypatch,
+    hass,
+    method_name,
+    input_value,
+    wire_key,
+    expected_value,
+) -> None:
+    """Manual tuning must stop advertising a preset the values no longer match."""
+    captured = {}
+    profile = copy.deepcopy(EQ_PROFILE_V2_VALUE)
+    profile["kefEqProfileV2"]["subwooferPreset"] = "kc62"
+    profile["kefEqProfileV2"]["futureFirmwareCode"] = {"value": 999}
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        return None
+
+    async def fake_get_path_item(self, path, *, roles="value"):
+        return copy.deepcopy(profile)
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["value"] = value
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_get_path_item", fake_get_path_item)
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await getattr(client, method_name)(input_value)
+
+    updated = captured["value"]["kefEqProfileV2"]
+    assert updated[wire_key] == expected_value
+    assert updated["subwooferPreset"] == "custom"
+    assert updated["futureFirmwareCode"] == {"value": 999}
+
+
+@pytest.mark.parametrize(
+    ("method_name", "input_value", "wire_key"),
+    [
+        ("async_set_subwoofer_polarity", "inverted", "subwooferPolarity"),
+        ("async_set_audio_polarity", "inverted", "audioPolarity"),
+        ("async_set_sub_enable_stereo", True, "subEnableStereo"),
+        ("async_set_sound_profile", "movie", "soundProfile"),
+    ],
+)
+async def test_new_eq_setters_preserve_v2_profile_fields(
+    monkeypatch,
+    hass,
+    method_name,
+    input_value,
+    wire_key,
+) -> None:
+    """New EQ setters should change one field without dropping future data."""
+    captured = {}
+    profile = copy.deepcopy(EQ_PROFILE_V2_VALUE)
+    profile["kefEqProfileV2"]["futureFirmwareCode"] = {"value": 999}
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        return None
+
+    async def fake_get_path_item(self, path, *, roles="value"):
+        return copy.deepcopy(profile)
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["value"] = value
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_get_path_item", fake_get_path_item)
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await getattr(client, method_name)(input_value)
+
+    updated = captured["value"]["kefEqProfileV2"]
+    assert updated[wire_key] == input_value
+    assert updated["futureFirmwareCode"] == {"value": 999}
+
+
+@pytest.mark.parametrize(
+    ("method_name", "input_value", "wire_key"),
+    [
+        ("async_set_subwoofer_polarity", "inverted", "subwooferPolarity"),
+        ("async_set_audio_polarity", "inverted", "audioPolarity"),
+        ("async_set_sub_enable_stereo", True, "subEnableStereo"),
+    ],
+)
+async def test_new_eq_setters_preserve_v1_profile_fields(
+    monkeypatch,
+    hass,
+    method_name,
+    input_value,
+    wire_key,
+) -> None:
+    """Features present in v1 should preserve that profile's wire contract."""
+    captured = {}
+    profile = copy.deepcopy(EQ_PROFILE_VALUE)
+    profile["kefEqProfile"]["dspInfo"]["futureFirmwareCode"] = {"value": 999}
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        return copy.deepcopy(profile)
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["value"] = value
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await getattr(client, method_name)(input_value)
+
+    updated = captured["value"]["kefEqProfile"]["dspInfo"]
+    assert updated[wire_key] == input_value
+    assert updated["futureFirmwareCode"] == {"value": 999}
+
+
+async def test_unknown_model_preset_updates_v1_label_without_guessing_values(
+    monkeypatch,
+    hass,
+) -> None:
+    """Models without a verified table should retain all existing v1 tuning."""
+    captured = {}
+    profile = copy.deepcopy(EQ_PROFILE_VALUE)
+    original_dsp = copy.deepcopy(profile["kefEqProfile"]["dspInfo"])
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        return copy.deepcopy(profile)
+
+    async def fake_set_data(self, path, *, role, value):
+        captured["value"] = value
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    applied = await client.async_set_subwoofer_preset("kc62", "LS50WII")
+
+    assert applied is None
+    updated = captured["value"]["kefEqProfile"]["dspInfo"]
+    assert updated["subwooferPreset"] == "kc62"
+    original_dsp["subwooferPreset"] = "kc62"
+    assert updated == original_dsp
+
+
+async def test_modern_start_calibration_activates_xio_path(
+    monkeypatch,
+    hass,
+) -> None:
+    """Starting calibration should use the activate role on the XIO path."""
+    captured = {}
+
+    async def fake_activate_path(self, path, value=None):
+        captured["path"] = path
+        captured["value"] = value
+
+    monkeypatch.setattr(ModernKefClient, "_activate_path", fake_activate_path)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    await client.async_start_calibration()
+
+    assert captured == {"path": PROBE_PATHS["calibration_start"], "value": None}
 
 
 async def test_modern_set_treble_updates_eq_profile_v2(

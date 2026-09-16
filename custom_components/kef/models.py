@@ -2,6 +2,7 @@
 
 from .kef_client import (
     KefBackend,
+    KefCalibrationStatus,
     KefDeviceInfo,
     KefEqProfile,
     KefFirmwareUpdateInfo,
@@ -12,6 +13,7 @@ from .kef_client import (
 
 __all__ = [
     "KefBackend",
+    "KefCalibrationStatus",
     "KefDeviceInfo",
     "KefEqProfile",
     "KefFirmwareUpdateInfo",

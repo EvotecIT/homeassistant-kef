@@ -313,6 +313,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.standby_led_enabled,
         async_set_fn=_async_set_standby_led,
+        model_feature="standby_led",
     ),
     KefSwitchDescription(
         key="top_panel",

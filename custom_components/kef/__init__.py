@@ -121,6 +121,7 @@ async def _async_cleanup_optional_entities(
     coordinator: KefCoordinator,
 ) -> None:
     """Remove stale registry entries for optional or retired entities."""
+    from .button import BUTTON_MODEL_FEATURES
     from .number import NUMBERS
     from .select import SELECTS
     from .switch import SWITCHES
@@ -175,6 +176,7 @@ async def _async_cleanup_optional_entities(
         )
     expected_binary_sensor_keys = set(_ACTIVE_BINARY_SENSOR_ENTITY_KEYS)
     model_features_by_platform = {
+        "button": BUTTON_MODEL_FEATURES,
         "select": {
             description.key: description.model_feature for description in SELECTS
         },

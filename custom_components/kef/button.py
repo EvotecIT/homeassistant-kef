@@ -12,6 +12,8 @@ from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend
 
+BUTTON_MODEL_FEATURES = {"start_calibration": "xio"}
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -22,7 +24,10 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     if coordinator.data.device.backend is not KefBackend.MODERN:
         return
-    if not model_supports_feature(coordinator.data.device.model, "xio"):
+    if not model_supports_feature(
+        coordinator.data.device.model,
+        BUTTON_MODEL_FEATURES["start_calibration"],
+    ):
         return
     async_add_entities([KefStartCalibrationButton(coordinator)])
 

@@ -17,6 +17,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .audio import audio_codec_value, audio_virtualizer_value
 from .const import (
     CONF_ENABLE_DIAGNOSTICS,
     DEFAULT_ENABLE_DIAGNOSTICS,
@@ -27,75 +28,18 @@ from .entity import KefEntity
 from .models import KefSnapshot
 
 
-def _format_channels(channel_count: int | str | None) -> str | None:
-    """Convert a channel count to audio format notation (e.g. "5.1.2")."""
-    if channel_count is None:
-        return None
-
-    if isinstance(channel_count, str):
-        channel_count = channel_count.strip()
-        if not channel_count:
-            return None
-        try:
-            channel_count = int(channel_count)
-        except ValueError:
-            return None if channel_count == "0.0" else channel_count
-
-    if channel_count <= 0:
-        return None
-    channel_map = {2: "2.0", 6: "5.1", 8: "5.1.2"}
-    return channel_map.get(channel_count, str(channel_count))
-
-
-def _audio_codec_value(data: KefSnapshot) -> str | None:
-    """Return the decoded audio codec with channel format."""
-    if data.playback is None or not data.playback.codec:
-        return None
-    codec_name = (
-        data.playback.codec.split(" - ")[0]
-        if " - " in data.playback.codec
-        else data.playback.codec
-    )
-    if codec_name == "Dolby PCM":
-        codec_name = "PCM"
-    channel_format = _format_channels(data.playback.stream_channels)
-    if channel_format:
-        return f"{codec_name} {channel_format}"
-    return codec_name
-
-
-def _audio_virtualizer_value(data: KefSnapshot) -> str | None:
-    """Return the decoded audio virtualizer/processing mode with channel format."""
-    if data.playback is None or not data.playback.codec:
-        return None
-    virtualizer_name = (
-        data.playback.codec.split(" - ")[1]
-        if " - " in data.playback.codec
-        else "Direct"
-    )
-    if virtualizer_name == "Direct":
-        channel_format = _format_channels(data.playback.stream_channels)
-        if channel_format is None:
-            channel_format = _format_channels(data.playback.audio_channels)
-    else:
-        channel_format = _format_channels(8)
-    if channel_format:
-        return f"{virtualizer_name} {channel_format}"
-    return virtualizer_name
-
-
 def _room_calibration_value(data: KefSnapshot) -> str | None:
     """Return the room calibration status as a date, or a plain status string."""
     status = data.calibration_status
     if status is None:
         return None
-    if not status.is_calibrated:
+    if status.is_calibrated is None:
+        return None
+    if status.is_calibrated is False:
         return "Not calibrated"
     if status.year and status.month and status.day:
         return f"{status.year}-{status.month:02d}-{status.day:02d}"
     return "Calibrated"
-
-
 @dataclass(frozen=True, kw_only=True)
 class KefSensorDescription(SensorEntityDescription):
     """Describe a KEF sensor."""
@@ -267,14 +211,14 @@ SENSORS: tuple[KefSensorDescription, ...] = (
         key="audio_codec",
         name="Audio codec",
         icon="mdi:waveform",
-        value_fn=_audio_codec_value,
+        value_fn=audio_codec_value,
         model_feature="xio",
     ),
     KefSensorDescription(
         key="audio_virtualizer",
         name="Audio virtualizer",
         icon="mdi:surround-sound",
-        value_fn=_audio_virtualizer_value,
+        value_fn=audio_virtualizer_value,
         model_feature="xio",
     ),
     KefSensorDescription(
