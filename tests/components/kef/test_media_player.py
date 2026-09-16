@@ -86,6 +86,36 @@ def _wire_volume_writes(player, device_volume=None):
     return written, device
 
 
+def test_extra_state_attributes_hide_unsupported_model_features() -> None:
+    """Attributes for a capability the model doesn't have should not appear."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.device.model = "XIO"
+    player = _build_player(snapshot)
+
+    attrs = player.extra_state_attributes
+
+    assert "desk_mode_setting" not in attrs
+    assert "wall_mode_setting" not in attrs
+    assert "cable_mode" not in attrs
+    assert "standby_led_enabled" not in attrs
+    assert "front_led_enabled" not in attrs
+    assert "eq_button_1" in attrs
+    assert "top_panel_enabled" in attrs
+
+
+def test_extra_state_attributes_keep_supported_model_features() -> None:
+    """A model without a MODEL_UNSUPPORTED_FEATURES entry should keep everything."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.device.model = "LSXIILT"
+    player = _build_player(snapshot)
+
+    attrs = player.extra_state_attributes
+
+    assert "standby_led_enabled" in attrs
+    assert "front_led_enabled" not in attrs
+    assert "eq_button_1" not in attrs
+
+
 def test_unavailable_player_has_no_media_state() -> None:
     """Unavailable speakers should rely on entity availability, not a media state."""
     player = _build_player(deepcopy(TEST_SNAPSHOT))

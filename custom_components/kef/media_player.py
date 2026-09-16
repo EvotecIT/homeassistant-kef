@@ -16,13 +16,39 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import AUTH_FAILURE_MESSAGE
+from .const import AUTH_FAILURE_MESSAGE, model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .exceptions import KefAuthenticationRequiredError, KefError
 from .models import KefBackend
 
 VOLUME_STEP = 4
+
+# Attributes tied to a capability that MODEL_UNSUPPORTED_FEATURES can hide.
+# Unlike the entity platforms (switch/number/select/sensor), this attribute
+# dict has no per-field opt-out, so an unsupported field would otherwise
+# always show a real-looking value (e.g. desk_mode_setting on an XIO, which
+# has no desk mode at all). Popped below to match the entity platforms,
+# which don't create the entity at all rather than showing it unavailable.
+_ATTRIBUTE_MODEL_FEATURES: dict[str, str] = {
+    "cable_mode": "cable_mode",
+    "master_channel": "stereo_pair",
+    "desk_mode_setting": "desk_mode",
+    "wall_mode_setting": "wall_mode",
+    "front_led_enabled": "front_led",
+    "standby_led_enabled": "standby_led",
+    "top_panel_enabled": "top_panel",
+    "top_panel_led_enabled": "top_panel",
+    "top_panel_standby_led_enabled": "top_panel",
+    "usb_charging_enabled": "usb_charging",
+    "eq_button_1": "eq_button",
+    "eq_button_2": "eq_button",
+    "codec": "xio_audio_info",
+    "sample_frequency": "xio_audio_info",
+    "stream_sample_rate": "xio_audio_info",
+    "stream_channels": "xio_audio_info",
+    "audio_channels": "xio_audio_info",
+}
 
 
 async def async_setup_entry(
@@ -195,7 +221,8 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         playback = snapshot.playback
         eq_profile = snapshot.eq_profile
         firmware_update = snapshot.firmware_update
-        return {
+        model = snapshot.device.model
+        attrs = {
             "backend": snapshot.device.backend.value,
             "speaker_status": snapshot.speaker_status,
             "cable_mode": snapshot.cable_mode,
@@ -295,6 +322,10 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
             ),
             "firmware_update_url": firmware_update.url if firmware_update else None,
         }
+        for key, feature in _ATTRIBUTE_MODEL_FEATURES.items():
+            if not model_supports_feature(model, feature):
+                attrs.pop(key, None)
+        return attrs
 
     async def async_turn_on(self) -> None:
         """Turn on the speaker."""
