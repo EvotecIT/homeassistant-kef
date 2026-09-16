@@ -25,6 +25,10 @@ async def _entity_keys_for_model(model: str) -> tuple[set[str], set[str], set[st
     """Return number, switch, and select keys created for a modern model."""
     snapshot = deepcopy(TEST_SNAPSHOT)
     snapshot.device.model = model
+    # v2-only fields (sound_profile, subwoofer_out, ...) are never populated by
+    # the v1 kefEqProfile parse path TEST_SNAPSHOT uses; every real modern
+    # speaker capable of these gated features reports v2, so use it here too.
+    snapshot.eq_profile = KefEqProfile.from_modern_value(EQ_PROFILE_V2_VALUE)
     coordinator = Mock()
     coordinator.data = snapshot
     coordinator.last_update_success = True
