@@ -63,7 +63,8 @@ _XIO_SUBWOOFER_PRESET_VALUES: dict[str, dict[tuple[bool, int], dict[str, float]]
 }
 
 # XIO, LSXII, and LSX2LT share the same table (confirmed in the APK source).
-SUBWOOFER_PRESET_VALUES: dict[str, dict[str, dict[tuple[bool, int], dict[str, float]]]] = {
+_SubwooferPresetTable = dict[str, dict[tuple[bool, int], dict[str, float]]]
+SUBWOOFER_PRESET_VALUES: dict[str, _SubwooferPresetTable] = {
     "XIO": _XIO_SUBWOOFER_PRESET_VALUES,
     "LSXII": _XIO_SUBWOOFER_PRESET_VALUES,
     "LSX2LT": _XIO_SUBWOOFER_PRESET_VALUES,
