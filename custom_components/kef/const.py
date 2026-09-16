@@ -68,6 +68,7 @@ MODEL_UNSUPPORTED_FEATURES: dict[str, frozenset[str]] = {
             "cable_mode",
             "desk_mode",
             "front_led",
+            "standby_led",
             "stereo_pair",
             "usb_charging",
             "wall_mode",
