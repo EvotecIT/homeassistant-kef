@@ -74,7 +74,7 @@ class KefPlaybackInfo:
     codec: str | None = None
     sample_frequency: int | None = None
     stream_sample_rate: int | None = None
-    stream_channels: str | None = None
+    stream_channels: int | str | None = None
     audio_channels: int | None = None
     duration_ms: int | None = None
     position_ms: int | None = None

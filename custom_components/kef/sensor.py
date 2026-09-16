@@ -20,10 +20,68 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     CONF_ENABLE_DIAGNOSTICS,
     DEFAULT_ENABLE_DIAGNOSTICS,
+    model_supports_feature,
 )
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefSnapshot
+
+
+def _format_channels(channel_count: int | str | None) -> str | None:
+    """Convert a channel count to audio format notation (e.g. "5.1.2")."""
+    if channel_count is None:
+        return None
+
+    if isinstance(channel_count, str):
+        channel_count = channel_count.strip()
+        if not channel_count:
+            return None
+        try:
+            channel_count = int(channel_count)
+        except ValueError:
+            return None if channel_count == "0.0" else channel_count
+
+    if channel_count <= 0:
+        return None
+    channel_map = {2: "2.0", 6: "5.1", 8: "5.1.2"}
+    return channel_map.get(channel_count, str(channel_count))
+
+
+def _audio_codec_value(data: KefSnapshot) -> str | None:
+    """Return the decoded audio codec with channel format."""
+    if data.playback is None or not data.playback.codec:
+        return None
+    codec_name = (
+        data.playback.codec.split(" - ")[0]
+        if " - " in data.playback.codec
+        else data.playback.codec
+    )
+    if codec_name == "Dolby PCM":
+        codec_name = "PCM"
+    channel_format = _format_channels(data.playback.stream_channels)
+    if channel_format:
+        return f"{codec_name} {channel_format}"
+    return codec_name
+
+
+def _audio_virtualizer_value(data: KefSnapshot) -> str | None:
+    """Return the decoded audio virtualizer/processing mode with channel format."""
+    if data.playback is None or not data.playback.codec:
+        return None
+    virtualizer_name = (
+        data.playback.codec.split(" - ")[1]
+        if " - " in data.playback.codec
+        else "Direct"
+    )
+    if virtualizer_name == "Direct":
+        channel_format = _format_channels(data.playback.stream_channels)
+        if channel_format is None:
+            channel_format = _format_channels(data.playback.audio_channels)
+    else:
+        channel_format = _format_channels(8)
+    if channel_format:
+        return f"{virtualizer_name} {channel_format}"
+    return virtualizer_name
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -32,6 +90,7 @@ class KefSensorDescription(SensorEntityDescription):
 
     value_fn: Callable[[KefSnapshot], Any]
     diagnostics_only: bool = False
+    model_feature: str | None = None
 
 
 SENSORS: tuple[KefSensorDescription, ...] = (
@@ -192,6 +251,63 @@ SENSORS: tuple[KefSensorDescription, ...] = (
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    KefSensorDescription(
+        key="audio_codec",
+        name="Audio codec",
+        icon="mdi:waveform",
+        value_fn=_audio_codec_value,
+        model_feature="xio_audio_info",
+    ),
+    KefSensorDescription(
+        key="audio_virtualizer",
+        name="Audio virtualizer",
+        icon="mdi:surround-sound",
+        value_fn=_audio_virtualizer_value,
+        model_feature="xio_audio_info",
+    ),
+    KefSensorDescription(
+        key="audio_sample_rate",
+        name="Audio sample rate",
+        device_class=SensorDeviceClass.FREQUENCY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="Hz",
+        icon="mdi:sine-wave",
+        value_fn=lambda data: (
+            data.playback.sample_frequency if data.playback else None
+        ),
+        model_feature="xio_audio_info",
+    ),
+    KefSensorDescription(
+        key="audio_codec_raw",
+        name="Audio codec (raw)",
+        icon="mdi:information-outline",
+        value_fn=lambda data: data.playback.codec if data.playback else None,
+        diagnostics_only=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        model_feature="xio_audio_info",
+    ),
+    KefSensorDescription(
+        key="audio_source_channels",
+        name="Audio channels (source)",
+        icon="mdi:audio-input-stereo-minijack",
+        value_fn=lambda data: (
+            data.playback.stream_channels if data.playback else None
+        ),
+        diagnostics_only=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        model_feature="xio_audio_info",
+    ),
+    KefSensorDescription(
+        key="audio_playback_channels",
+        name="Audio channels (playback)",
+        icon="mdi:speaker-multiple",
+        value_fn=lambda data: (
+            data.playback.audio_channels if data.playback else None
+        ),
+        diagnostics_only=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        model_feature="xio_audio_info",
+    ),
 )
 
 
@@ -210,6 +326,10 @@ async def async_setup_entry(
     entities = []
     for description in SENSORS:
         if description.diagnostics_only and not enable_diagnostics:
+            continue
+        if not model_supports_feature(
+            coordinator.data.device.model, description.model_feature
+        ):
             continue
         entities.append(KefSensor(coordinator, description))
     async_add_entities(entities)
