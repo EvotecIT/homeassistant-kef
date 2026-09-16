@@ -23,7 +23,8 @@ from custom_components.kef.const import (
     model_supports_feature,
 )
 from custom_components.kef.coordinator import KefCoordinator
-from custom_components.kef.sensor import SENSORS
+from custom_components.kef.models import KefCalibrationStatus
+from custom_components.kef.sensor import SENSORS, _room_calibration_value
 from tests.conftest import TEST_HOST, TEST_SNAPSHOT
 
 EXPECTED_SENSORS = tuple(
@@ -98,6 +99,35 @@ def test_audio_sensor_values_decode_codec_and_channel_contract(
 
     assert audio_codec_value(snapshot) == expected_codec
     assert audio_virtualizer_value(snapshot) == expected_virtualizer
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        (None, None),
+        (KefCalibrationStatus(is_calibrated=None), None),
+        (KefCalibrationStatus(is_calibrated=False), "Not calibrated"),
+        (KefCalibrationStatus(is_calibrated=True), "Calibrated"),
+        (
+            KefCalibrationStatus(
+                is_calibrated=True,
+                year=2026,
+                month=9,
+                day=16,
+            ),
+            "2026-09-16",
+        ),
+    ],
+)
+def test_room_calibration_value_distinguishes_unknown_and_uncalibrated(
+    status: KefCalibrationStatus | None,
+    expected: str | None,
+) -> None:
+    """Missing calibration state must not be reported as a negative result."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.calibration_status = status
+
+    assert _room_calibration_value(snapshot) == expected
 
 
 async def _async_publish_test_snapshot(coordinator: KefCoordinator) -> None:

@@ -25,6 +25,10 @@ async def _entity_keys_for_model(model: str) -> tuple[set[str], set[str], set[st
     """Return number, switch, and select keys created for a modern model."""
     snapshot = deepcopy(TEST_SNAPSHOT)
     snapshot.device.model = model
+    # v2-only fields (sound_profile, subwoofer_out, ...) are never populated by
+    # the v1 kefEqProfile parse path TEST_SNAPSHOT uses; every real modern
+    # speaker capable of these gated features reports v2, so use it here too.
+    snapshot.eq_profile = KefEqProfile.from_modern_value(EQ_PROFILE_V2_VALUE)
     coordinator = Mock()
     coordinator.data = snapshot
     coordinator.last_update_success = True
@@ -85,6 +89,7 @@ async def test_lsx_ii_lt_hides_only_known_unsupported_controls(model: str) -> No
         "top_panel",
         "top_panel_led",
         "top_panel_standby_led",
+        "sub_enable_stereo",
     }
     assert unsupported_switches.isdisjoint(switches)
     assert {"desk_mode", "wall_mode", "standby_led"} <= switches
@@ -92,6 +97,7 @@ async def test_lsx_ii_lt_hides_only_known_unsupported_controls(model: str) -> No
     assert "cable_mode" not in selects
     assert {"eq_button_1", "eq_button_2"}.isdisjoint(selects)
     assert "master_channel" in selects
+    assert "subwoofer_preset" in selects
 
 
 async def test_xio_keeps_top_panel_controls_and_hides_pair_controls() -> None:
@@ -104,11 +110,17 @@ async def test_xio_keeps_top_panel_controls_and_hides_pair_controls() -> None:
         "desk_mode",
         "usb_charging",
         "wall_mode",
+        "sub_enable_stereo",
         "standby_led",
     }.isdisjoint(switches)
     assert {"balance", "desk_mode_db", "wall_mode_db"}.isdisjoint(numbers)
     assert {"master_channel", "cable_mode"}.isdisjoint(selects)
-    assert {"eq_button_1", "eq_button_2"} <= selects
+    assert {
+        "eq_button_1",
+        "eq_button_2",
+        "sound_profile",
+        "subwoofer_preset",
+    } <= selects
 
 
 @pytest.mark.parametrize("model", ["LS60", "LS60W"])
@@ -121,12 +133,13 @@ async def test_ls60_hides_desk_mode_but_keeps_unverified_controls_visible(
     assert "desk_mode" not in switches
     assert "desk_mode_db" not in numbers
     assert {"balance", "wall_mode_db"} <= numbers
-    assert {"wall_mode", "front_led", "standby_led"} <= switches
+    assert {"wall_mode", "front_led", "standby_led", "sub_enable_stereo"} <= switches
     assert {"top_panel", "top_panel_led", "top_panel_standby_led"}.isdisjoint(
         switches
     )
     assert {"master_channel", "cable_mode"} <= selects
-    assert {"eq_button_1", "eq_button_2"}.isdisjoint(selects)
+    assert {"eq_button_1", "eq_button_2", "sound_profile"}.isdisjoint(selects)
+    assert "subwoofer_preset" not in selects
 
 
 @pytest.mark.parametrize("model", ["LS50W2", "LS50WII"])
@@ -135,8 +148,10 @@ async def test_ls50_wireless_ii_keeps_top_panel_controls(model: str) -> None:
     _numbers, switches, selects = await _entity_keys_for_model(model)
 
     assert {"top_panel", "top_panel_led", "top_panel_standby_led"} <= switches
+    assert "sub_enable_stereo" in switches
     assert "standby_led" in switches
-    assert {"eq_button_1", "eq_button_2"}.isdisjoint(selects)
+    assert {"eq_button_1", "eq_button_2", "sound_profile"}.isdisjoint(selects)
+    assert "subwoofer_preset" not in selects
 
 
 async def test_unknown_models_keep_all_reported_controls() -> None:
@@ -148,16 +163,24 @@ async def test_unknown_models_keep_all_reported_controls() -> None:
         "top_panel",
         "desk_mode",
         "wall_mode",
+        "sub_enable_stereo",
         "standby_led",
     } <= switches
     assert {"balance", "desk_mode_db", "wall_mode_db"} <= numbers
     assert {"master_channel", "cable_mode"} <= selects
-    assert {"eq_button_1", "eq_button_2"} <= selects
+    assert {"eq_button_1", "eq_button_2", "sound_profile"} <= selects
+    assert "subwoofer_preset" not in selects
 
 
 async def test_xio_audio_sensors_follow_model_and_diagnostics_gates() -> None:
     """XIO audio sensors should be absent from verified unsupported models."""
-    primary = {"audio_codec", "audio_virtualizer", "audio_sample_rate"}
+    primary = {
+        "audio_codec",
+        "audio_virtualizer",
+        "audio_sample_rate",
+        "room_calibration",
+        "calibration_adjustment",
+    }
     diagnostics = {
         "audio_codec_raw",
         "audio_source_channels",
@@ -311,9 +334,53 @@ async def test_cleanup_removes_xio_audio_sensors_from_legacy_devices(hass) -> No
         f"{unique_id_prefix}speaker_status",
         config_entry=entry,
     )
+    start_calibration = registry.async_get_or_create(
+        Platform.BUTTON,
+        DOMAIN,
+        f"{unique_id_prefix}start_calibration",
+        config_entry=entry,
+    )
+    subwoofer_preset = registry.async_get_or_create(
+        Platform.SELECT,
+        DOMAIN,
+        f"{unique_id_prefix}subwoofer_preset",
+        config_entry=entry,
+    )
 
     await _async_cleanup_optional_entities(hass, entry, coordinator)
 
     assert registry.async_get(audio_codec.entity_id) is None
     assert registry.async_get(audio_codec_raw.entity_id) is None
+    assert registry.async_get(start_calibration.entity_id) is None
+    assert registry.async_get(subwoofer_preset.entity_id) is None
     assert registry.async_get(speaker_status.entity_id) is not None
+
+
+@pytest.mark.parametrize(
+    ("model", "expect_button"),
+    [
+        ("XIO", True),
+        ("LSXII", False),
+        ("LS60W", False),
+        ("FUTURE", True),
+    ],
+)
+async def test_calibration_button_is_xio_only(
+    model: str, expect_button: bool
+) -> None:
+    """The start-calibration button should only appear for XIO (and unknown models)."""
+    from custom_components.kef.button import async_setup_entry as async_setup_buttons
+
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.device.model = model
+    coordinator = Mock()
+    coordinator.data = snapshot
+    coordinator.last_update_success = True
+    coordinator.config_entry = SimpleNamespace(domain="kef")
+    coordinator.hass = Mock()
+    entry = SimpleNamespace(runtime_data=coordinator)
+
+    buttons = []
+    await async_setup_buttons(Mock(), entry, buttons.extend)
+
+    assert bool(buttons) is expect_button

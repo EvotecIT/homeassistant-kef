@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from dataclasses import replace
+from typing import Any, TypeVar
 
 from homeassistant.exceptions import HomeAssistantError
 
@@ -48,3 +49,18 @@ class KefEntity:
             "serial_number": device.serial_number or device.mac_address,
             "configuration_url": f"http://{device.host}:{device.port}",
         }
+
+
+def apply_eq_profile_change(coordinator: KefCoordinator, **changes: Any) -> None:
+    """Publish an eq_profile field change a write just made itself.
+
+    Mirrors coordinator.async_apply_local_change for fields nested inside
+    eq_profile rather than top-level KefSnapshot fields, so a write shows
+    up immediately instead of flickering back to the stale value until
+    the next poll (or the in-flight refresh, which can race the speaker
+    not having applied the change yet).
+    """
+    eq_profile = coordinator.data.eq_profile
+    if eq_profile is None:
+        return
+    coordinator.async_apply_local_change(eq_profile=replace(eq_profile, **changes))

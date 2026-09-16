@@ -242,20 +242,71 @@ async def test_local_change_survives_a_read_that_started_before_it(hass) -> None
 
 
 @pytest.mark.asyncio
-async def test_a_newer_read_replaces_the_local_change(hass) -> None:
-    """Once a read that started after the write lands, the device wins."""
+async def test_local_change_survives_one_stale_post_write_read(hass) -> None:
+    """An immediate stale refresh should not undo an acknowledged write."""
+    coordinator = _coordinator(hass)
+    coordinator.data = replace(TEST_SNAPSHOT, volume_raw=40, volume_level=0.40)
+    coordinator.async_apply_local_change(volume_raw=44, volume_level=0.44)
+    snapshots = iter(
+        [
+            replace(TEST_SNAPSHOT, volume_raw=40, volume_level=0.40),
+            replace(TEST_SNAPSHOT, volume_raw=60, volume_level=0.60),
+        ]
+    )
+
+    async def _refresh():
+        return next(snapshots)
+
+    coordinator.client = SimpleNamespace(async_refresh=_refresh)
+
+    snapshot = await coordinator._async_update_data()
+    assert snapshot.volume_raw == 44
+    assert coordinator._local_changes == {"volume_raw": 44, "volume_level": 0.44}
+
+    snapshot = await coordinator._async_update_data()
+    assert snapshot.volume_raw == 60
+    assert coordinator._local_changes == {}
+
+
+@pytest.mark.asyncio
+async def test_matching_post_write_read_settles_local_change(hass) -> None:
+    """A device response matching the write should settle without a grace wait."""
     coordinator = _coordinator(hass)
     coordinator.data = replace(TEST_SNAPSHOT, volume_raw=40, volume_level=0.40)
     coordinator.async_apply_local_change(volume_raw=44, volume_level=0.44)
 
     async def _refresh():
-        return replace(TEST_SNAPSHOT, volume_raw=60, volume_level=0.60)
+        return replace(TEST_SNAPSHOT, volume_raw=44, volume_level=0.44)
 
     coordinator.client = SimpleNamespace(async_refresh=_refresh)
 
     snapshot = await coordinator._async_update_data()
-    assert snapshot.volume_raw == 60
+    assert snapshot.volume_raw == 44
     assert coordinator._local_changes == {}
+
+
+@pytest.mark.asyncio
+async def test_nested_eq_change_survives_immediate_stale_refresh(hass) -> None:
+    """The post-write grace cycle should also preserve nested EQ snapshots."""
+    coordinator = _coordinator(hass)
+    coordinator.data = TEST_SNAPSHOT
+    assert TEST_SNAPSHOT.eq_profile is not None
+    updated_profile = replace(
+        TEST_SNAPSHOT.eq_profile,
+        subwoofer_preset="kc62",
+        subwoofer_gain=-1,
+    )
+    coordinator.async_apply_local_change(eq_profile=updated_profile)
+
+    async def _refresh():
+        return TEST_SNAPSHOT
+
+    coordinator.client = SimpleNamespace(async_refresh=_refresh)
+
+    snapshot = await coordinator._async_update_data()
+    assert snapshot.eq_profile == updated_profile
+    assert snapshot.eq_profile.subwoofer_preset == "kc62"
+    assert coordinator._local_changes == {"eq_profile": updated_profile}
 
 
 @pytest.mark.asyncio

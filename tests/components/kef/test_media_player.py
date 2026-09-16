@@ -99,9 +99,11 @@ def test_extra_state_attributes_hide_unsupported_model_features() -> None:
     assert "cable_mode" not in attrs
     assert "standby_led_enabled" not in attrs
     assert "front_led_enabled" not in attrs
+    assert "sub_enable_stereo" not in attrs
     assert attrs["audio_codec"] == "pcm 2.0"
     assert attrs["audio_virtualizer"] == "Direct 2.0"
     assert "eq_button_1" in attrs
+    assert "sound_profile" in attrs
     assert "top_panel_enabled" in attrs
 
 
@@ -116,6 +118,8 @@ def test_extra_state_attributes_keep_supported_model_features() -> None:
     assert "standby_led_enabled" in attrs
     assert "front_led_enabled" not in attrs
     assert "eq_button_1" not in attrs
+    assert "sound_profile" not in attrs
+    assert "sub_enable_stereo" not in attrs
     assert "codec" not in attrs
     assert "audio_codec" not in attrs
     assert "audio_virtualizer" not in attrs

@@ -28,6 +28,7 @@ PLATFORMS = [
     Platform.BINARY_SENSOR,
     Platform.UPDATE,
     Platform.TEXT,
+    Platform.BUTTON,
 ]
 
 ATTR_FIRMWARE_FILE_PATH = "file_path"
@@ -120,6 +121,7 @@ async def _async_cleanup_optional_entities(
     coordinator: KefCoordinator,
 ) -> None:
     """Remove stale registry entries for optional or retired entities."""
+    from .button import BUTTON_MODEL_FEATURES
     from .number import NUMBERS
     from .select import SELECTS
     from .switch import SWITCHES
@@ -131,8 +133,8 @@ async def _async_cleanup_optional_entities(
         CONF_ENABLE_DIAGNOSTICS,
         DEFAULT_ENABLE_DIAGNOSTICS,
     )
-    xio_audio_info_supported = model_supports_feature(
-        device_model, "xio_audio_info"
+    xio_supported = model_supports_feature(
+        device_model, "xio"
     )
     expected_sensor_keys = {"backend", "speaker_status", "play_mode"}
     if diagnostics_enabled:
@@ -154,7 +156,7 @@ async def _async_cleanup_optional_entities(
                 "alert_snooze_time",
             }
         )
-        if xio_audio_info_supported:
+        if xio_supported:
             expected_sensor_keys.update(
                 {
                     "audio_codec_raw",
@@ -162,16 +164,19 @@ async def _async_cleanup_optional_entities(
                     "audio_playback_channels",
                 }
             )
-    if xio_audio_info_supported:
+    if xio_supported:
         expected_sensor_keys.update(
             {
                 "audio_codec",
                 "audio_virtualizer",
                 "audio_sample_rate",
+                "room_calibration",
+                "calibration_adjustment",
             }
         )
     expected_binary_sensor_keys = set(_ACTIVE_BINARY_SENSOR_ENTITY_KEYS)
     model_features_by_platform = {
+        "button": BUTTON_MODEL_FEATURES,
         "select": {
             description.key: description.model_feature for description in SELECTS
         },
@@ -182,6 +187,7 @@ async def _async_cleanup_optional_entities(
             description.key: description.model_feature for description in NUMBERS
         },
     }
+    selects_by_key = {description.key: description for description in SELECTS}
 
     for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
         platform = entity_entry.entity_id.split(".", 1)[0]
@@ -191,8 +197,14 @@ async def _async_cleanup_optional_entities(
                 continue
             key = unique_id.removeprefix(f"{device_unique_id}_")
             feature = model_features_by_platform[platform].get(key)
-            if feature is not None and not model_supports_feature(
-                device_model, feature
+            select_unavailable = (
+                platform == "select"
+                and key in selects_by_key
+                and not selects_by_key[key].model_available_fn(device_model)
+            )
+            if select_unavailable or (
+                feature is not None
+                and not model_supports_feature(device_model, feature)
             ):
                 registry.async_remove(entity_entry.entity_id)
             continue

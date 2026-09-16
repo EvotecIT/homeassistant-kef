@@ -50,13 +50,15 @@ _ATTRIBUTE_MODEL_FEATURES: dict[str, str] = {
     "usb_charging_enabled": "usb_charging",
     "eq_button_1": "eq_button",
     "eq_button_2": "eq_button",
-    "codec": "xio_audio_info",
-    "audio_codec": "xio_audio_info",
-    "audio_virtualizer": "xio_audio_info",
-    "sample_frequency": "xio_audio_info",
-    "stream_sample_rate": "xio_audio_info",
-    "stream_channels": "xio_audio_info",
-    "audio_channels": "xio_audio_info",
+    "sound_profile": "xio",
+    "sub_enable_stereo": "dual_subwoofer_stereo",
+    "codec": "xio",
+    "audio_codec": "xio",
+    "audio_virtualizer": "xio",
+    "sample_frequency": "xio",
+    "stream_sample_rate": "xio",
+    "stream_channels": "xio",
+    "audio_channels": "xio",
 }
 
 
@@ -176,7 +178,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         title = playback.title if playback is not None else None
         snapshot = self.coordinator.data
         if self.source not in _PASSTHROUGH_SOURCES or not model_supports_feature(
-            snapshot.device.model, "xio_audio_info"
+            snapshot.device.model, "xio"
         ):
             return title
         codec = audio_codec_value(snapshot)

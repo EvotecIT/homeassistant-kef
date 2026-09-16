@@ -15,6 +15,7 @@ from .exceptions import (
 )
 from .models import (
     KefBackend,
+    KefCalibrationStatus,
     KefDeviceInfo,
     KefEqProfile,
     KefFirmwareUpdateInfo,
@@ -27,6 +28,7 @@ __all__ = [
     "BaseKefClient",
     "KefBackend",
     "KefAuthenticationRequiredError",
+    "KefCalibrationStatus",
     "KefConnectionError",
     "KefDeviceInfo",
     "KefEqProfile",

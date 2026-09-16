@@ -9,6 +9,74 @@ AUTH_MODE_SETDATA = "setData"
 DEFAULT_PORT = 80
 DEFAULT_LEGACY_PORT = 50001
 
+# Subwoofer preset gain/crossover values, extracted from the KEF Connect
+# APK's SubwooferModelKt.java / SubwooferModelSubGainKt.java. Setting a
+# preset alone has no audible effect; the app also recalculates these
+# three fields for the speaker model and current (isKW1, subwooferCount)
+# combination. Only covers models where this has been reverse-engineered
+# and confirmed; models absent here fall back to writing the preset name
+# alone rather than guessing values.
+#
+# Structure: SUBWOOFER_PRESET_VALUES[model][preset][(is_kw1, subwoofer_count)]
+#   -> {"gain": float, "lowpass": float, "highpass": float}
+_XIO_SUBWOOFER_PRESET_VALUES: dict[str, dict[tuple[bool, int], dict[str, float]]] = {
+    "kc62": {
+        (False, 1): {"gain": -1.0, "lowpass": 55.0, "highpass": 67.5},
+        (False, 2): {"gain": -7.0, "lowpass": 55.0, "highpass": 67.5},
+        (True, 1): {"gain": 4.0, "lowpass": 55.0, "highpass": 67.5},
+        (True, 2): {"gain": -2.0, "lowpass": 55.0, "highpass": 67.5},
+    },
+    "kf92": {
+        (False, 1): {"gain": -3.0, "lowpass": 55.0, "highpass": 67.5},
+        (False, 2): {"gain": -9.0, "lowpass": 55.0, "highpass": 67.5},
+        (True, 1): {"gain": 2.0, "lowpass": 55.0, "highpass": 67.5},
+        (True, 2): {"gain": -4.0, "lowpass": 55.0, "highpass": 67.5},
+    },
+    "kube8b": {
+        (False, 1): {"gain": 3.0, "lowpass": 62.5, "highpass": 67.5},
+        (False, 2): {"gain": -3.0, "lowpass": 62.5, "highpass": 67.5},
+        (True, 1): {"gain": 2.0, "lowpass": 62.5, "highpass": 67.5},
+        (True, 2): {"gain": -4.0, "lowpass": 62.5, "highpass": 67.5},
+    },
+    "kube10b": {
+        (False, 1): {"gain": 1.0, "lowpass": 55.0, "highpass": 67.5},
+        (False, 2): {"gain": -5.0, "lowpass": 55.0, "highpass": 67.5},
+        (True, 1): {"gain": 0.0, "lowpass": 55.0, "highpass": 67.5},
+        (True, 2): {"gain": -6.0, "lowpass": 55.0, "highpass": 67.5},
+    },
+    "kube12b": {
+        (False, 1): {"gain": -1.0, "lowpass": 52.5, "highpass": 65.0},
+        (False, 2): {"gain": -7.0, "lowpass": 52.5, "highpass": 65.0},
+        (True, 1): {"gain": -2.0, "lowpass": 52.5, "highpass": 65.0},
+        (True, 2): {"gain": -8.0, "lowpass": 52.5, "highpass": 65.0},
+    },
+    "kube15mie": {
+        (False, 1): {"gain": 0.0, "lowpass": 57.5, "highpass": 65.0},
+        (False, 2): {"gain": -6.0, "lowpass": 57.5, "highpass": 65.0},
+        (True, 1): {"gain": -1.0, "lowpass": 57.5, "highpass": 65.0},
+        (True, 2): {"gain": -7.0, "lowpass": 57.5, "highpass": 65.0},
+    },
+    "t2": {
+        (False, 1): {"gain": -1.0, "lowpass": 62.5, "highpass": 67.5},
+        (False, 2): {"gain": -7.0, "lowpass": 62.5, "highpass": 67.5},
+    },
+}
+
+# XIO and the observed LSX II / LSX II LT identifiers share this table.
+_SubwooferPresetTable = dict[str, dict[tuple[bool, int], dict[str, float]]]
+SUBWOOFER_PRESET_VALUES: dict[str, _SubwooferPresetTable] = {
+    "XIO": _XIO_SUBWOOFER_PRESET_VALUES,
+    "LSX2": _XIO_SUBWOOFER_PRESET_VALUES,
+    "LSXII": _XIO_SUBWOOFER_PRESET_VALUES,
+    "LSX2LT": _XIO_SUBWOOFER_PRESET_VALUES,
+    "LSXIILT": _XIO_SUBWOOFER_PRESET_VALUES,
+}
+
+
+def model_has_subwoofer_preset_values(model: str) -> bool:
+    """Return whether preset selection has verified tuning values for a model."""
+    return model.upper() in SUBWOOFER_PRESET_VALUES
+
 API_ROOT = "/api"
 GET_DATA_ENDPOINT = "/getData"
 SET_DATA_ENDPOINT = "/setData"
@@ -82,6 +150,9 @@ PROBE_PATHS = {
     "play_time": "player:player/data/playTime",
     "eq_profile": "kef:eqProfile",
     "eq_profile_v2": "kef:eqProfile/v2",
+    "calibration_status": "settings:/kef/dsp/calibrationStatus",
+    "calibration_result": "settings:/kef/dsp/calibrationResult",
+    "calibration_start": "kefdsp:/calibration/start",
     "network_info": "network:info",
     "standby_mode": "settings:/kef/host/standbyMode",
     "startup_tone": "settings:/kef/host/startupTone",

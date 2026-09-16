@@ -123,6 +123,30 @@ class KefFirmwareUpdateInfo:
 
 
 @dataclass(slots=True)
+class KefCalibrationStatus:
+    """Room calibration status exposed by the modern API (XIO only)."""
+
+    is_calibrated: bool | None = None
+    year: int | None = None
+    month: int | None = None
+    day: int | None = None
+    stability: int | None = None
+
+    @classmethod
+    def from_modern_value(cls, value: dict[str, Any]) -> KefCalibrationStatus | None:
+        """Build calibration status from the raw kefDspCalibrationStatus payload."""
+        if not value:
+            return None
+        return cls(
+            is_calibrated=value.get("isCalibrated"),
+            year=value.get("year"),
+            month=value.get("month"),
+            day=value.get("day"),
+            stability=value.get("stability"),
+        )
+
+
+@dataclass(slots=True)
 class KefWifiInfo:
     """Flattened KEF Wi-Fi information."""
 
@@ -332,6 +356,8 @@ class KefSnapshot:
     alert_timer_count: int | None
     alert_snooze_minutes: int | None
     player_notification_active: bool | None
+    calibration_status: KefCalibrationStatus | None
+    calibration_result: float | None
     source_list: tuple[str, ...]
     default_volume_by_source: dict[str, int] = field(default_factory=dict)
 
