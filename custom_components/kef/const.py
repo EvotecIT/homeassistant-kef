@@ -42,6 +42,7 @@ STATE_OFF = "standby"
 # Only list capabilities known to be unsupported. Models and capabilities that
 # have not been verified remain visible instead of being hidden by inference.
 MODEL_UNSUPPORTED_FEATURES: dict[str, frozenset[str]] = {
+    "KEF LEGACY": frozenset({"xio_audio_info"}),
     "LSX2": frozenset(
         {"eq_button", "front_led", "top_panel", "xio_audio_info"}
     ),
