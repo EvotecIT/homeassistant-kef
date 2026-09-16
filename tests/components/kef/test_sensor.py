@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from unittest.mock import patch
 
+import pytest
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import CONF_HOST
 from homeassistant.helpers import entity_registry as er
@@ -16,7 +18,12 @@ from custom_components.kef.const import (
     model_supports_feature,
 )
 from custom_components.kef.coordinator import KefCoordinator
-from custom_components.kef.sensor import SENSORS
+from custom_components.kef.sensor import (
+    SENSORS,
+    _audio_codec_value,
+    _audio_virtualizer_value,
+    _format_channels,
+)
 from tests.conftest import TEST_HOST, TEST_SNAPSHOT
 
 EXPECTED_SENSORS = tuple(
@@ -26,6 +33,71 @@ EXPECTED_SENSORS = tuple(
         TEST_SNAPSHOT.device.model, description.model_feature
     )
 )
+
+
+@pytest.mark.parametrize(
+    ("channel_count", "expected"),
+    [
+        (None, None),
+        (0, None),
+        ("0", None),
+        ("0.0", None),
+        (2, "2.0"),
+        ("2", "2.0"),
+        ("2.0", "2.0"),
+        (6, "5.1"),
+        ("6", "5.1"),
+        (8, "5.1.2"),
+        ("8", "5.1.2"),
+        (7, "7"),
+    ],
+)
+def test_format_channels_accepts_numeric_and_wire_string_values(
+    channel_count: int | str | None,
+    expected: str | None,
+) -> None:
+    """Channel formatting should tolerate both observed payload shapes."""
+    assert _format_channels(channel_count) == expected
+
+
+@pytest.mark.parametrize(
+    (
+        "codec",
+        "stream_channels",
+        "audio_channels",
+        "expected_codec",
+        "expected_virtualizer",
+    ),
+    [
+        ("Dolby PCM - Direct", 6, 2, "PCM 5.1", "Direct 5.1"),
+        ("Dolby PCM - Direct", "0", 2, "PCM", "Direct 2.0"),
+        (
+            "Dolby Digital Plus - Dolby Surround",
+            "2",
+            2,
+            "Dolby Digital Plus 2.0",
+            "Dolby Surround 5.1.2",
+        ),
+        ("PCM", "2.0", 2, "PCM 2.0", "Direct 2.0"),
+        (None, None, None, None, None),
+    ],
+)
+def test_audio_sensor_values_decode_codec_and_channel_contract(
+    codec: str | None,
+    stream_channels: int | str | None,
+    audio_channels: int | None,
+    expected_codec: str | None,
+    expected_virtualizer: str | None,
+) -> None:
+    """Codec sensors should decode live values without leaking zero channels."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    assert snapshot.playback is not None
+    snapshot.playback.codec = codec
+    snapshot.playback.stream_channels = stream_channels
+    snapshot.playback.audio_channels = audio_channels
+
+    assert _audio_codec_value(snapshot) == expected_codec
+    assert _audio_virtualizer_value(snapshot) == expected_virtualizer
 
 
 async def _async_publish_test_snapshot(coordinator: KefCoordinator) -> None:

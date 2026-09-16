@@ -16,6 +16,7 @@ from custom_components.kef.const import DOMAIN
 from custom_components.kef.kef_client.models import KefEqProfile
 from custom_components.kef.number import async_setup_entry as async_setup_numbers
 from custom_components.kef.select import async_setup_entry as async_setup_selects
+from custom_components.kef.sensor import async_setup_entry as async_setup_sensors
 from custom_components.kef.switch import async_setup_entry as async_setup_switches
 from tests.conftest import EQ_PROFILE_V2_VALUE, TEST_SNAPSHOT
 
@@ -46,6 +47,30 @@ async def _entity_keys_for_model(model: str) -> tuple[set[str], set[str], set[st
         {entity.entity_description.key for entity in switches},
         {entity.entity_description.key for entity in selects},
     )
+
+
+async def _sensor_keys_for_model(
+    model: str,
+    *,
+    diagnostics: bool,
+) -> set[str]:
+    """Return sensor keys created for a modern model and option set."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.device.model = model
+    coordinator = Mock()
+    coordinator.data = snapshot
+    coordinator.last_update_success = True
+    coordinator.config_entry = SimpleNamespace(domain="kef")
+    coordinator.hass = Mock()
+    entry = SimpleNamespace(
+        runtime_data=coordinator,
+        options={"enable_diagnostics": diagnostics},
+    )
+    sensors = []
+
+    await async_setup_sensors(Mock(), entry, sensors.extend)
+
+    return {entity.entity_description.key for entity in sensors}
 
 
 @pytest.mark.parametrize("model", ["LSX2LT", "LSXIILT"])
@@ -115,6 +140,27 @@ async def test_unknown_models_keep_all_reported_controls() -> None:
     assert {"balance", "desk_mode_db", "wall_mode_db"} <= numbers
     assert {"master_channel", "cable_mode"} <= selects
     assert {"eq_button_1", "eq_button_2"} <= selects
+
+
+async def test_xio_audio_sensors_follow_model_and_diagnostics_gates() -> None:
+    """XIO audio sensors should be absent from verified unsupported models."""
+    primary = {"audio_codec", "audio_virtualizer", "audio_sample_rate"}
+    diagnostics = {
+        "audio_codec_raw",
+        "audio_source_channels",
+        "audio_playback_channels",
+    }
+
+    xio_default = await _sensor_keys_for_model("XIO", diagnostics=False)
+    xio_diagnostics = await _sensor_keys_for_model("XIO", diagnostics=True)
+    lsx_diagnostics = await _sensor_keys_for_model("LSXII", diagnostics=True)
+    future_diagnostics = await _sensor_keys_for_model("FUTURE", diagnostics=True)
+
+    assert primary <= xio_default
+    assert diagnostics.isdisjoint(xio_default)
+    assert primary | diagnostics <= xio_diagnostics
+    assert (primary | diagnostics).isdisjoint(lsx_diagnostics)
+    assert primary | diagnostics <= future_diagnostics
 
 
 async def test_subwoofer_switches_follow_reported_profile_values() -> None:
@@ -188,6 +234,18 @@ async def test_cleanup_removes_only_model_unsupported_registry_entries(hass) -> 
             f"{unique_id_prefix}desk_mode_db",
             config_entry=entry,
         ),
+        "audio_codec": registry.async_get_or_create(
+            Platform.SENSOR,
+            DOMAIN,
+            f"{unique_id_prefix}audio_codec",
+            config_entry=entry,
+        ),
+        "audio_codec_raw": registry.async_get_or_create(
+            Platform.SENSOR,
+            DOMAIN,
+            f"{unique_id_prefix}audio_codec_raw",
+            config_entry=entry,
+        ),
     }
 
     await _async_cleanup_optional_entities(hass, entry, coordinator)
@@ -198,3 +256,5 @@ async def test_cleanup_removes_only_model_unsupported_registry_entries(hass) -> 
     assert registry.async_get(entries["desk_mode_db"].entity_id) is None
     assert registry.async_get(entries["top_panel"].entity_id) is not None
     assert registry.async_get(entries["standby_mode"].entity_id) is not None
+    assert registry.async_get(entries["audio_codec"].entity_id) is not None
+    assert registry.async_get(entries["audio_codec_raw"].entity_id) is None

@@ -27,9 +27,21 @@ from .entity import KefEntity
 from .models import KefSnapshot
 
 
-def _format_channels(channel_count: int | None) -> str | None:
+def _format_channels(channel_count: int | str | None) -> str | None:
     """Convert a channel count to audio format notation (e.g. "5.1.2")."""
-    if not channel_count:
+    if channel_count is None:
+        return None
+
+    if isinstance(channel_count, str):
+        channel_count = channel_count.strip()
+        if not channel_count:
+            return None
+        try:
+            channel_count = int(channel_count)
+        except ValueError:
+            return None if channel_count == "0.0" else channel_count
+
+    if channel_count <= 0:
         return None
     channel_map = {2: "2.0", 6: "5.1", 8: "5.1.2"}
     return channel_map.get(channel_count, str(channel_count))
@@ -62,10 +74,11 @@ def _audio_virtualizer_value(data: KefSnapshot) -> str | None:
         else "Direct"
     )
     if virtualizer_name == "Direct":
-        channels = data.playback.stream_channels or data.playback.audio_channels
+        channel_format = _format_channels(data.playback.stream_channels)
+        if channel_format is None:
+            channel_format = _format_channels(data.playback.audio_channels)
     else:
-        channels = 8
-    channel_format = _format_channels(channels)
+        channel_format = _format_channels(8)
     if channel_format:
         return f"{virtualizer_name} {channel_format}"
     return virtualizer_name

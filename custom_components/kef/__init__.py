@@ -33,17 +33,6 @@ PLATFORMS = [
 ATTR_FIRMWARE_FILE_PATH = "file_path"
 SERVICE_INSTALL_FIRMWARE_FILE = "install_firmware_file"
 
-_ACTIVE_SENSOR_ENTITY_KEYS = {
-    "backend",
-    "speaker_status",
-    "play_mode",
-    "service_id",
-    "wifi_signal_level",
-    "wifi_ssid",
-    "wifi_frequency",
-    "wifi_bssid",
-}
-
 _ACTIVE_BINARY_SENSOR_ENTITY_KEYS: set[str] = set()
 
 
