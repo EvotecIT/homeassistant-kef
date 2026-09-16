@@ -42,31 +42,58 @@ STATE_OFF = "standby"
 # Only list capabilities known to be unsupported. Models and capabilities that
 # have not been verified remain visible instead of being hidden by inference.
 MODEL_UNSUPPORTED_FEATURES: dict[str, frozenset[str]] = {
-    "KEF LEGACY": frozenset({"xio_audio_info"}),
+    "KEF LEGACY": frozenset({"dual_subwoofer_stereo", "xio"}),
     "LSX2": frozenset(
-        {"eq_button", "front_led", "top_panel", "xio_audio_info"}
+        {
+            "dual_subwoofer_stereo",
+            "eq_button",
+            "front_led",
+            "top_panel",
+            "xio",
+        }
     ),
     "LSXII": frozenset(
-        {"eq_button", "front_led", "top_panel", "xio_audio_info"}
+        {
+            "dual_subwoofer_stereo",
+            "eq_button",
+            "front_led",
+            "top_panel",
+            "xio",
+        }
     ),
     "LSX2LT": frozenset(
-        {"cable_mode", "eq_button", "front_led", "top_panel", "xio_audio_info"}
+        {
+            "cable_mode",
+            "dual_subwoofer_stereo",
+            "eq_button",
+            "front_led",
+            "top_panel",
+            "xio",
+        }
     ),
     "LSXIILT": frozenset(
-        {"cable_mode", "eq_button", "front_led", "top_panel", "xio_audio_info"}
+        {
+            "cable_mode",
+            "dual_subwoofer_stereo",
+            "eq_button",
+            "front_led",
+            "top_panel",
+            "xio",
+        }
     ),
-    "LS50W2": frozenset({"eq_button", "xio_audio_info"}),
-    "LS50WII": frozenset({"eq_button", "xio_audio_info"}),
+    "LS50W2": frozenset({"eq_button", "xio"}),
+    "LS50WII": frozenset({"eq_button", "xio"}),
     "LS60": frozenset(
-        {"desk_mode", "eq_button", "top_panel", "xio_audio_info"}
+        {"desk_mode", "eq_button", "top_panel", "xio"}
     ),
     "LS60W": frozenset(
-        {"desk_mode", "eq_button", "top_panel", "xio_audio_info"}
+        {"desk_mode", "eq_button", "top_panel", "xio"}
     ),
     "XIO": frozenset(
         {
             "cable_mode",
             "desk_mode",
+            "dual_subwoofer_stereo",
             "front_led",
             "stereo_pair",
             "usb_charging",
@@ -107,6 +134,32 @@ BASS_EXTENSION_OPTIONS = {
 CABLE_MODE_OPTIONS = {
     "wired": "Wired",
     "wireless": "Wireless",
+}
+
+POLARITY_OPTIONS = {
+    "normal": "Normal",
+    "inverted": "Inverted",
+}
+
+SUBWOOFER_PRESET_OPTIONS = {
+    "custom": "Custom",
+    "kc62": "KEF KC62",
+    "kf92": "KEF KF92 / KC92",
+    "kube8b": "KEF KUBE 8B / 8 MIE",
+    "kube10b": "KEF KUBE 10B / 10 MIE",
+    "kube12b": "KEF KUBE 12B / 12 MIE",
+    "kube15mie": "KEF KUBE 15 MIE",
+    "t2": "KEF T2 Subwoofer",
+    "other": "Other",
+}
+
+SOUND_PROFILE_OPTIONS = {
+    "default": "Default",
+    "music": "Music",
+    "movie": "Movie",
+    "night": "Night",
+    "dialogue": "Dialogue",
+    "direct": "Direct",
 }
 
 MASTER_CHANNEL_OPTIONS = {

@@ -28,6 +28,7 @@ PLATFORMS = [
     Platform.BINARY_SENSOR,
     Platform.UPDATE,
     Platform.TEXT,
+    Platform.BUTTON,
 ]
 
 ATTR_FIRMWARE_FILE_PATH = "file_path"
@@ -131,8 +132,8 @@ async def _async_cleanup_optional_entities(
         CONF_ENABLE_DIAGNOSTICS,
         DEFAULT_ENABLE_DIAGNOSTICS,
     )
-    xio_audio_info_supported = model_supports_feature(
-        device_model, "xio_audio_info"
+    xio_supported = model_supports_feature(
+        device_model, "xio"
     )
     expected_sensor_keys = {"backend", "speaker_status", "play_mode"}
     if diagnostics_enabled:
@@ -154,7 +155,7 @@ async def _async_cleanup_optional_entities(
                 "alert_snooze_time",
             }
         )
-        if xio_audio_info_supported:
+        if xio_supported:
             expected_sensor_keys.update(
                 {
                     "audio_codec_raw",
@@ -162,12 +163,14 @@ async def _async_cleanup_optional_entities(
                     "audio_playback_channels",
                 }
             )
-    if xio_audio_info_supported:
+    if xio_supported:
         expected_sensor_keys.update(
             {
                 "audio_codec",
                 "audio_virtualizer",
                 "audio_sample_rate",
+                "room_calibration",
+                "calibration_adjustment",
             }
         )
     expected_binary_sensor_keys = set(_ACTIVE_BINARY_SENSOR_ENTITY_KEYS)

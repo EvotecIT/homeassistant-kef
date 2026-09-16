@@ -84,6 +84,18 @@ def _audio_virtualizer_value(data: KefSnapshot) -> str | None:
     return virtualizer_name
 
 
+def _room_calibration_value(data: KefSnapshot) -> str | None:
+    """Return the room calibration status as a date, or a plain status string."""
+    status = data.calibration_status
+    if status is None:
+        return None
+    if not status.is_calibrated:
+        return "Not calibrated"
+    if status.year and status.month and status.day:
+        return f"{status.year}-{status.month:02d}-{status.day:02d}"
+    return "Calibrated"
+
+
 @dataclass(frozen=True, kw_only=True)
 class KefSensorDescription(SensorEntityDescription):
     """Describe a KEF sensor."""
@@ -256,14 +268,14 @@ SENSORS: tuple[KefSensorDescription, ...] = (
         name="Audio codec",
         icon="mdi:waveform",
         value_fn=_audio_codec_value,
-        model_feature="xio_audio_info",
+        model_feature="xio",
     ),
     KefSensorDescription(
         key="audio_virtualizer",
         name="Audio virtualizer",
         icon="mdi:surround-sound",
         value_fn=_audio_virtualizer_value,
-        model_feature="xio_audio_info",
+        model_feature="xio",
     ),
     KefSensorDescription(
         key="audio_sample_rate",
@@ -275,7 +287,7 @@ SENSORS: tuple[KefSensorDescription, ...] = (
         value_fn=lambda data: (
             data.playback.sample_frequency if data.playback else None
         ),
-        model_feature="xio_audio_info",
+        model_feature="xio",
     ),
     KefSensorDescription(
         key="audio_codec_raw",
@@ -284,7 +296,7 @@ SENSORS: tuple[KefSensorDescription, ...] = (
         value_fn=lambda data: data.playback.codec if data.playback else None,
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
-        model_feature="xio_audio_info",
+        model_feature="xio",
     ),
     KefSensorDescription(
         key="audio_source_channels",
@@ -295,7 +307,7 @@ SENSORS: tuple[KefSensorDescription, ...] = (
         ),
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
-        model_feature="xio_audio_info",
+        model_feature="xio",
     ),
     KefSensorDescription(
         key="audio_playback_channels",
@@ -306,7 +318,23 @@ SENSORS: tuple[KefSensorDescription, ...] = (
         ),
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
-        model_feature="xio_audio_info",
+        model_feature="xio",
+    ),
+    KefSensorDescription(
+        key="room_calibration",
+        name="DSP: Room calibration",
+        icon="mdi:tune",
+        value_fn=_room_calibration_value,
+        model_feature="xio",
+    ),
+    KefSensorDescription(
+        key="calibration_adjustment",
+        name="DSP: Calibration adjustment",
+        icon="mdi:tune-variant",
+        native_unit_of_measurement="dB",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.calibration_result,
+        model_feature="xio",
     ),
 )
 

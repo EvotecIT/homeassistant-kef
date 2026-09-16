@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import WAKE_SOURCE_OPTIONS, model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
-from .entity import KefEntity
+from .entity import KefEntity, apply_eq_profile_change
 from .models import KefBackend, KefSnapshot
 
 
@@ -92,6 +92,9 @@ async def _async_set_subwoofer_gain(
     if client is None:
         return
     await client.async_set_subwoofer_gain(round(value))
+    apply_eq_profile_change(
+        coordinator, subwoofer_gain=round(value), subwoofer_preset="custom"
+    )
 
 
 async def _async_set_high_pass_frequency(
@@ -103,6 +106,9 @@ async def _async_set_high_pass_frequency(
     if client is None:
         return
     await client.async_set_high_pass_frequency(value)
+    apply_eq_profile_change(
+        coordinator, high_pass_frequency=value, subwoofer_preset="custom"
+    )
 
 
 async def _async_set_sub_out_low_pass_frequency(
@@ -114,6 +120,9 @@ async def _async_set_sub_out_low_pass_frequency(
     if client is None:
         return
     await client.async_set_sub_out_low_pass_frequency(value)
+    apply_eq_profile_change(
+        coordinator, sub_out_low_pass_frequency=value, subwoofer_preset="custom"
+    )
 
 
 async def _async_set_desk_mode_db(

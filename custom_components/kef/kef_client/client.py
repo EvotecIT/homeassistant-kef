@@ -38,6 +38,7 @@ from .const import (
     PROBE_PATHS,
     SET_DATA_ENDPOINT,
     STATE_OFF,
+    SUBWOOFER_PRESET_VALUES,
 )
 from .exceptions import (
     KefAuthenticationRequiredError,
@@ -48,6 +49,7 @@ from .exceptions import (
 )
 from .models import (
     KefBackend,
+    KefCalibrationStatus,
     KefDeviceInfo,
     KefEqProfile,
     KefFirmwareUpdateInfo,
@@ -273,6 +275,50 @@ class BaseKefClient(ABC):
         """Enable or disable the KW1 wireless subwoofer adapter."""
 
     @abstractmethod
+    async def async_set_subwoofer_polarity(self, value: str) -> None:
+        """Set the subwoofer polarity ("normal" or "inverted")."""
+
+    @abstractmethod
+    async def async_set_audio_polarity(self, value: str) -> None:
+        """Set the main speaker audio polarity ("normal" or "inverted")."""
+
+    @abstractmethod
+    async def async_set_subwoofer_preset(
+        self, value: str, model: str
+    ) -> dict[str, float] | None:
+        """Set the subwoofer model preset.
+
+        Also recalculates gain and crossover frequencies to match, for
+        models where those values have been reverse-engineered; the
+        current model is passed in since the caller already has it
+        cached and an extra async_identify() round-trip would be wasteful
+        just to determine which table to look the values up in. Returns
+        the applied {"gain", "lowpass", "highpass"} values, or None if no
+        table matched and only the preset name was written, so the
+        caller can publish an accurate optimistic update.
+        """
+
+    @abstractmethod
+    async def async_set_sub_enable_stereo(self, enabled: bool) -> None:
+        """Enable or disable dual-subwoofer stereo channel separation."""
+
+    @abstractmethod
+    async def async_set_sound_profile(self, value: str) -> None:
+        """Set the sound profile preset (XIO only)."""
+
+    @abstractmethod
+    async def async_get_calibration_status(self) -> dict[str, Any] | None:
+        """Return the room calibration status (XIO only)."""
+
+    @abstractmethod
+    async def async_get_calibration_result(self) -> float | None:
+        """Return the room calibration dB adjustment result (XIO only)."""
+
+    @abstractmethod
+    async def async_start_calibration(self) -> None:
+        """Start room calibration (XIO only)."""
+
+    @abstractmethod
     async def async_set_desk_mode_enabled(self, enabled: bool) -> None:
         """Enable or disable desk mode."""
 
@@ -370,6 +416,19 @@ class BaseKefClient(ABC):
     async def async_reset_event_queue(self) -> None:
         """Reset any live event queue state when supported."""
         return None
+
+
+def _set_subwoofer_tuning_field(dsp: dict[str, Any], key: str, value: Any) -> None:
+    """Set a subwoofer-tuning field and drop the preset to "custom".
+
+    A named preset (e.g. "kube8b") represents a specific gain/crossover
+    combination; manually overriding any one of those fields means the
+    current values no longer match that preset, so the label should stop
+    claiming they do.
+    """
+    dsp[key] = value
+    if dsp.get("subwooferPreset") != "custom":
+        dsp["subwooferPreset"] = "custom"
 
 
 class ModernKefClient(BaseKefClient):
@@ -731,6 +790,17 @@ class ModernKefClient(BaseKefClient):
         if source not in (None, STATE_OFF):
             self._last_active_source = source
 
+        calibration_status_payload = await self._get_optional_path_value(
+            PROBE_PATHS["calibration_status"],
+            typed_key="kefDspCalibrationStatus",
+        )
+        calibration_result = self._extract_float(
+            await self._get_optional_path_value(
+                PROBE_PATHS["calibration_result"],
+                typed_key="double_",
+            )
+        )
+
         return KefSnapshot(
             device=device,
             speaker_status=speaker_status or STATE_OFF,
@@ -812,6 +882,12 @@ class ModernKefClient(BaseKefClient):
             alert_timer_count=alert_counts[1],
             alert_snooze_minutes=alert_snooze_minutes,
             player_notification_active=player_notification_active,
+            calibration_status=(
+                KefCalibrationStatus.from_modern_value(calibration_status_payload)
+                if isinstance(calibration_status_payload, dict)
+                else None
+            ),
+            calibration_result=calibration_result,
             source_list=source_list,
             default_volume_by_source=default_volume_by_source,
         )
@@ -1075,16 +1151,28 @@ class ModernKefClient(BaseKefClient):
         )
 
     async def async_set_subwoofer_gain(self, value: int) -> None:
-        """Set the EQ subwoofer gain."""
+        """Set the EQ subwoofer gain.
+
+        Manually tuning this deviates from whatever preset is currently
+        labeled, so the preset reverts to "custom" to reflect that the
+        values are no longer a known preset's values.
+        """
         await self._update_eq_profile(
-            lambda dsp: dsp.__setitem__("subwooferGain", max(-10, min(10, value)))
+            lambda dsp: _set_subwoofer_tuning_field(
+                dsp, "subwooferGain", max(-10, min(10, value))
+            )
         )
 
     async def async_set_sub_out_low_pass_frequency(self, value: float) -> None:
-        """Set the subwoofer output low-pass crossover frequency."""
+        """Set the subwoofer output low-pass crossover frequency.
+
+        Manually tuning this deviates from whatever preset is currently
+        labeled, so the preset reverts to "custom" to reflect that the
+        values are no longer a known preset's values.
+        """
         await self._update_eq_profile(
-            lambda dsp: dsp.__setitem__(
-                "subOutLPFreq", max(40.0, min(250.0, value))
+            lambda dsp: _set_subwoofer_tuning_field(
+                dsp, "subOutLPFreq", max(40.0, min(250.0, value))
             )
         )
 
@@ -1107,6 +1195,87 @@ class ModernKefClient(BaseKefClient):
         await self._update_eq_profile(
             lambda dsp: dsp.__setitem__("isKW1", enabled)
         )
+
+    async def async_set_subwoofer_polarity(self, value: str) -> None:
+        """Set the subwoofer polarity."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("subwooferPolarity", value)
+        )
+
+    async def async_set_audio_polarity(self, value: str) -> None:
+        """Set the main speaker audio polarity."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("audioPolarity", value)
+        )
+
+    async def async_set_subwoofer_preset(
+        self, value: str, model: str
+    ) -> dict[str, float] | None:
+        """Set the subwoofer model preset.
+
+        Setting only the preset name has no audible effect: the gain and
+        crossover frequencies also need to be recalculated for the
+        selected model and the current (isKW1, subwooferCount)
+        combination, matching what the speaker's own app does. Falls
+        back to writing just the name for models without a known table
+        (e.g. "custom", or a model this hasn't been verified for) rather
+        than guessing values.
+        """
+        preset_table = SUBWOOFER_PRESET_VALUES.get(model.upper(), {}).get(value, {})
+        applied_values: dict[str, float] | None = None
+
+        def _mutate(dsp: dict[str, Any]) -> None:
+            nonlocal applied_values
+            dsp["subwooferPreset"] = value
+            lookup_key = (
+                bool(dsp.get("isKW1", False)),
+                dsp.get("subwooferCount", 1),
+            )
+            values = preset_table.get(lookup_key)
+            if values is not None:
+                dsp["subwooferGain"] = values["gain"]
+                dsp["subOutLPFreq"] = values["lowpass"]
+                dsp["highPassModeFreq"] = values["highpass"]
+                applied_values = values
+
+        await self._update_eq_profile(_mutate)
+        return applied_values
+
+    async def async_set_sub_enable_stereo(self, enabled: bool) -> None:
+        """Enable or disable dual-subwoofer stereo channel separation."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("subEnableStereo", enabled)
+        )
+
+    async def async_set_sound_profile(self, value: str) -> None:
+        """Set the sound profile preset."""
+        await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("soundProfile", value)
+        )
+
+    async def async_get_calibration_status(self) -> dict[str, Any] | None:
+        """Return the room calibration status."""
+        payload = await self._get_optional_path_item(
+            PROBE_PATHS["calibration_status"], roles="value"
+        )
+        if not isinstance(payload, dict):
+            return None
+        status = payload.get("kefDspCalibrationStatus")
+        return status if isinstance(status, dict) else None
+
+    async def async_get_calibration_result(self) -> float | None:
+        """Return the room calibration dB adjustment result."""
+        payload = await self._get_optional_path_item(
+            PROBE_PATHS["calibration_result"], roles="value"
+        )
+        if not isinstance(payload, dict):
+            return None
+        value = payload.get("double_")
+        return float(value) if isinstance(value, (int, float)) else None
+
+    async def async_start_calibration(self) -> None:
+        """Start room calibration."""
+        await self._activate_path(PROBE_PATHS["calibration_start"])
 
     async def async_set_desk_mode_enabled(self, enabled: bool) -> None:
         """Enable or disable desk mode."""
@@ -1149,10 +1318,15 @@ class ModernKefClient(BaseKefClient):
         )
 
     async def async_set_high_pass_frequency(self, value: float) -> None:
-        """Set the high-pass filter frequency."""
+        """Set the high-pass filter frequency.
+
+        Manually tuning this deviates from whatever preset is currently
+        labeled, so the preset reverts to "custom" to reflect that the
+        values are no longer a known preset's values.
+        """
         await self._update_eq_profile(
-            lambda dsp: dsp.__setitem__(
-                "highPassModeFreq", max(50.0, min(120.0, value))
+            lambda dsp: _set_subwoofer_tuning_field(
+                dsp, "highPassModeFreq", max(50.0, min(120.0, value))
             )
         )
 
@@ -2227,6 +2401,8 @@ class LegacyBinaryClient(BaseKefClient):
             alert_timer_count=None,
             alert_snooze_minutes=None,
             player_notification_active=None,
+            calibration_status=None,
+            calibration_result=None,
             source_list=LEGACY_SOURCE_LIST,
             default_volume_by_source={},
         )
@@ -2448,6 +2624,52 @@ class LegacyBinaryClient(BaseKefClient):
         """Legacy speakers do not expose KW1 adapter configuration."""
         raise KefUnsupportedDeviceError(
             "KW1 wireless subwoofer adapter is not supported for legacy KEF"
+        )
+
+    async def async_set_subwoofer_polarity(self, value: str) -> None:
+        """Legacy speakers do not expose subwoofer polarity configuration."""
+        raise KefUnsupportedDeviceError(
+            "Subwoofer polarity is not supported for legacy KEF"
+        )
+
+    async def async_set_audio_polarity(self, value: str) -> None:
+        """Legacy speakers do not expose audio polarity configuration."""
+        raise KefUnsupportedDeviceError(
+            "Audio polarity is not supported for legacy KEF"
+        )
+
+    async def async_set_subwoofer_preset(
+        self, value: str, model: str
+    ) -> dict[str, float] | None:
+        """Legacy speakers do not expose subwoofer preset configuration."""
+        raise KefUnsupportedDeviceError(
+            "Subwoofer preset is not supported for legacy KEF"
+        )
+
+    async def async_set_sub_enable_stereo(self, enabled: bool) -> None:
+        """Legacy speakers do not expose dual-subwoofer stereo configuration."""
+        raise KefUnsupportedDeviceError(
+            "Dual-subwoofer stereo is not supported for legacy KEF"
+        )
+
+    async def async_set_sound_profile(self, value: str) -> None:
+        """Legacy speakers do not expose sound profile configuration."""
+        raise KefUnsupportedDeviceError(
+            "Sound profile is not supported for legacy KEF"
+        )
+
+    async def async_get_calibration_status(self) -> dict[str, Any] | None:
+        """Legacy speakers do not expose room calibration."""
+        return None
+
+    async def async_get_calibration_result(self) -> float | None:
+        """Legacy speakers do not expose room calibration."""
+        return None
+
+    async def async_start_calibration(self) -> None:
+        """Legacy speakers do not expose room calibration."""
+        raise KefUnsupportedDeviceError(
+            "Room calibration is not supported for legacy KEF"
         )
 
     async def async_set_desk_mode_enabled(self, enabled: bool) -> None:

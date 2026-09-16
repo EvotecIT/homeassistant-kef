@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
-from .entity import KefEntity
+from .entity import KefEntity, apply_eq_profile_change
 from .models import KefBackend, KefSnapshot
 
 
@@ -180,6 +180,18 @@ async def _async_set_kw1_adapter(
     if client is None:
         return
     await client.async_set_kw1_enabled(enabled)
+
+
+async def _async_set_sub_enable_stereo(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Enable or disable dual-subwoofer stereo channel separation."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_sub_enable_stereo(enabled)
+    apply_eq_profile_change(coordinator, sub_enable_stereo=enabled)
 
 
 async def _async_set_remote_ir(
@@ -395,6 +407,17 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_profile.is_kw1 if data.eq_profile else None,
         async_set_fn=_async_set_kw1_adapter,
+    ),
+    KefSwitchDescription(
+        key="sub_enable_stereo",
+        name="SW: Stereo subwoofers",
+        icon="mdi:speaker-multiple",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: (
+            data.eq_profile.sub_enable_stereo if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_sub_enable_stereo,
+        model_feature="dual_subwoofer_stereo",
     ),
     KefSwitchDescription(
         key="remote_ir",

@@ -18,13 +18,16 @@ from .const import (
     FAVOURITE_BUTTON_OPTIONS,
     IR_CODE_OPTIONS,
     MASTER_CHANNEL_OPTIONS,
+    POLARITY_OPTIONS,
+    SOUND_PROFILE_OPTIONS,
     STANDBY_MODE_OPTIONS,
     STREAMING_QUALITY_OPTIONS,
+    SUBWOOFER_PRESET_OPTIONS,
     WAKE_SOURCE_OPTIONS,
     model_supports_feature,
 )
 from .coordinator import KefConfigEntry, KefCoordinator
-from .entity import KefEntity
+from .entity import KefEntity, apply_eq_profile_change
 from .models import KefBackend, KefSnapshot
 
 
@@ -138,6 +141,61 @@ async def _async_set_eq_button_2(
     await client.async_set_eq_button_action(2, value)
 
 
+async def _async_set_subwoofer_polarity(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the subwoofer polarity."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_subwoofer_polarity(value)
+    apply_eq_profile_change(coordinator, subwoofer_polarity=value)
+
+
+async def _async_set_audio_polarity(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the main speaker audio polarity."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_audio_polarity(value)
+    apply_eq_profile_change(coordinator, audio_polarity=value)
+
+
+async def _async_set_subwoofer_preset(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the subwoofer model preset."""
+    client = coordinator.client
+    if client is None:
+        return
+    applied = await client.async_set_subwoofer_preset(
+        value, coordinator.data.device.model
+    )
+    changes: dict[str, object] = {"subwoofer_preset": value}
+    if applied is not None:
+        changes["subwoofer_gain"] = applied["gain"]
+        changes["sub_out_low_pass_frequency"] = applied["lowpass"]
+        changes["high_pass_frequency"] = applied["highpass"]
+    apply_eq_profile_change(coordinator, **changes)
+
+
+async def _async_set_sound_profile(
+    coordinator: KefCoordinator,
+    value: str,
+) -> None:
+    """Set the sound profile preset."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_sound_profile(value)
+    apply_eq_profile_change(coordinator, sound_profile=value)
+
+
 @dataclass(frozen=True, kw_only=True)
 class KefSelectDescription(SelectEntityDescription):
     """Describe a KEF configuration select."""
@@ -244,6 +302,50 @@ SELECTS: tuple[KefSelectDescription, ...] = (
         async_set_fn=_async_set_eq_button_2,
         options_map=EQ_BUTTON_OPTIONS,
         model_feature="eq_button",
+    ),
+    KefSelectDescription(
+        key="subwoofer_polarity",
+        name="SW: Polarity",
+        icon="mdi:sine-wave",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: (
+            data.eq_profile.subwoofer_polarity if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_subwoofer_polarity,
+        options_map=POLARITY_OPTIONS,
+    ),
+    KefSelectDescription(
+        key="audio_polarity",
+        name="DSP: Audio polarity",
+        icon="mdi:sine-wave",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: (
+            data.eq_profile.audio_polarity if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_audio_polarity,
+        options_map=POLARITY_OPTIONS,
+    ),
+    KefSelectDescription(
+        key="subwoofer_preset",
+        name="SW: Model preset",
+        icon="mdi:speaker",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: (
+            data.eq_profile.subwoofer_preset if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_subwoofer_preset,
+        options_map=SUBWOOFER_PRESET_OPTIONS,
+    ),
+    KefSelectDescription(
+        key="sound_profile",
+        name="DSP: Sound profile",
+        icon="mdi:surround-sound",
+        value_fn=lambda data: (
+            data.eq_profile.sound_profile if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_sound_profile,
+        options_map=SOUND_PROFILE_OPTIONS,
+        model_feature="xio",
     ),
 )
 
