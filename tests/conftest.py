@@ -289,6 +289,8 @@ TEST_SNAPSHOT = KefSnapshot(
     alert_timer_count=0,
     alert_snooze_minutes=10,
     player_notification_active=False,
+    calibration_status=None,
+    calibration_result=None,
     source_list=("wifi", "bluetooth", "tv", "optical", "coaxial", "analog", "usb"),
     default_volume_by_source={
         "wifi": 30,
