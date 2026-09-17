@@ -1,4 +1,4 @@
-"""Optimistic EQ entity update tests for KEF."""
+"""Optimistic entity update tests for KEF."""
 
 from __future__ import annotations
 
@@ -10,8 +10,55 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from custom_components.kef.exceptions import KefError
-from custom_components.kef.number import _async_set_subwoofer_gain
-from custom_components.kef.select import _async_set_subwoofer_preset
+from custom_components.kef.number import (
+    _async_set_balance,
+    _async_set_default_volume_global,
+    _async_set_desk_mode_db,
+    _async_set_fixed_volume_level,
+    _async_set_maximum_volume,
+    _async_set_source_volume,
+    _async_set_subwoofer_gain,
+    _async_set_treble_amount,
+    _async_set_volume_step,
+    _async_set_wall_mode_db,
+)
+from custom_components.kef.select import (
+    _async_set_bass_extension,
+    _async_set_cable_mode,
+    _async_set_eq_button_1,
+    _async_set_eq_button_2,
+    _async_set_favourite_button,
+    _async_set_master_channel,
+    _async_set_remote_ir_code,
+    _async_set_standby_mode,
+    _async_set_streaming_quality,
+    _async_set_subwoofer_preset,
+    _async_set_wake_source,
+)
+from custom_components.kef.switch import (
+    _async_set_analytics,
+    _async_set_app_analytics,
+    _async_set_auto_switch_hdmi,
+    _async_set_desk_mode,
+    _async_set_front_led,
+    _async_set_high_pass_mode,
+    _async_set_kw1_adapter,
+    _async_set_kw1_wake,
+    _async_set_per_input_startup_volume,
+    _async_set_phase_correction,
+    _async_set_remote_ir,
+    _async_set_standby_led,
+    _async_set_startup_tone,
+    _async_set_startup_volume,
+    _async_set_subwoofer_enabled,
+    _async_set_subwoofer_wake,
+    _async_set_top_panel,
+    _async_set_top_panel_led,
+    _async_set_top_panel_standby_led,
+    _async_set_usb_charging,
+    _async_set_volume_limit,
+    _async_set_wall_mode,
+)
 from tests.conftest import TEST_SNAPSHOT
 
 
@@ -80,3 +127,218 @@ async def test_failed_preset_write_does_not_publish_optimistic_state() -> None:
 
     assert coordinator.data == before
     coordinator.async_apply_local_change.assert_not_called()
+
+
+def _get_field(data, field_path: str):
+    """Resolve a possibly-dotted field path against a snapshot."""
+    obj = data
+    for part in field_path.split("."):
+        obj = getattr(obj, part)
+    return obj
+
+
+# (setter, client_method, field_path, value) - value doubles as the
+# expected published result, since every one of these is a plain 1:1 write.
+_SETTERS = [
+    (
+        _async_set_standby_mode,
+        "async_set_standby_mode",
+        "standby_mode",
+        "standby_20mins",
+    ),
+    (_async_set_wake_source, "async_set_wake_source", "wake_source", "tv"),
+    (_async_set_master_channel, "async_set_master_channel", "master_channel", "right"),
+    (_async_set_cable_mode, "async_set_cable_mode", "cable_mode", "wireless"),
+    (
+        _async_set_bass_extension,
+        "async_set_bass_extension",
+        "eq_profile.bass_extension",
+        "extra",
+    ),
+    (
+        _async_set_remote_ir_code,
+        "async_set_remote_ir_code",
+        "remote_ir_code",
+        "ir_code_set_b",
+    ),
+    (
+        _async_set_streaming_quality,
+        "async_set_streaming_quality",
+        "streaming_quality",
+        "320",
+    ),
+    (
+        _async_set_favourite_button,
+        "async_set_favourite_button_action",
+        "favourite_button",
+        "nextSource",
+    ),
+    (_async_set_eq_button_1, "async_set_eq_button_action", "eq_button_1", "music"),
+    (_async_set_eq_button_2, "async_set_eq_button_action", "eq_button_2", "night"),
+    (
+        _async_set_startup_tone,
+        "async_set_startup_tone_enabled",
+        "startup_tone_enabled",
+        True,
+    ),
+    (
+        _async_set_auto_switch_hdmi,
+        "async_set_auto_switch_hdmi_enabled",
+        "auto_switch_hdmi",
+        True,
+    ),
+    (
+        _async_set_standby_led,
+        "async_set_standby_led_enabled",
+        "standby_led_enabled",
+        False,
+    ),
+    (_async_set_front_led, "async_set_front_led_enabled", "front_led_enabled", True),
+    (_async_set_top_panel, "async_set_top_panel_enabled", "top_panel_enabled", False),
+    (
+        _async_set_top_panel_led,
+        "async_set_top_panel_led_enabled",
+        "top_panel_led_enabled",
+        False,
+    ),
+    (
+        _async_set_top_panel_standby_led,
+        "async_set_top_panel_standby_led_enabled",
+        "top_panel_standby_led_enabled",
+        False,
+    ),
+    (
+        _async_set_usb_charging,
+        "async_set_usb_charging_enabled",
+        "usb_charging_enabled",
+        True,
+    ),
+    (
+        _async_set_startup_volume,
+        "async_set_startup_volume_enabled",
+        "startup_volume_enabled",
+        True,
+    ),
+    (
+        _async_set_per_input_startup_volume,
+        "async_set_per_input_startup_volume_enabled",
+        "per_input_startup_volume_enabled",
+        True,
+    ),
+    (
+        _async_set_volume_limit,
+        "async_set_volume_limit_enabled",
+        "volume_limit_enabled",
+        True,
+    ),
+    (
+        _async_set_subwoofer_wake,
+        "async_set_subwoofer_wake_enabled",
+        "subwoofer_wake_enabled",
+        True,
+    ),
+    (_async_set_kw1_wake, "async_set_kw1_wake_enabled", "kw1_wake_enabled", True),
+    (
+        _async_set_subwoofer_enabled,
+        "async_set_subwoofer_enabled",
+        "eq_profile.subwoofer_out",
+        False,
+    ),
+    (_async_set_kw1_adapter, "async_set_kw1_enabled", "eq_profile.is_kw1", True),
+    (_async_set_remote_ir, "async_set_remote_ir_enabled", "remote_ir_enabled", False),
+    (_async_set_analytics, "async_set_analytics_enabled", "analytics_enabled", False),
+    (
+        _async_set_app_analytics,
+        "async_set_app_analytics_enabled",
+        "app_analytics_enabled",
+        False,
+    ),
+    (_async_set_desk_mode, "async_set_desk_mode_enabled", "eq_profile.desk_mode", True),
+    (_async_set_wall_mode, "async_set_wall_mode_enabled", "eq_profile.wall_mode", True),
+    (
+        _async_set_phase_correction,
+        "async_set_phase_correction_enabled",
+        "eq_profile.phase_correction",
+        False,
+    ),
+    (
+        _async_set_high_pass_mode,
+        "async_set_high_pass_mode_enabled",
+        "eq_profile.high_pass_mode",
+        True,
+    ),
+    (
+        _async_set_default_volume_global,
+        "async_set_default_volume_global",
+        "default_volume_global",
+        50,
+    ),
+    (_async_set_maximum_volume, "async_set_maximum_volume", "maximum_volume", 80),
+    (_async_set_volume_step, "async_set_volume_step", "volume_step", 5),
+    (
+        _async_set_fixed_volume_level,
+        "async_set_fixed_volume_level",
+        "fixed_volume_level",
+        25,
+    ),
+    (_async_set_balance, "async_set_balance", "eq_profile.balance", 10),
+    (
+        _async_set_treble_amount,
+        "async_set_treble_amount",
+        "eq_profile.treble_amount",
+        1.5,
+    ),
+    (
+        _async_set_desk_mode_db,
+        "async_set_desk_mode_db",
+        "eq_profile.desk_mode_setting",
+        -5.0,
+    ),
+    (
+        _async_set_wall_mode_db,
+        "async_set_wall_mode_db",
+        "eq_profile.wall_mode_setting",
+        -3.5,
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "setter, client_method, field_path, value",
+    _SETTERS,
+    ids=[params[2] for params in _SETTERS],
+)
+async def test_setter_publishes_optimistic_state(
+    setter, client_method, field_path, value
+) -> None:
+    """Every writable select/switch/number entity should publish immediately.
+
+    Covers the entities PR #30 did not touch (only subwoofer_preset/polarity,
+    audio_polarity, sound_profile, and sub_enable_stereo got this fix there),
+    closing the systemic gap where a write showed its new value, then
+    flickered back to stale data until the next ~10s poll caught up.
+    """
+    coordinator = _coordinator_with_local_updates()
+    coordinator.client = SimpleNamespace(**{client_method: AsyncMock()})
+
+    await setter(coordinator, value)
+
+    assert _get_field(coordinator.data, field_path) == value
+
+
+async def test_source_volume_publishes_only_the_touched_source() -> None:
+    """Setting one source's startup volume must not disturb the others."""
+    coordinator = _coordinator_with_local_updates()
+    coordinator.client = SimpleNamespace(
+        async_set_default_volume_for_source=AsyncMock()
+    )
+    original_by_source = dict(coordinator.data.default_volume_by_source)
+    assert "wifi" in original_by_source
+
+    await _async_set_source_volume(coordinator, "wifi", 45)
+
+    updated = coordinator.data.default_volume_by_source
+    assert updated["wifi"] == 45
+    for source, value in original_by_source.items():
+        if source != "wifi":
+            assert updated[source] == value

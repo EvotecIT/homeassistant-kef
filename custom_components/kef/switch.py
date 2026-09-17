@@ -26,6 +26,7 @@ async def _async_set_startup_tone(
     if client is None:
         return
     await client.async_set_startup_tone_enabled(enabled)
+    coordinator.async_apply_local_change(startup_tone_enabled=enabled)
 
 
 async def _async_set_auto_switch_hdmi(
@@ -37,6 +38,7 @@ async def _async_set_auto_switch_hdmi(
     if client is None:
         return
     await client.async_set_auto_switch_hdmi_enabled(enabled)
+    coordinator.async_apply_local_change(auto_switch_hdmi=enabled)
 
 
 async def _async_set_standby_led(
@@ -48,6 +50,7 @@ async def _async_set_standby_led(
     if client is None:
         return
     await client.async_set_standby_led_enabled(enabled)
+    coordinator.async_apply_local_change(standby_led_enabled=enabled)
 
 
 async def _async_set_front_led(
@@ -59,6 +62,7 @@ async def _async_set_front_led(
     if client is None:
         return
     await client.async_set_front_led_enabled(enabled)
+    coordinator.async_apply_local_change(front_led_enabled=enabled)
 
 
 async def _async_set_top_panel(
@@ -70,6 +74,7 @@ async def _async_set_top_panel(
     if client is None:
         return
     await client.async_set_top_panel_enabled(enabled)
+    coordinator.async_apply_local_change(top_panel_enabled=enabled)
 
 
 async def _async_set_top_panel_led(
@@ -81,6 +86,7 @@ async def _async_set_top_panel_led(
     if client is None:
         return
     await client.async_set_top_panel_led_enabled(enabled)
+    coordinator.async_apply_local_change(top_panel_led_enabled=enabled)
 
 
 async def _async_set_top_panel_standby_led(
@@ -92,6 +98,7 @@ async def _async_set_top_panel_standby_led(
     if client is None:
         return
     await client.async_set_top_panel_standby_led_enabled(enabled)
+    coordinator.async_apply_local_change(top_panel_standby_led_enabled=enabled)
 
 
 async def _async_set_usb_charging(
@@ -103,6 +110,7 @@ async def _async_set_usb_charging(
     if client is None:
         return
     await client.async_set_usb_charging_enabled(enabled)
+    coordinator.async_apply_local_change(usb_charging_enabled=enabled)
 
 
 async def _async_set_startup_volume(
@@ -114,6 +122,7 @@ async def _async_set_startup_volume(
     if client is None:
         return
     await client.async_set_startup_volume_enabled(enabled)
+    coordinator.async_apply_local_change(startup_volume_enabled=enabled)
 
 
 async def _async_set_per_input_startup_volume(
@@ -125,6 +134,7 @@ async def _async_set_per_input_startup_volume(
     if client is None:
         return
     await client.async_set_per_input_startup_volume_enabled(enabled)
+    coordinator.async_apply_local_change(per_input_startup_volume_enabled=enabled)
 
 
 async def _async_set_volume_limit(
@@ -136,6 +146,7 @@ async def _async_set_volume_limit(
     if client is None:
         return
     await client.async_set_volume_limit_enabled(enabled)
+    coordinator.async_apply_local_change(volume_limit_enabled=enabled)
 
 
 async def _async_set_subwoofer_wake(
@@ -147,6 +158,7 @@ async def _async_set_subwoofer_wake(
     if client is None:
         return
     await client.async_set_subwoofer_wake_enabled(enabled)
+    coordinator.async_apply_local_change(subwoofer_wake_enabled=enabled)
 
 
 async def _async_set_kw1_wake(
@@ -158,6 +170,7 @@ async def _async_set_kw1_wake(
     if client is None:
         return
     await client.async_set_kw1_wake_enabled(enabled)
+    coordinator.async_apply_local_change(kw1_wake_enabled=enabled)
 
 
 async def _async_set_subwoofer_enabled(
@@ -169,6 +182,7 @@ async def _async_set_subwoofer_enabled(
     if client is None:
         return
     await client.async_set_subwoofer_enabled(enabled)
+    apply_eq_profile_change(coordinator, subwoofer_out=enabled)
 
 
 async def _async_set_kw1_adapter(
@@ -180,6 +194,7 @@ async def _async_set_kw1_adapter(
     if client is None:
         return
     await client.async_set_kw1_enabled(enabled)
+    apply_eq_profile_change(coordinator, is_kw1=enabled)
 
 
 async def _async_set_sub_enable_stereo(
@@ -203,6 +218,7 @@ async def _async_set_remote_ir(
     if client is None:
         return
     await client.async_set_remote_ir_enabled(enabled)
+    coordinator.async_apply_local_change(remote_ir_enabled=enabled)
 
 
 async def _async_set_analytics(
@@ -214,6 +230,7 @@ async def _async_set_analytics(
     if client is None:
         return
     await client.async_set_analytics_enabled(enabled)
+    coordinator.async_apply_local_change(analytics_enabled=enabled)
 
 
 async def _async_set_app_analytics(
@@ -225,6 +242,7 @@ async def _async_set_app_analytics(
     if client is None:
         return
     await client.async_set_app_analytics_enabled(enabled)
+    coordinator.async_apply_local_change(app_analytics_enabled=enabled)
 
 
 async def _async_set_desk_mode(
@@ -236,6 +254,7 @@ async def _async_set_desk_mode(
     if client is None:
         return
     await client.async_set_desk_mode_enabled(enabled)
+    apply_eq_profile_change(coordinator, desk_mode=enabled)
 
 
 async def _async_set_wall_mode(
@@ -247,6 +266,7 @@ async def _async_set_wall_mode(
     if client is None:
         return
     await client.async_set_wall_mode_enabled(enabled)
+    apply_eq_profile_change(coordinator, wall_mode=enabled)
 
 
 async def _async_set_phase_correction(
@@ -258,6 +278,7 @@ async def _async_set_phase_correction(
     if client is None:
         return
     await client.async_set_phase_correction_enabled(enabled)
+    apply_eq_profile_change(coordinator, phase_correction=enabled)
 
 
 async def _async_set_high_pass_mode(
@@ -269,6 +290,7 @@ async def _async_set_high_pass_mode(
     if client is None:
         return
     await client.async_set_high_pass_mode_enabled(enabled)
+    apply_eq_profile_change(coordinator, high_pass_mode=enabled)
 
 
 @dataclass(frozen=True, kw_only=True)
