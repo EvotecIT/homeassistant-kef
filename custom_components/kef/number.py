@@ -85,8 +85,11 @@ async def _async_set_treble_amount(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_treble_amount(value)
-    apply_eq_profile_change(coordinator, treble_amount=value)
+    applied = await client.async_set_treble_amount(value)
+    apply_eq_profile_change(
+        coordinator,
+        treble_amount=float(applied["trebleAmount"]),
+    )
 
 
 async def _async_set_subwoofer_gain(
@@ -111,9 +114,11 @@ async def _async_set_high_pass_frequency(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_high_pass_frequency(value)
+    applied = await client.async_set_high_pass_frequency(value)
     apply_eq_profile_change(
-        coordinator, high_pass_frequency=value, subwoofer_preset="custom"
+        coordinator,
+        high_pass_frequency=float(applied["highPassModeFreq"]),
+        subwoofer_preset=str(applied.get("subwooferPreset") or "custom"),
     )
 
 
@@ -125,9 +130,11 @@ async def _async_set_sub_out_low_pass_frequency(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_sub_out_low_pass_frequency(value)
+    applied = await client.async_set_sub_out_low_pass_frequency(value)
     apply_eq_profile_change(
-        coordinator, sub_out_low_pass_frequency=value, subwoofer_preset="custom"
+        coordinator,
+        sub_out_low_pass_frequency=float(applied["subOutLPFreq"]),
+        subwoofer_preset=str(applied.get("subwooferPreset") or "custom"),
     )
 
 
@@ -139,8 +146,11 @@ async def _async_set_desk_mode_db(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_desk_mode_db(value)
-    apply_eq_profile_change(coordinator, desk_mode_setting=value)
+    applied = await client.async_set_desk_mode_db(value)
+    apply_eq_profile_change(
+        coordinator,
+        desk_mode_setting=float(applied["deskModeSetting"]),
+    )
 
 
 async def _async_set_wall_mode_db(
@@ -151,8 +161,11 @@ async def _async_set_wall_mode_db(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_wall_mode_db(value)
-    apply_eq_profile_change(coordinator, wall_mode_setting=value)
+    applied = await client.async_set_wall_mode_db(value)
+    apply_eq_profile_change(
+        coordinator,
+        wall_mode_setting=float(applied["wallModeSetting"]),
+    )
 
 
 async def _async_set_source_volume(

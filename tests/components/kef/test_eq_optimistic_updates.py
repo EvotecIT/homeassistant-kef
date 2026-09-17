@@ -8,15 +8,23 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.kef.const import CONF_BACKEND, CONF_TCP_PORT, DOMAIN
+from custom_components.kef.coordinator import KefCoordinator
 from custom_components.kef.exceptions import KefError
 from custom_components.kef.number import (
+    NUMBERS,
+    KefNumber,
+    KefSourceVolumeNumber,
     _async_set_balance,
     _async_set_default_volume_global,
     _async_set_desk_mode_db,
     _async_set_fixed_volume_level,
+    _async_set_high_pass_frequency,
     _async_set_maximum_volume,
     _async_set_source_volume,
+    _async_set_sub_out_low_pass_frequency,
     _async_set_subwoofer_gain,
     _async_set_treble_amount,
     _async_set_volume_step,
@@ -36,6 +44,8 @@ from custom_components.kef.select import (
     _async_set_wake_source,
 )
 from custom_components.kef.switch import (
+    SWITCHES,
+    KefSwitch,
     _async_set_analytics,
     _async_set_app_analytics,
     _async_set_auto_switch_hdmi,
@@ -59,7 +69,7 @@ from custom_components.kef.switch import (
     _async_set_volume_limit,
     _async_set_wall_mode,
 )
-from tests.conftest import TEST_SNAPSHOT
+from tests.conftest import TEST_HOST, TEST_PORT, TEST_SNAPSHOT
 
 
 def _coordinator_with_local_updates():
@@ -72,6 +82,33 @@ def _coordinator_with_local_updates():
 
     coordinator.async_apply_local_change = Mock(side_effect=apply)
     return coordinator
+
+
+def _real_coordinator(hass) -> KefCoordinator:
+    """Create a real coordinator for entity-to-refresh contract tests."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "host": TEST_HOST,
+            "port": TEST_PORT,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: "modern",
+        },
+        title="KEF",
+    )
+    coordinator = KefCoordinator(hass, entry)
+    coordinator.data = deepcopy(TEST_SNAPSHOT)
+    return coordinator
+
+
+def _refresh_immediately(coordinator: KefCoordinator) -> None:
+    """Make an entity's requested refresh publish the fetched snapshot."""
+
+    async def refresh() -> None:
+        snapshot = await coordinator._async_update_data()
+        coordinator.async_set_updated_data(snapshot)
+
+    coordinator.async_request_refresh = AsyncMock(side_effect=refresh)
 
 
 async def test_subwoofer_preset_publishes_all_written_values() -> None:
@@ -276,24 +313,6 @@ _SETTERS = [
         25,
     ),
     (_async_set_balance, "async_set_balance", "eq_profile.balance", 10),
-    (
-        _async_set_treble_amount,
-        "async_set_treble_amount",
-        "eq_profile.treble_amount",
-        1.5,
-    ),
-    (
-        _async_set_desk_mode_db,
-        "async_set_desk_mode_db",
-        "eq_profile.desk_mode_setting",
-        -5.0,
-    ),
-    (
-        _async_set_wall_mode_db,
-        "async_set_wall_mode_db",
-        "eq_profile.wall_mode_setting",
-        -3.5,
-    ),
 ]
 
 
@@ -323,19 +342,97 @@ async def test_setter_publishes_optimistic_state(
 
 
 @pytest.mark.parametrize(
-    ("enabled", "initial_count", "expected_count"),
+    (
+        "setter",
+        "client_method",
+        "wire_key",
+        "field_path",
+        "requested",
+        "applied",
+    ),
     [
-        (True, 0, 1),
-        (True, 2, 2),
-        (False, 2, 0),
+        (
+            _async_set_treble_amount,
+            "async_set_treble_amount",
+            "trebleAmount",
+            "eq_profile.treble_amount",
+            1.4,
+            1.5,
+        ),
+        (
+            _async_set_desk_mode_db,
+            "async_set_desk_mode_db",
+            "deskModeSetting",
+            "eq_profile.desk_mode_setting",
+            -3.6,
+            -3.5,
+        ),
+        (
+            _async_set_wall_mode_db,
+            "async_set_wall_mode_db",
+            "wallModeSetting",
+            "eq_profile.wall_mode_setting",
+            -3.6,
+            -3.5,
+        ),
+        (
+            _async_set_high_pass_frequency,
+            "async_set_high_pass_frequency",
+            "highPassModeFreq",
+            "eq_profile.high_pass_frequency",
+            67.5,
+            70.0,
+        ),
+        (
+            _async_set_sub_out_low_pass_frequency,
+            "async_set_sub_out_low_pass_frequency",
+            "subOutLPFreq",
+            "eq_profile.sub_out_low_pass_frequency",
+            57.5,
+            60.0,
+        ),
     ],
 )
-async def test_subwoofer_enabled_publishes_consistent_count(
+async def test_eq_number_publishes_representable_value(
+    setter,
+    client_method: str,
+    wire_key: str,
+    field_path: str,
+    requested: float,
+    applied: float,
+) -> None:
+    """Optimistic EQ state should match the value encoded by the client."""
+    coordinator = _coordinator_with_local_updates()
+    coordinator.client = SimpleNamespace(
+        **{
+            client_method: AsyncMock(
+                return_value={wire_key: applied, "subwooferPreset": "custom"}
+            )
+        }
+    )
+
+    await setter(coordinator, requested)
+
+    assert _get_field(coordinator.data, field_path) == applied
+    assert getattr(coordinator.client, client_method).await_count == 1
+    assert coordinator.async_apply_local_change.call_count == 1
+
+
+@pytest.mark.parametrize(
+    ("enabled", "coordinator_count", "applied_profile", "expected_count"),
+    [
+        (True, 0, {"subwooferCount": 2}, 2),
+        (True, 0, {"subwooferOut": True, "subwooferCount": 1}, 1),
+        (False, 2, {"subwooferCount": 0}, 0),
+    ],
+)
+async def test_subwoofer_enabled_publishes_client_profile(
     enabled: bool,
-    initial_count: int,
+    coordinator_count: int,
+    applied_profile: dict[str, object],
     expected_count: int,
 ) -> None:
-    """Subwoofer output and count should match the complete client write."""
+    """Optimistic subwoofer state should come from the fresh client profile."""
     coordinator = _coordinator_with_local_updates()
     assert coordinator.data.eq_profile is not None
     coordinator.data = replace(
@@ -343,10 +440,12 @@ async def test_subwoofer_enabled_publishes_consistent_count(
         eq_profile=replace(
             coordinator.data.eq_profile,
             subwoofer_out=not enabled,
-            subwoofer_count=initial_count,
+            subwoofer_count=coordinator_count,
         ),
     )
-    coordinator.client = SimpleNamespace(async_set_subwoofer_enabled=AsyncMock())
+    coordinator.client = SimpleNamespace(
+        async_set_subwoofer_enabled=AsyncMock(return_value=applied_profile)
+    )
 
     await _async_set_subwoofer_enabled(coordinator, enabled)
 
@@ -374,3 +473,67 @@ async def test_source_volume_publishes_only_the_touched_source() -> None:
     for source, value in original_by_source.items():
         if source != "wifi":
             assert updated[source] == value
+
+
+async def test_switch_entity_keeps_optimistic_value_through_stale_refresh(
+    hass,
+) -> None:
+    """A top-level switch write should survive its immediate stale refresh."""
+    coordinator = _real_coordinator(hass)
+    coordinator.client = SimpleNamespace(
+        async_set_startup_tone_enabled=AsyncMock(),
+        async_refresh=AsyncMock(return_value=deepcopy(TEST_SNAPSHOT)),
+    )
+    _refresh_immediately(coordinator)
+    description = next(item for item in SWITCHES if item.key == "startup_tone")
+    entity = KefSwitch(coordinator, description)
+
+    await entity.async_turn_off()
+
+    assert entity.is_on is False
+    coordinator.client.async_set_startup_tone_enabled.assert_awaited_once_with(False)
+    assert coordinator._local_changes == {"startup_tone_enabled": False}
+
+
+async def test_eq_number_entity_keeps_normalized_value_through_stale_refresh(
+    hass,
+) -> None:
+    """A nested EQ write should preserve its representable value on refresh."""
+    coordinator = _real_coordinator(hass)
+    coordinator.client = SimpleNamespace(
+        async_set_treble_amount=AsyncMock(return_value={"trebleAmount": 1.5}),
+        async_refresh=AsyncMock(return_value=deepcopy(TEST_SNAPSHOT)),
+    )
+    _refresh_immediately(coordinator)
+    description = next(item for item in NUMBERS if item.key == "treble_amount")
+    entity = KefNumber(coordinator, description)
+
+    await entity.async_set_native_value(1.4)
+
+    assert entity.native_value == 1.5
+    assert coordinator.data.eq_profile is not None
+    assert coordinator._local_changes == {"eq_profile": coordinator.data.eq_profile}
+
+
+async def test_source_number_keeps_copied_map_through_stale_refresh(hass) -> None:
+    """A source-volume write should keep its copied map on immediate refresh."""
+    coordinator = _real_coordinator(hass)
+    coordinator.client = SimpleNamespace(
+        async_set_default_volume_for_source=AsyncMock(),
+        async_refresh=AsyncMock(return_value=deepcopy(TEST_SNAPSHOT)),
+    )
+    _refresh_immediately(coordinator)
+    original_by_source = dict(coordinator.data.default_volume_by_source)
+    entity = KefSourceVolumeNumber(
+        coordinator,
+        "wifi",
+        original_by_source["wifi"],
+    )
+
+    await entity.async_set_native_value(45)
+
+    assert entity.native_value == 45
+    assert coordinator.data.default_volume_by_source["wifi"] == 45
+    for source, value in original_by_source.items():
+        if source != "wifi":
+            assert coordinator.data.default_volume_by_source[source] == value

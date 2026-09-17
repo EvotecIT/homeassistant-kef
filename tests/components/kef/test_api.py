@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import builtins
 import copy
 from types import SimpleNamespace
@@ -1260,6 +1261,100 @@ async def test_modern_v1_eq_writes_translate_native_units(
     expected_dsp_info = copy.deepcopy(original_dsp_info)
     expected_dsp_info[wire_key] = expected_wire_value
     assert dsp_info == expected_dsp_info
+
+
+@pytest.mark.parametrize(
+    ("method", "requested", "wire_key", "expected_applied"),
+    [
+        ("async_set_treble_amount", 1.4, "trebleAmount", 1.5),
+        ("async_set_desk_mode_db", -3.6, "deskModeSetting", -3.5),
+        ("async_set_wall_mode_db", -3.6, "wallModeSetting", -3.5),
+        ("async_set_high_pass_frequency", 67.5, "highPassModeFreq", 70.0),
+        (
+            "async_set_sub_out_low_pass_frequency",
+            57.5,
+            "subOutLPFreq",
+            60.0,
+        ),
+    ],
+)
+async def test_modern_v1_eq_writes_return_representable_value(
+    monkeypatch,
+    hass,
+    method,
+    requested,
+    wire_key,
+    expected_applied,
+) -> None:
+    """EQ setters should return the physical value encoded on a v1 speaker."""
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile"]
+        return copy.deepcopy(EQ_PROFILE_VALUE)
+
+    async def fake_set_data(self, path, *, role, value):
+        return None
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+
+    applied = await getattr(client, method)(requested)
+
+    assert applied[wire_key] == expected_applied
+
+
+async def test_modern_eq_writes_are_serialized(monkeypatch, hass) -> None:
+    """Concurrent full-profile writes must preserve both requested changes."""
+    device_profile = copy.deepcopy(EQ_PROFILE_V2_VALUE)
+    first_read_started = asyncio.Event()
+    release_first_read = asyncio.Event()
+    read_count = 0
+
+    async def fake_get_optional_path_item(self, path, *, roles="value"):
+        assert path == PROBE_PATHS["eq_profile"]
+        return None
+
+    async def fake_get_path_item(self, path, *, roles="value"):
+        nonlocal read_count
+        assert path == PROBE_PATHS["eq_profile_v2"]
+        read_count += 1
+        snapshot = copy.deepcopy(device_profile)
+        if read_count == 1:
+            first_read_started.set()
+            await release_first_read.wait()
+        return snapshot
+
+    async def fake_set_data(self, path, *, role, value):
+        nonlocal device_profile
+        assert path == PROBE_PATHS["eq_profile_v2"]
+        device_profile = copy.deepcopy(value)
+
+    monkeypatch.setattr(
+        ModernKefClient,
+        "_get_optional_path_item",
+        fake_get_optional_path_item,
+    )
+    monkeypatch.setattr(ModernKefClient, "_get_path_item", fake_get_path_item)
+    monkeypatch.setattr(ModernKefClient, "_set_data", fake_set_data)
+
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    desk_task = asyncio.create_task(client.async_set_desk_mode_enabled(True))
+    await first_read_started.wait()
+    wall_task = asyncio.create_task(client.async_set_wall_mode_enabled(True))
+    await asyncio.sleep(0)
+    release_first_read.set()
+    await asyncio.gather(desk_task, wall_task)
+
+    written = device_profile["kefEqProfileV2"]
+    assert written["deskMode"] is True
+    assert written["wallMode"] is True
+    assert read_count == 2
 
 
 async def test_modern_v1_eq_write_preserves_noncanonical_unrelated_fields(
