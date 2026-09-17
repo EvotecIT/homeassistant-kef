@@ -147,7 +147,7 @@ _SETTERS = [
         "standby_20mins",
     ),
     (_async_set_wake_source, "async_set_wake_source", "wake_source", "tv"),
-    (_async_set_master_channel, "async_set_master_channel", "master_channel", "right"),
+    (_async_set_master_channel, "async_set_master_channel", "master_channel", "left"),
     (_async_set_cable_mode, "async_set_cable_mode", "cable_mode", "wireless"),
     (
         _async_set_bass_extension,
@@ -174,12 +174,12 @@ _SETTERS = [
         "nextSource",
     ),
     (_async_set_eq_button_1, "async_set_eq_button_action", "eq_button_1", "music"),
-    (_async_set_eq_button_2, "async_set_eq_button_action", "eq_button_2", "night"),
+    (_async_set_eq_button_2, "async_set_eq_button_action", "eq_button_2", "movie"),
     (
         _async_set_startup_tone,
         "async_set_startup_tone_enabled",
         "startup_tone_enabled",
-        True,
+        False,
     ),
     (
         _async_set_auto_switch_hdmi,
@@ -238,12 +238,6 @@ _SETTERS = [
         True,
     ),
     (_async_set_kw1_wake, "async_set_kw1_wake_enabled", "kw1_wake_enabled", True),
-    (
-        _async_set_subwoofer_enabled,
-        "async_set_subwoofer_enabled",
-        "eq_profile.subwoofer_out",
-        False,
-    ),
     (_async_set_kw1_adapter, "async_set_kw1_enabled", "eq_profile.is_kw1", True),
     (_async_set_remote_ir, "async_set_remote_ir_enabled", "remote_ir_enabled", False),
     (_async_set_analytics, "async_set_analytics_enabled", "analytics_enabled", False),
@@ -324,6 +318,44 @@ async def test_setter_publishes_optimistic_state(
     await setter(coordinator, value)
 
     assert _get_field(coordinator.data, field_path) == value
+    assert getattr(coordinator.client, client_method).await_count == 1
+    assert coordinator.async_apply_local_change.call_count == 1
+
+
+@pytest.mark.parametrize(
+    ("enabled", "initial_count", "expected_count"),
+    [
+        (True, 0, 1),
+        (True, 2, 2),
+        (False, 2, 0),
+    ],
+)
+async def test_subwoofer_enabled_publishes_consistent_count(
+    enabled: bool,
+    initial_count: int,
+    expected_count: int,
+) -> None:
+    """Subwoofer output and count should match the complete client write."""
+    coordinator = _coordinator_with_local_updates()
+    assert coordinator.data.eq_profile is not None
+    coordinator.data = replace(
+        coordinator.data,
+        eq_profile=replace(
+            coordinator.data.eq_profile,
+            subwoofer_out=not enabled,
+            subwoofer_count=initial_count,
+        ),
+    )
+    coordinator.client = SimpleNamespace(async_set_subwoofer_enabled=AsyncMock())
+
+    await _async_set_subwoofer_enabled(coordinator, enabled)
+
+    profile = coordinator.data.eq_profile
+    assert profile is not None
+    assert profile.subwoofer_out is enabled
+    assert profile.subwoofer_count == expected_count
+    coordinator.client.async_set_subwoofer_enabled.assert_awaited_once_with(enabled)
+    assert coordinator.async_apply_local_change.call_count == 1
 
 
 async def test_source_volume_publishes_only_the_touched_source() -> None:

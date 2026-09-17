@@ -182,7 +182,19 @@ async def _async_set_subwoofer_enabled(
     if client is None:
         return
     await client.async_set_subwoofer_enabled(enabled)
-    apply_eq_profile_change(coordinator, subwoofer_out=enabled)
+    eq_profile = coordinator.data.eq_profile
+    if eq_profile is None:
+        return
+    subwoofer_count = eq_profile.subwoofer_count
+    if not enabled:
+        subwoofer_count = 0
+    elif subwoofer_count is None or subwoofer_count < 1:
+        subwoofer_count = 1
+    apply_eq_profile_change(
+        coordinator,
+        subwoofer_out=enabled,
+        subwoofer_count=subwoofer_count,
+    )
 
 
 async def _async_set_kw1_adapter(
