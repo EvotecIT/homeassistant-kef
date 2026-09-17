@@ -26,6 +26,7 @@ async def _async_set_default_volume_global(
     if client is None:
         return
     await client.async_set_default_volume_global(round(value))
+    coordinator.async_apply_local_change(default_volume_global=round(value))
 
 
 async def _async_set_maximum_volume(
@@ -37,6 +38,7 @@ async def _async_set_maximum_volume(
     if client is None:
         return
     await client.async_set_maximum_volume(round(value))
+    coordinator.async_apply_local_change(maximum_volume=round(value))
 
 
 async def _async_set_volume_step(
@@ -48,6 +50,7 @@ async def _async_set_volume_step(
     if client is None:
         return
     await client.async_set_volume_step(round(value))
+    coordinator.async_apply_local_change(volume_step=round(value))
 
 
 async def _async_set_fixed_volume_level(
@@ -59,6 +62,7 @@ async def _async_set_fixed_volume_level(
     if client is None:
         return
     await client.async_set_fixed_volume_level(round(value))
+    coordinator.async_apply_local_change(fixed_volume_level=round(value))
 
 
 async def _async_set_balance(
@@ -70,6 +74,7 @@ async def _async_set_balance(
     if client is None:
         return
     await client.async_set_balance(round(value))
+    apply_eq_profile_change(coordinator, balance=round(value))
 
 
 async def _async_set_treble_amount(
@@ -80,7 +85,11 @@ async def _async_set_treble_amount(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_treble_amount(value)
+    applied = await client.async_set_treble_amount(value)
+    apply_eq_profile_change(
+        coordinator,
+        treble_amount=float(applied["trebleAmount"]),
+    )
 
 
 async def _async_set_subwoofer_gain(
@@ -105,9 +114,11 @@ async def _async_set_high_pass_frequency(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_high_pass_frequency(value)
+    applied = await client.async_set_high_pass_frequency(value)
     apply_eq_profile_change(
-        coordinator, high_pass_frequency=value, subwoofer_preset="custom"
+        coordinator,
+        high_pass_frequency=float(applied["highPassModeFreq"]),
+        subwoofer_preset=str(applied.get("subwooferPreset") or "custom"),
     )
 
 
@@ -119,9 +130,11 @@ async def _async_set_sub_out_low_pass_frequency(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_sub_out_low_pass_frequency(value)
+    applied = await client.async_set_sub_out_low_pass_frequency(value)
     apply_eq_profile_change(
-        coordinator, sub_out_low_pass_frequency=value, subwoofer_preset="custom"
+        coordinator,
+        sub_out_low_pass_frequency=float(applied["subOutLPFreq"]),
+        subwoofer_preset=str(applied.get("subwooferPreset") or "custom"),
     )
 
 
@@ -133,7 +146,11 @@ async def _async_set_desk_mode_db(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_desk_mode_db(value)
+    applied = await client.async_set_desk_mode_db(value)
+    apply_eq_profile_change(
+        coordinator,
+        desk_mode_setting=float(applied["deskModeSetting"]),
+    )
 
 
 async def _async_set_wall_mode_db(
@@ -144,7 +161,28 @@ async def _async_set_wall_mode_db(
     client = coordinator.client
     if client is None:
         return
-    await client.async_set_wall_mode_db(value)
+    applied = await client.async_set_wall_mode_db(value)
+    apply_eq_profile_change(
+        coordinator,
+        wall_mode_setting=float(applied["wallModeSetting"]),
+    )
+
+
+async def _async_set_source_volume(
+    coordinator: KefCoordinator,
+    source: str,
+    value: float,
+) -> None:
+    """Set the startup volume for a single source."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_default_volume_for_source(source, round(value))
+    updated_by_source = {
+        **coordinator.data.default_volume_by_source,
+        source: round(value),
+    }
+    coordinator.async_apply_local_change(default_volume_by_source=updated_by_source)
 
 
 def _friendly_source_name(source: str) -> str:
@@ -421,12 +459,7 @@ class KefSourceVolumeNumber(KefEntity, CoordinatorEntity[KefCoordinator], Number
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the source-specific startup volume."""
-        client = self.coordinator.client
-        if client is None:
-            return
         await self.async_call_kef(
-            lambda: client.async_set_default_volume_for_source(
-                self._source, round(value)
-            )
+            lambda: _async_set_source_volume(self.coordinator, self._source, value)
         )
         await self.coordinator.async_request_refresh()

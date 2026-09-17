@@ -41,6 +41,7 @@ async def _async_set_standby_mode(
     if client is None:
         return
     await client.async_set_standby_mode(value)
+    coordinator.async_apply_local_change(standby_mode=value)
 
 
 async def _async_set_wake_source(
@@ -52,6 +53,7 @@ async def _async_set_wake_source(
     if client is None:
         return
     await client.async_set_wake_source(value)
+    coordinator.async_apply_local_change(wake_source=value)
 
 
 async def _async_set_master_channel(
@@ -63,6 +65,7 @@ async def _async_set_master_channel(
     if client is None:
         return
     await client.async_set_master_channel(value)
+    coordinator.async_apply_local_change(master_channel=value)
 
 
 async def _async_set_cable_mode(
@@ -74,6 +77,7 @@ async def _async_set_cable_mode(
     if client is None:
         return
     await client.async_set_cable_mode(value)
+    coordinator.async_apply_local_change(cable_mode=value)
 
 
 async def _async_set_bass_extension(
@@ -85,6 +89,7 @@ async def _async_set_bass_extension(
     if client is None:
         return
     await client.async_set_bass_extension(value)
+    apply_eq_profile_change(coordinator, bass_extension=value)
 
 
 async def _async_set_remote_ir_code(
@@ -96,6 +101,7 @@ async def _async_set_remote_ir_code(
     if client is None:
         return
     await client.async_set_remote_ir_code(value)
+    coordinator.async_apply_local_change(remote_ir_code=value)
 
 
 async def _async_set_streaming_quality(
@@ -107,6 +113,7 @@ async def _async_set_streaming_quality(
     if client is None:
         return
     await client.async_set_streaming_quality(value)
+    coordinator.async_apply_local_change(streaming_quality=value)
 
 
 async def _async_set_favourite_button(
@@ -118,6 +125,7 @@ async def _async_set_favourite_button(
     if client is None:
         return
     await client.async_set_favourite_button_action(value)
+    coordinator.async_apply_local_change(favourite_button=value)
 
 
 async def _async_set_eq_button_1(
@@ -129,6 +137,7 @@ async def _async_set_eq_button_1(
     if client is None:
         return
     await client.async_set_eq_button_action(1, value)
+    coordinator.async_apply_local_change(eq_button_1=value)
 
 
 async def _async_set_eq_button_2(
@@ -140,6 +149,7 @@ async def _async_set_eq_button_2(
     if client is None:
         return
     await client.async_set_eq_button_action(2, value)
+    coordinator.async_apply_local_change(eq_button_2=value)
 
 
 async def _async_set_subwoofer_polarity(

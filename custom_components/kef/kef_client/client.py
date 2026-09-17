@@ -255,20 +255,22 @@ class BaseKefClient(ABC):
         """Set the EQ bass extension."""
 
     @abstractmethod
-    async def async_set_treble_amount(self, value: float) -> None:
-        """Set the EQ treble amount in dB (-3.0 to +3.0, 0.25 dB steps)."""
+    async def async_set_treble_amount(self, value: float) -> dict[str, Any]:
+        """Set EQ treble and return the applied native profile."""
 
     @abstractmethod
     async def async_set_subwoofer_gain(self, value: int) -> None:
         """Set the EQ subwoofer gain in dB (-10 to +10)."""
 
     @abstractmethod
-    async def async_set_sub_out_low_pass_frequency(self, value: float) -> None:
-        """Set the subwoofer output low-pass crossover frequency in Hz (40.0-250.0)."""
+    async def async_set_sub_out_low_pass_frequency(
+        self, value: float
+    ) -> dict[str, Any]:
+        """Set subwoofer low-pass frequency and return the applied native profile."""
 
     @abstractmethod
-    async def async_set_subwoofer_enabled(self, enabled: bool) -> None:
-        """Enable or disable subwoofer output."""
+    async def async_set_subwoofer_enabled(self, enabled: bool) -> dict[str, Any]:
+        """Set subwoofer output state and return the applied native profile."""
 
     @abstractmethod
     async def async_set_kw1_enabled(self, enabled: bool) -> None:
@@ -323,16 +325,16 @@ class BaseKefClient(ABC):
         """Enable or disable desk mode."""
 
     @abstractmethod
-    async def async_set_desk_mode_db(self, value: float) -> None:
-        """Set the desk mode attenuation in dB (-10.0 to 0.0)."""
+    async def async_set_desk_mode_db(self, value: float) -> dict[str, Any]:
+        """Set desk attenuation and return the applied native profile."""
 
     @abstractmethod
     async def async_set_wall_mode_enabled(self, enabled: bool) -> None:
         """Enable or disable wall mode."""
 
     @abstractmethod
-    async def async_set_wall_mode_db(self, value: float) -> None:
-        """Set the wall mode attenuation in dB (-10.0 to 0.0)."""
+    async def async_set_wall_mode_db(self, value: float) -> dict[str, Any]:
+        """Set wall attenuation and return the applied native profile."""
 
     @abstractmethod
     async def async_set_phase_correction_enabled(self, enabled: bool) -> None:
@@ -343,8 +345,8 @@ class BaseKefClient(ABC):
         """Enable or disable high-pass mode."""
 
     @abstractmethod
-    async def async_set_high_pass_frequency(self, value: float) -> None:
-        """Set the high-pass filter frequency in Hz (50.0-120.0)."""
+    async def async_set_high_pass_frequency(self, value: float) -> dict[str, Any]:
+        """Set high-pass frequency and return the applied native profile."""
 
     @abstractmethod
     async def async_set_master_channel(self, channel: str) -> None:
@@ -456,6 +458,7 @@ class ModernKefClient(BaseKefClient):
         self._last_active_source: str | None = None
         self._event_queue_id: str | None = None
         self._auth_mode: str | None = None
+        self._eq_profile_lock = asyncio.Lock()
 
     async def async_identify(self) -> KefDeviceInfo:
         """Probe the modern HTTP API."""
@@ -1144,9 +1147,9 @@ class ModernKefClient(BaseKefClient):
             lambda dsp: dsp.__setitem__("bassExtension", value)
         )
 
-    async def async_set_treble_amount(self, value: float) -> None:
+    async def async_set_treble_amount(self, value: float) -> dict[str, Any]:
         """Set the EQ treble amount."""
-        await self._update_eq_profile(
+        return await self._update_eq_profile(
             lambda dsp: dsp.__setitem__("trebleAmount", max(-3.0, min(3.0, value)))
         )
 
@@ -1163,20 +1166,22 @@ class ModernKefClient(BaseKefClient):
             )
         )
 
-    async def async_set_sub_out_low_pass_frequency(self, value: float) -> None:
+    async def async_set_sub_out_low_pass_frequency(
+        self, value: float
+    ) -> dict[str, Any]:
         """Set the subwoofer output low-pass crossover frequency.
 
         Manually tuning this deviates from whatever preset is currently
         labeled, so the preset reverts to "custom" to reflect that the
         values are no longer a known preset's values.
         """
-        await self._update_eq_profile(
+        return await self._update_eq_profile(
             lambda dsp: _set_subwoofer_tuning_field(
                 dsp, "subOutLPFreq", max(40.0, min(250.0, value))
             )
         )
 
-    async def async_set_subwoofer_enabled(self, enabled: bool) -> None:
+    async def async_set_subwoofer_enabled(self, enabled: bool) -> dict[str, Any]:
         """Enable or disable subwoofer output."""
 
         def _mutate(dsp: dict[str, Any]) -> None:
@@ -1188,7 +1193,7 @@ class ModernKefClient(BaseKefClient):
             elif not isinstance(current_count, int) or current_count < 1:
                 dsp["subwooferCount"] = 1
 
-        await self._update_eq_profile(_mutate)
+        return await self._update_eq_profile(_mutate)
 
     async def async_set_kw1_enabled(self, enabled: bool) -> None:
         """Enable or disable the KW1 wireless subwoofer adapter."""
@@ -1289,9 +1294,9 @@ class ModernKefClient(BaseKefClient):
             lambda dsp: dsp.__setitem__("deskMode", enabled)
         )
 
-    async def async_set_desk_mode_db(self, value: float) -> None:
+    async def async_set_desk_mode_db(self, value: float) -> dict[str, Any]:
         """Set the desk mode attenuation."""
-        await self._update_eq_profile(
+        return await self._update_eq_profile(
             lambda dsp: dsp.__setitem__(
                 "deskModeSetting", max(-10.0, min(0.0, value))
             )
@@ -1303,9 +1308,9 @@ class ModernKefClient(BaseKefClient):
             lambda dsp: dsp.__setitem__("wallMode", enabled)
         )
 
-    async def async_set_wall_mode_db(self, value: float) -> None:
+    async def async_set_wall_mode_db(self, value: float) -> dict[str, Any]:
         """Set the wall mode attenuation."""
-        await self._update_eq_profile(
+        return await self._update_eq_profile(
             lambda dsp: dsp.__setitem__(
                 "wallModeSetting", max(-10.0, min(0.0, value))
             )
@@ -1323,14 +1328,14 @@ class ModernKefClient(BaseKefClient):
             lambda dsp: dsp.__setitem__("highPassMode", enabled)
         )
 
-    async def async_set_high_pass_frequency(self, value: float) -> None:
+    async def async_set_high_pass_frequency(self, value: float) -> dict[str, Any]:
         """Set the high-pass filter frequency.
 
         Manually tuning this deviates from whatever preset is currently
         labeled, so the preset reverts to "custom" to reflect that the
         values are no longer a known preset's values.
         """
-        await self._update_eq_profile(
+        return await self._update_eq_profile(
             lambda dsp: _set_subwoofer_tuning_field(
                 dsp, "highPassModeFreq", max(50.0, min(120.0, value))
             )
@@ -1632,6 +1637,11 @@ class ModernKefClient(BaseKefClient):
         return payload[0]
 
     async def _update_eq_profile(self, mutator) -> dict[str, Any]:
+        """Serialize a complete EQ profile read-modify-write transaction."""
+        async with self._eq_profile_lock:
+            return await self._update_eq_profile_unlocked(mutator)
+
+    async def _update_eq_profile_unlocked(self, mutator) -> dict[str, Any]:
         """Fetch, mutate, and write back the typed EQ profile wrapper."""
         payload = await self._get_optional_path_item(
             PROBE_PATHS["eq_profile"],
@@ -2603,7 +2613,7 @@ class LegacyBinaryClient(BaseKefClient):
             "Bass extension is not supported for legacy KEF"
         )
 
-    async def async_set_treble_amount(self, value: float) -> None:
+    async def async_set_treble_amount(self, value: float) -> dict[str, Any]:
         """Legacy speakers do not expose treble configuration."""
         raise KefUnsupportedDeviceError(
             "Treble amount is not supported for legacy KEF"
@@ -2615,13 +2625,15 @@ class LegacyBinaryClient(BaseKefClient):
             "Subwoofer gain is not supported for legacy KEF"
         )
 
-    async def async_set_sub_out_low_pass_frequency(self, value: float) -> None:
+    async def async_set_sub_out_low_pass_frequency(
+        self, value: float
+    ) -> dict[str, Any]:
         """Legacy speakers do not expose subwoofer low-pass configuration."""
         raise KefUnsupportedDeviceError(
             "Subwoofer low-pass frequency is not supported for legacy KEF"
         )
 
-    async def async_set_subwoofer_enabled(self, enabled: bool) -> None:
+    async def async_set_subwoofer_enabled(self, enabled: bool) -> dict[str, Any]:
         """Legacy speakers do not expose subwoofer output configuration."""
         raise KefUnsupportedDeviceError(
             "Subwoofer output is not supported for legacy KEF"
@@ -2683,7 +2695,7 @@ class LegacyBinaryClient(BaseKefClient):
         """Legacy speakers do not expose desk-mode configuration."""
         raise KefUnsupportedDeviceError("Desk mode is not supported for legacy KEF")
 
-    async def async_set_desk_mode_db(self, value: float) -> None:
+    async def async_set_desk_mode_db(self, value: float) -> dict[str, Any]:
         """Legacy speakers do not expose desk-mode configuration."""
         raise KefUnsupportedDeviceError("Desk mode is not supported for legacy KEF")
 
@@ -2691,7 +2703,7 @@ class LegacyBinaryClient(BaseKefClient):
         """Legacy speakers do not expose wall-mode configuration."""
         raise KefUnsupportedDeviceError("Wall mode is not supported for legacy KEF")
 
-    async def async_set_wall_mode_db(self, value: float) -> None:
+    async def async_set_wall_mode_db(self, value: float) -> dict[str, Any]:
         """Legacy speakers do not expose wall-mode configuration."""
         raise KefUnsupportedDeviceError("Wall mode is not supported for legacy KEF")
 
@@ -2707,7 +2719,7 @@ class LegacyBinaryClient(BaseKefClient):
             "High-pass mode is not supported for legacy KEF"
         )
 
-    async def async_set_high_pass_frequency(self, value: float) -> None:
+    async def async_set_high_pass_frequency(self, value: float) -> dict[str, Any]:
         """Legacy speakers do not expose high-pass-frequency configuration."""
         raise KefUnsupportedDeviceError(
             "High-pass frequency is not supported for legacy KEF"
