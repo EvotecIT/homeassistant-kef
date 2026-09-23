@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import logging
+import socket
 from typing import Any
 
 import voluptuous as vol
@@ -64,6 +66,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         self._entry_data: dict[str, Any] = {}
         self._entry_title = "KEF"
         self._discovery_id: str | None = None
+        self._discovery_ipv4_host: str | None = None
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """Handle manual setup."""
@@ -73,6 +76,11 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             self._host = user_input[CONF_HOST]
             self._password = user_input.get(CONF_PASSWORD, "")
             if await self._async_validate_host():
+                if (
+                    self._entry_data[CONF_BACKEND] == KefBackend.LEGACY.value
+                    and await self._async_legacy_host_configured()
+                ):
+                    return self.async_abort(reason="already_configured")
                 return self.async_create_entry(
                     title=self._entry_title,
                     data=self._entry_data,
@@ -184,6 +192,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         self._title = discovery_info.name.removesuffix(f".{discovery_info.type}")
 
         legacy_host = self._legacy_ipv4_host(discovery_info)
+        self._discovery_ipv4_host = legacy_host
         if discovery_unique_id:
             entries = self.hass.config_entries.async_entries(DOMAIN)
             existing = next(
@@ -195,14 +204,18 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 None,
             )
             if existing is None and legacy_host is not None:
-                # Older legacy entries only had an address-derived ID. Link
-                # one while its saved address is still advertised, so later
-                # address changes can use the persisted AirPlay identifier.
+                # Link an old legacy entry only before it has an AirPlay ID.
+                # An address may later be assigned to another speaker.
+                advertised_hosts = {
+                    host.rstrip(".").casefold()
+                    for host in (*discovery_info.ip_addresses, legacy_host, self._host)
+                }
                 matches = [
                     entry for entry in entries
                     if entry.data.get(CONF_BACKEND) == KefBackend.LEGACY.value
-                    and entry.data.get(CONF_HOST)
-                    in (*discovery_info.ip_addresses, legacy_host)
+                    and not entry.data.get(CONF_DISCOVERY_ID)
+                    and str(entry.data.get(CONF_HOST, "")).rstrip(".").casefold()
+                    in advertised_hosts
                 ]
                 if len(matches) == 1:
                     existing = matches[0]
@@ -292,6 +305,40 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 continue
         return None
 
+    @staticmethod
+    async def _async_ipv4_addresses(host: str) -> set[str]:
+        """Resolve the addresses an IPv4-only legacy socket can reach."""
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            try:
+                results = await asyncio.get_running_loop().getaddrinfo(
+                    host, None, family=socket.AF_INET
+                )
+            except OSError:
+                return set()
+            return {result[4][0] for result in results}
+        return {str(address)} if isinstance(address, ipaddress.IPv4Address) else set()
+
+    async def _async_legacy_host_configured(self) -> bool:
+        """Check a manually added legacy host against configured IPv4 aliases."""
+        entries = [
+            entry
+            for entry in self.hass.config_entries.async_entries(DOMAIN)
+            if entry.data.get(CONF_BACKEND) == KefBackend.LEGACY.value
+        ]
+        host = self._host.rstrip(".").casefold()
+        addresses: set[str] | None = None
+        for entry in entries:
+            saved_host = str(entry.data.get(CONF_HOST, "")).rstrip(".").casefold()
+            if host == saved_host:
+                return True
+            if addresses is None:
+                addresses = await self._async_ipv4_addresses(self._host)
+            if addresses and addresses & await self._async_ipv4_addresses(saved_host):
+                return True
+        return False
+
     async def async_step_confirm(self, user_input: dict[str, Any] | None = None):
         """Confirm a discovered speaker."""
         self._errors = {}
@@ -330,12 +377,31 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         except KefAuthenticationRequiredError:
             self._errors["base"] = "invalid_auth"
             return None
-        except KefUnsupportedDeviceError:
-            self._errors["base"] = "unsupported"
-            return None
-        except KefError:
-            self._errors["base"] = "cannot_connect"
-            return None
+        except KefError as err:
+            if self.source == SOURCE_ZEROCONF and self._discovery_ipv4_host:
+                try:
+                    client = await async_create_client(
+                        self._discovery_ipv4_host,
+                        session,
+                        backend=KefBackend.LEGACY,
+                        password=self._password,
+                    )
+                    device = await client.async_identify()
+                except KefError as legacy_err:
+                    self._errors["base"] = (
+                        "unsupported"
+                        if isinstance(legacy_err, KefUnsupportedDeviceError)
+                        else "cannot_connect"
+                    )
+                    return None
+                self._host = self._discovery_ipv4_host
+            else:
+                self._errors["base"] = (
+                    "unsupported"
+                    if isinstance(err, KefUnsupportedDeviceError)
+                    else "cannot_connect"
+                )
+                return None
 
         entry_unique_id = device.unique_id
         stored_device_id = device.unique_id
