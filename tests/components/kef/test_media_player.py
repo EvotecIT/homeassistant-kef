@@ -34,6 +34,14 @@ def _build_player(snapshot):
     return KefMediaPlayer(coordinator)
 
 
+def test_device_configuration_url_brackets_ipv6_address() -> None:
+    """The Home Assistant device link must be usable for IPv6 speakers."""
+    device = replace(TEST_SNAPSHOT.device, host="fd42:241::228", port=8080)
+    player = _build_player(replace(TEST_SNAPSHOT, device=device))
+
+    assert player.device_info["configuration_url"] == "http://[fd42:241::228]:8080"
+
+
 def test_media_position_uses_stable_device_refresh_timestamp() -> None:
     """The interpolation timestamp must not drift between state serializations."""
     snapshot = deepcopy(TEST_SNAPSHOT)

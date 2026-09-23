@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
+import ipaddress
 import logging
+import socket
 from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
     SOURCE_RECONFIGURE,
+    SOURCE_ZEROCONF,
     ConfigFlow,
     OptionsFlow,
 )
@@ -21,6 +25,7 @@ from .const import (
     AIRPLAY_ZEROCONF_TYPE,
     CONF_BACKEND,
     CONF_DEVICE_ID,
+    CONF_DISCOVERY_ID,
     CONF_ENABLE_DIAGNOSTICS,
     CONF_SCAN_INTERVAL,
     CONF_TCP_PORT,
@@ -37,6 +42,7 @@ from .exceptions import (
     KefError,
     KefUnsupportedDeviceError,
 )
+from .models import KefBackend
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,6 +65,8 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         self._errors: dict[str, str] = {}
         self._entry_data: dict[str, Any] = {}
         self._entry_title = "KEF"
+        self._discovery_id: str | None = None
+        self._discovery_ipv4_host: str | None = None
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """Handle manual setup."""
@@ -68,6 +76,11 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             self._host = user_input[CONF_HOST]
             self._password = user_input.get(CONF_PASSWORD, "")
             if await self._async_validate_host():
+                if (
+                    self._entry_data[CONF_BACKEND] == KefBackend.LEGACY.value
+                    and await self._async_legacy_host_configured()
+                ):
+                    return self.async_abort(reason="already_configured")
                 return self.async_create_entry(
                     title=self._entry_title,
                     data=self._entry_data,
@@ -168,16 +181,57 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         manufacturer = str(discovery_info.properties.get("manufacturer", ""))
         model = str(discovery_info.properties.get("model", ""))
         discovery_unique_id = self._discovery_unique_id(discovery_info)
+        self._discovery_id = discovery_unique_id
 
         if "KEF" not in manufacturer and "LS" not in model:
             return self.async_abort(reason="unsupported")
 
-        self._host = discovery_info.host
+        # Keep the advertised name so Home Assistant's mDNS resolver can try
+        # both address families and follow address changes after setup.
+        self._host = discovery_info.hostname.rstrip(".") or discovery_info.host
         self._title = discovery_info.name.removesuffix(f".{discovery_info.type}")
 
+        legacy_host = self._legacy_ipv4_host(discovery_info)
+        self._discovery_ipv4_host = legacy_host
         if discovery_unique_id:
+            entries = self.hass.config_entries.async_entries(DOMAIN)
+            existing = next(
+                (
+                    entry for entry in entries
+                    if entry.unique_id == discovery_unique_id
+                    or entry.data.get(CONF_DISCOVERY_ID) == discovery_unique_id
+                ),
+                None,
+            )
+            if existing is None and legacy_host is not None:
+                # Link an old legacy entry only before it has an AirPlay ID.
+                # An address may later be assigned to another speaker.
+                advertised_hosts = {
+                    host.rstrip(".").casefold()
+                    for host in (*discovery_info.ip_addresses, legacy_host, self._host)
+                }
+                matches = [
+                    entry for entry in entries
+                    if entry.data.get(CONF_BACKEND) == KefBackend.LEGACY.value
+                    and not entry.data.get(CONF_DISCOVERY_ID)
+                    and str(entry.data.get(CONF_HOST, "")).rstrip(".").casefold()
+                    in advertised_hosts
+                ]
+                if len(matches) == 1:
+                    existing = matches[0]
+            if existing is not None:
+                updates = {CONF_HOST: self._host}
+                if existing.data.get(CONF_BACKEND) == KefBackend.LEGACY.value:
+                    if legacy_host is None:
+                        await self.async_set_unique_id(existing.unique_id)
+                        self._abort_if_unique_id_configured()
+                    updates = {
+                        CONF_HOST: legacy_host,
+                        CONF_DISCOVERY_ID: discovery_unique_id,
+                    }
+                await self.async_set_unique_id(existing.unique_id)
+                self._abort_if_unique_id_configured(updates=updates)
             await self.async_set_unique_id(discovery_unique_id)
-            self._abort_if_unique_id_configured(updates={CONF_HOST: self._host})
 
         # AirPlay TXT records don't reliably carry a per-device name, so resolve
         # the speaker's real name via its local API for a usable discovery card.
@@ -189,13 +243,37 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 password=self._password,
             )
             device = await client.async_identify()
-        except KefError as err:
+        except KefAuthenticationRequiredError as err:
             _LOGGER.debug(
                 "Could not resolve speaker identity for %s: %s",
                 self._host,
                 err,
             )
-        else:
+            device = None
+        except KefError as err:
+            _LOGGER.debug("Could not probe %s: %s", self._host, err)
+            device = None
+            if legacy_host is not None:
+                try:
+                    client = await async_create_client(
+                        legacy_host,
+                        session,
+                        backend=KefBackend.LEGACY,
+                        password=self._password,
+                    )
+                    device = await client.async_identify()
+                except KefError as legacy_err:
+                    _LOGGER.debug(
+                        "Could not probe legacy KEF at %s: %s",
+                        legacy_host,
+                        legacy_err,
+                    )
+
+        if device is not None:
+            if device.backend is KefBackend.LEGACY:
+                if legacy_host is None:
+                    return self.async_abort(reason="unsupported")
+                self._host = legacy_host
             resolved_name = device.device_name.strip()
             resolved_model = device.model.strip()
             if resolved_name.casefold() != "kef":
@@ -215,6 +293,51 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
 
         serial = str(discovery_info.properties.get("serialNumber", "")).strip()
         return serial or None
+
+    @staticmethod
+    def _legacy_ipv4_host(discovery_info: ZeroconfServiceInfo) -> str | None:
+        """Pick an IPv4 address for the legacy client's IPv4-only socket."""
+        for host in (*discovery_info.ip_addresses, discovery_info.host):
+            try:
+                if isinstance(ipaddress.ip_address(host), ipaddress.IPv4Address):
+                    return host
+            except ValueError:
+                continue
+        return None
+
+    @staticmethod
+    async def _async_ipv4_addresses(host: str) -> set[str]:
+        """Resolve the addresses an IPv4-only legacy socket can reach."""
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            try:
+                results = await asyncio.get_running_loop().getaddrinfo(
+                    host, None, family=socket.AF_INET
+                )
+            except OSError:
+                return set()
+            return {result[4][0] for result in results}
+        return {str(address)} if isinstance(address, ipaddress.IPv4Address) else set()
+
+    async def _async_legacy_host_configured(self) -> bool:
+        """Check a manually added legacy host against configured IPv4 aliases."""
+        entries = [
+            entry
+            for entry in self.hass.config_entries.async_entries(DOMAIN)
+            if entry.data.get(CONF_BACKEND) == KefBackend.LEGACY.value
+        ]
+        host = self._host.rstrip(".").casefold()
+        addresses: set[str] | None = None
+        for entry in entries:
+            saved_host = str(entry.data.get(CONF_HOST, "")).rstrip(".").casefold()
+            if host == saved_host:
+                return True
+            if addresses is None:
+                addresses = await self._async_ipv4_addresses(self._host)
+            if addresses and addresses & await self._async_ipv4_addresses(saved_host):
+                return True
+        return False
 
     async def async_step_confirm(self, user_input: dict[str, Any] | None = None):
         """Confirm a discovered speaker."""
@@ -254,14 +377,45 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         except KefAuthenticationRequiredError:
             self._errors["base"] = "invalid_auth"
             return None
-        except KefUnsupportedDeviceError:
-            self._errors["base"] = "unsupported"
-            return None
-        except KefError:
-            self._errors["base"] = "cannot_connect"
-            return None
+        except KefError as err:
+            if self.source == SOURCE_ZEROCONF and self._discovery_ipv4_host:
+                try:
+                    client = await async_create_client(
+                        self._discovery_ipv4_host,
+                        session,
+                        backend=KefBackend.LEGACY,
+                        password=self._password,
+                    )
+                    device = await client.async_identify()
+                except KefError as legacy_err:
+                    self._errors["base"] = (
+                        "unsupported"
+                        if isinstance(legacy_err, KefUnsupportedDeviceError)
+                        else "cannot_connect"
+                    )
+                    return None
+                self._host = self._discovery_ipv4_host
+            else:
+                self._errors["base"] = (
+                    "unsupported"
+                    if isinstance(err, KefUnsupportedDeviceError)
+                    else "cannot_connect"
+                )
+                return None
 
-        await self.async_set_unique_id(device.unique_id)
+        entry_unique_id = device.unique_id
+        stored_device_id = device.unique_id
+        if device.backend is KefBackend.LEGACY:
+            if self.source == SOURCE_ZEROCONF and self._discovery_id:
+                entry_unique_id = self._discovery_id
+                stored_device_id = entry_unique_id
+            elif self.source == SOURCE_RECONFIGURE:
+                entry = self._get_reconfigure_entry()
+                if entry.data.get(CONF_BACKEND) == KefBackend.LEGACY.value:
+                    entry_unique_id = entry.unique_id or device.unique_id
+                    stored_device_id = entry.data.get(CONF_DEVICE_ID, entry_unique_id)
+
+        await self.async_set_unique_id(entry_unique_id)
         if self.source in {SOURCE_REAUTH, SOURCE_RECONFIGURE}:
             self._abort_if_unique_id_mismatch()
         else:
@@ -272,9 +426,11 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_PORT: device.port or DEFAULT_PORT,
             CONF_TCP_PORT: DEFAULT_LEGACY_PORT,
             CONF_BACKEND: device.backend.value,
-            CONF_DEVICE_ID: device.unique_id,
+            CONF_DEVICE_ID: stored_device_id,
             CONF_PASSWORD: self._password,
         }
+        if device.backend is KefBackend.LEGACY and self._discovery_id:
+            self._entry_data[CONF_DISCOVERY_ID] = self._discovery_id
         self._entry_title = device.device_name
         return True
 

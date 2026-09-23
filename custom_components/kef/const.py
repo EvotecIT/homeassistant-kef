@@ -20,6 +20,7 @@ MAX_SCAN_INTERVAL_SECONDS = 120
 
 CONF_BACKEND = "backend"
 CONF_DEVICE_ID = "device_id"
+CONF_DISCOVERY_ID = "discovery_id"
 CONF_ENABLE_DIAGNOSTICS = "enable_diagnostics"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_TCP_PORT = "tcp_port"

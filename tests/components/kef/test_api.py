@@ -95,6 +95,32 @@ from tests.conftest import (
 
 
 @pytest.mark.parametrize(
+    ("host", "port", "expected", "authority"),
+    [
+        ("lsxii.local", 80, "http://lsxii.local/api/getData", "lsxii.local:80"),
+        ("192.0.2.11", 80, "http://192.0.2.11/api/getData", "192.0.2.11:80"),
+        (
+            "fd42:241::228",
+            80,
+            "http://[fd42:241::228]/api/getData",
+            "[fd42:241::228]:80",
+        ),
+        (
+            "fd42:241::228",
+            8080,
+            "http://[fd42:241::228]:8080/api/getData",
+            "[fd42:241::228]:8080",
+        ),
+    ],
+)
+async def test_modern_http_authority(host, port, expected, authority, hass) -> None:
+    """A literal IPv6 host must form a valid URL for all modern requests."""
+    client = ModernKefClient(host, async_get_clientsession(hass), port=port)
+    assert client._build_url("/getData") == expected
+    assert client._http_authority(include_port=True) == authority
+
+
+@pytest.mark.parametrize(
     ("key", "v1_step", "v1_max", "v2_step", "v2_max"),
     [
         ("treble_amount", 0.375, 3.0, 0.25, 3.0),

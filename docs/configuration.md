@@ -13,8 +13,16 @@ This is the speaker web-interface password, not a request to put your credential
 into YAML. Firmware updates that enable authentication can trigger a Home
 Assistant reauthentication prompt.
 
-Use **Reconfigure** to change the speaker address or password. An existing entry
-must still point to the same speaker.
+Modern speakers found through Bonjour use their `.local` hostname so Home
+Assistant can try IPv4 or IPv6 and follow address changes. If an older entry
+still points to an unreachable IP address, use **Reconfigure** and enter the
+speaker's advertised `.local` hostname. The speaker must be reachable during
+reconfiguration. Modern speakers must match the existing entry. First-generation
+speakers continue to use IPv4 for their binary control protocol. Their existing entries
+learn a stable AirPlay identifier when rediscovered at the saved address, then
+can follow later IPv4 changes. If the address changed before that rediscovery,
+use **Reconfigure** with the current IPv4 address and confirm it belongs to
+the same speaker; the legacy binary API does not provide a stable device ID.
 
 ## Options
 
@@ -54,8 +62,10 @@ do not run firmware installation as a routine unattended automation.
   password, then reauthenticate or reconfigure.
 - **Playback action unavailable:** check the selected source and whether that
   source exposes the action.
-- **Speaker unavailable:** restore connectivity and allow the next poll to run.
-  The integration retries without requiring the speaker to be removed.
+- **Speaker unavailable:** check whether its saved address still responds. If
+  its IPv4 address times out but its `.local` hostname works, reconfigure a
+  modern speaker with that hostname. The integration retries without requiring
+  the speaker to be removed.
 
 For an issue, reproduce once and download integration diagnostics. Include the
 model, firmware, integration version, and the failed action. Review the file and
