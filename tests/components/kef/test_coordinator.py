@@ -14,6 +14,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef.const import (
     CONF_BACKEND,
+    CONF_DEVICE_ID,
     CONF_TCP_PORT,
     DOMAIN,
 )
@@ -21,6 +22,35 @@ from custom_components.kef.coordinator import KefCoordinator
 from custom_components.kef.exceptions import KefAuthenticationRequiredError, KefError
 from custom_components.kef.models import KefBackend
 from tests.conftest import TEST_HOST, TEST_PORT, TEST_SNAPSHOT
+
+
+async def test_legacy_address_change_preserves_entity_identity(hass) -> None:
+    """A new legacy IP must not create a second set of Home Assistant entities."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "host": "192.0.2.12",
+            CONF_BACKEND: KefBackend.LEGACY.value,
+            CONF_DEVICE_ID: "kef-legacy-192.0.2.11",
+        },
+        title="KEF",
+    )
+    coordinator = KefCoordinator(hass, entry)
+    snapshot = replace(
+        TEST_SNAPSHOT,
+        device=replace(
+            TEST_SNAPSHOT.device,
+            backend=KefBackend.LEGACY,
+            host="192.0.2.12",
+            unique_id="kef-legacy-192.0.2.12",
+        ),
+    )
+    coordinator.client = SimpleNamespace(async_refresh=AsyncMock(return_value=snapshot))
+
+    result = await coordinator._async_update_data()
+
+    assert result.device.unique_id == "kef-legacy-192.0.2.11"
+    assert result.device.host == "192.0.2.12"
 
 
 @pytest.mark.asyncio

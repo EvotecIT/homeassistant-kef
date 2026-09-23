@@ -20,6 +20,7 @@ from homeassistant.util import dt as dt_util
 from .api import async_create_client
 from .const import (
     CONF_BACKEND,
+    CONF_DEVICE_ID,
     CONF_SCAN_INTERVAL,
     CONF_TCP_PORT,
     DEFAULT_SCAN_INTERVAL_SECONDS,
@@ -82,6 +83,13 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
             raise ConfigEntryAuthFailed(str(err)) from err
         except KefError as err:
             raise UpdateFailed(str(err)) from err
+        if snapshot.device.backend is KefBackend.LEGACY:
+            stored_id = self.config_entry.data.get(CONF_DEVICE_ID)
+            if stored_id and snapshot.device.unique_id != stored_id:
+                snapshot = replace(
+                    snapshot,
+                    device=replace(snapshot.device, unique_id=stored_id),
+                )
         self.last_device_update_at = dt_util.utcnow()
         return self._merge_local_changes(snapshot, started_at)
 

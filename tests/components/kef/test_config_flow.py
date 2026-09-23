@@ -15,12 +15,16 @@ from custom_components.kef.const import (
     AIRPLAY_ZEROCONF_TYPE,
     CONF_BACKEND,
     CONF_DEVICE_ID,
+    CONF_DISCOVERY_ID,
     CONF_ENABLE_DIAGNOSTICS,
     CONF_SCAN_INTERVAL,
     CONF_TCP_PORT,
     DOMAIN,
 )
-from custom_components.kef.exceptions import KefAuthenticationRequiredError
+from custom_components.kef.exceptions import (
+    KefAuthenticationRequiredError,
+    KefUnsupportedDeviceError,
+)
 from custom_components.kef.models import KefBackend, KefDeviceInfo
 from tests.conftest import TEST_DEVICE_INFO, TEST_HOST
 
@@ -261,7 +265,9 @@ async def test_zeroconf_preserves_title_for_generic_legacy_identity(
         password=None,
         tcp_port=None,
     ):
-        assert host in {"lsx.local", "192.0.2.11"}
+        if host == "lsx.local":
+            raise KefUnsupportedDeviceError("legacy socket cannot resolve mDNS")
+        assert host == "192.0.2.11"
         assert password == ""
         return _FakeClient(legacy_device)
 
@@ -297,6 +303,8 @@ async def test_zeroconf_preserves_title_for_generic_legacy_identity(
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_HOST] == "192.0.2.11"
+    assert result["data"][CONF_DEVICE_ID] == "AA-BB-CC"
+    assert result["data"][CONF_DISCOVERY_ID] == "AA-BB-CC"
 
 
 async def test_zeroconf_confirm_accepts_web_password(monkeypatch, hass) -> None:
@@ -409,6 +417,55 @@ async def test_reconfigure_updates_password_options(monkeypatch, hass) -> None:
     assert entry.options[CONF_PASSWORD] == "new-secret"
 
 
+async def test_reconfigure_legacy_keeps_entity_identity(monkeypatch, hass) -> None:
+    """Explicitly changing an old legacy IP must retain its entity IDs."""
+    old_id = "kef-legacy-192.0.2.11"
+    legacy_device = KefDeviceInfo(
+        backend=KefBackend.LEGACY,
+        unique_id="kef-legacy-192.0.2.12",
+        device_name="KEF",
+        model="KEF Legacy",
+        host="192.0.2.12",
+        port=50001,
+    )
+
+    async def fake_create_client(host, session, **kwargs):
+        assert host == "192.0.2.12"
+        return _FakeClient(legacy_device)
+
+    monkeypatch.setattr(
+        "custom_components.kef.config_flow.async_create_client",
+        fake_create_client,
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=old_id,
+        data={
+            CONF_HOST: "192.0.2.11",
+            CONF_PORT: 50001,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: KefBackend.LEGACY.value,
+            CONF_DEVICE_ID: old_id,
+        },
+        title="KEF",
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": config_entries.SOURCE_RECONFIGURE,
+            "entry_id": entry.entry_id,
+        },
+        data={CONF_HOST: "192.0.2.12"},
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert entry.data[CONF_HOST] == "192.0.2.12"
+    assert entry.data[CONF_DEVICE_ID] == old_id
+    assert entry.unique_id == old_id
+
+
 async def test_reauth_updates_password_options(monkeypatch, hass) -> None:
     """Reauth should prompt for and store a replacement web UI password."""
 
@@ -516,13 +573,13 @@ async def test_zeroconf_legacy_entry_uses_ipv4_when_ipv6_is_preferred(hass) -> N
     """Rediscovery must not save IPv6 for an IPv4-only legacy socket."""
     entry = MockConfigEntry(
         domain=DOMAIN,
-        unique_id="kef-02:00:00:00:00:02",
+        unique_id="kef-legacy-192.0.2.11",
         data={
-            CONF_HOST: "192.0.2.10",
+            CONF_HOST: "192.0.2.11",
             CONF_PORT: 80,
             CONF_TCP_PORT: 50001,
             CONF_BACKEND: KefBackend.LEGACY.value,
-            CONF_DEVICE_ID: "kef-02:00:00:00:00:02",
+            CONF_DEVICE_ID: "kef-legacy-192.0.2.11",
         },
         title="Living Room LSX",
     )
@@ -551,3 +608,30 @@ async def test_zeroconf_legacy_entry_uses_ipv4_when_ipv6_is_preferred(hass) -> N
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
     assert entry.data[CONF_HOST] == "192.0.2.11"
+    assert entry.data[CONF_DISCOVERY_ID] == "kef-02:00:00:00:00:02"
+
+    # A later address change matches the persisted AirPlay ID while keeping
+    # the existing entity's address-derived identity stable.
+    discovery_info = ZeroconfServiceInfo(
+        ip_address="fd42:241::229",
+        ip_addresses=["fd42:241::229", "192.0.2.12"],
+        hostname="lsx.local.",
+        type=AIRPLAY_ZEROCONF_TYPE,
+        name="Living Room LSX._airplay._tcp.local.",
+        port=7000,
+        properties={
+            "manufacturer": "KEF",
+            "model": "LSX",
+            "deviceid": "02:00:00:00:00:02",
+        },
+    )
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_ZEROCONF},
+        data=discovery_info,
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert entry.data[CONF_HOST] == "192.0.2.12"
+    assert entry.data[CONF_DEVICE_ID] == "kef-legacy-192.0.2.11"

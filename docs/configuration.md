@@ -17,8 +17,12 @@ Modern speakers found through Bonjour use their `.local` hostname so Home
 Assistant can try IPv4 or IPv6 and follow address changes. If an older entry
 still points to an unreachable IP address, use **Reconfigure** and enter the
 speaker's advertised `.local` hostname. The speaker must be reachable during
-reconfiguration and must match the existing entry. First-generation speakers
-continue to use IPv4 for their binary control protocol.
+reconfiguration. Modern speakers must match the existing entry. First-generation
+speakers continue to use IPv4 for their binary control protocol. Their existing entries
+learn a stable AirPlay identifier when rediscovered at the saved address, then
+can follow later IPv4 changes. If the address changed before that rediscovery,
+use **Reconfigure** with the current IPv4 address and confirm it belongs to
+the same speaker; the legacy binary API does not provide a stable device ID.
 
 ## Options
 
