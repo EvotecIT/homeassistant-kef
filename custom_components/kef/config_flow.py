@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 from typing import Any
 
@@ -37,6 +38,7 @@ from .exceptions import (
     KefError,
     KefUnsupportedDeviceError,
 )
+from .models import KefBackend
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -172,10 +174,23 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         if "KEF" not in manufacturer and "LS" not in model:
             return self.async_abort(reason="unsupported")
 
-        self._host = discovery_info.host
+        # Keep the advertised name so Home Assistant's mDNS resolver can try
+        # both address families and follow address changes after setup.
+        self._host = discovery_info.hostname.rstrip(".") or discovery_info.host
         self._title = discovery_info.name.removesuffix(f".{discovery_info.type}")
 
         if discovery_unique_id:
+            # Legacy devices use an IPv4-only socket and a host-derived ID.
+            if any(
+                entry.unique_id == discovery_unique_id
+                and entry.data.get(CONF_BACKEND) == KefBackend.LEGACY.value
+                for entry in self.hass.config_entries.async_entries(DOMAIN)
+            ):
+                legacy_host = self._legacy_ipv4_host(discovery_info)
+                if legacy_host is None:
+                    await self.async_set_unique_id(discovery_unique_id)
+                    self._abort_if_unique_id_configured()
+                self._host = legacy_host
             await self.async_set_unique_id(discovery_unique_id)
             self._abort_if_unique_id_configured(updates={CONF_HOST: self._host})
 
@@ -196,6 +211,11 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 err,
             )
         else:
+            if device.backend is KefBackend.LEGACY:
+                legacy_host = self._legacy_ipv4_host(discovery_info)
+                if legacy_host is None:
+                    return self.async_abort(reason="unsupported")
+                self._host = legacy_host
             resolved_name = device.device_name.strip()
             resolved_model = device.model.strip()
             if resolved_name.casefold() != "kef":
@@ -215,6 +235,17 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
 
         serial = str(discovery_info.properties.get("serialNumber", "")).strip()
         return serial or None
+
+    @staticmethod
+    def _legacy_ipv4_host(discovery_info: ZeroconfServiceInfo) -> str | None:
+        """Pick an IPv4 address for the legacy client's IPv4-only socket."""
+        for host in (*discovery_info.ip_addresses, discovery_info.host):
+            try:
+                if isinstance(ipaddress.ip_address(host), ipaddress.IPv4Address):
+                    return host
+            except ValueError:
+                continue
+        return None
 
     async def async_step_confirm(self, user_input: dict[str, Any] | None = None):
         """Confirm a discovered speaker."""

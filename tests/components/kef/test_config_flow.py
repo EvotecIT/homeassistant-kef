@@ -200,7 +200,7 @@ async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) ->
         password=None,
         tcp_port=None,
     ):
-        assert host == "192.0.2.11"
+        assert host == "lsxii.local"
         assert password == ""
         return _FakeClient()
 
@@ -211,7 +211,7 @@ async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) ->
 
     discovery_info = ZeroconfServiceInfo(
         ip_address="192.0.2.11",
-        ip_addresses=["192.0.2.11"],
+        ip_addresses=["192.0.2.11", "fd42:241::228"],
         hostname="lsxii.local.",
         type=AIRPLAY_ZEROCONF_TYPE,
         name="Living Room LSX II._airplay._tcp.local.",
@@ -231,9 +231,11 @@ async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) ->
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "confirm"
-    assert result["description_placeholders"] == {
-        "title": "LSX II-Test (LSXII)"
-    }
+    assert result["description_placeholders"] == {"title": "LSX II-Test (LSXII)"}
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_HOST] == "lsxii.local"
 
 
 async def test_zeroconf_preserves_title_for_generic_legacy_identity(
@@ -259,7 +261,7 @@ async def test_zeroconf_preserves_title_for_generic_legacy_identity(
         password=None,
         tcp_port=None,
     ):
-        assert host == "192.0.2.11"
+        assert host in {"lsx.local", "192.0.2.11"}
         assert password == ""
         return _FakeClient(legacy_device)
 
@@ -269,8 +271,8 @@ async def test_zeroconf_preserves_title_for_generic_legacy_identity(
     )
 
     discovery_info = ZeroconfServiceInfo(
-        ip_address="192.0.2.11",
-        ip_addresses=["192.0.2.11"],
+        ip_address="fd42:241::228",
+        ip_addresses=["fd42:241::228", "192.0.2.11"],
         hostname="lsx.local.",
         type=AIRPLAY_ZEROCONF_TYPE,
         name="Living Room LSX._airplay._tcp.local.",
@@ -292,6 +294,10 @@ async def test_zeroconf_preserves_title_for_generic_legacy_identity(
     assert result["step_id"] == "confirm"
     assert result["description_placeholders"] == {"title": "Living Room LSX"}
 
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_HOST] == "192.0.2.11"
+
 
 async def test_zeroconf_confirm_accepts_web_password(monkeypatch, hass) -> None:
     """Discovered setup should let users enter a web UI password."""
@@ -307,7 +313,7 @@ async def test_zeroconf_confirm_accepts_web_password(monkeypatch, hass) -> None:
         password=None,
         tcp_port=None,
     ):
-        assert host == "192.0.2.11"
+        assert host == "lsxii.local"
         passwords.append(password)
         if password == "":
             raise KefAuthenticationRequiredError("password required")
@@ -492,6 +498,47 @@ async def test_zeroconf_updates_existing_entry_using_deviceid(hass) -> None:
             "model": "LSX II",
             "deviceid": "02:00:00:00:00:01",
             "serialNumber": "AA-BB-CC",
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_ZEROCONF},
+        data=discovery_info,
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert entry.data[CONF_HOST] == "lsxii.local"
+
+
+async def test_zeroconf_legacy_entry_uses_ipv4_when_ipv6_is_preferred(hass) -> None:
+    """Rediscovery must not save IPv6 for an IPv4-only legacy socket."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="kef-02:00:00:00:00:02",
+        data={
+            CONF_HOST: "192.0.2.10",
+            CONF_PORT: 80,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: KefBackend.LEGACY.value,
+            CONF_DEVICE_ID: "kef-02:00:00:00:00:02",
+        },
+        title="Living Room LSX",
+    )
+    entry.add_to_hass(hass)
+
+    discovery_info = ZeroconfServiceInfo(
+        ip_address="fd42:241::228",
+        ip_addresses=["fd42:241::228", "192.0.2.11"],
+        hostname="lsx.local.",
+        type=AIRPLAY_ZEROCONF_TYPE,
+        name="Living Room LSX._airplay._tcp.local.",
+        port=7000,
+        properties={
+            "manufacturer": "KEF",
+            "model": "LSX",
+            "deviceid": "02:00:00:00:00:02",
         },
     )
 

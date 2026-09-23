@@ -7,6 +7,7 @@ import base64
 import copy
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import os
@@ -1492,7 +1493,10 @@ class ModernKefClient(BaseKefClient):
         file_path: str,
     ) -> KefFirmwareUpdateInfo | None:
         """Upload a firmware image through the speaker settings page."""
-        upload_url = f"http://{self._host}:{self._port}/settings.fcgi?firmwareupdate=1"
+        upload_url = (
+            f"http://{self._http_authority(include_port=True)}"
+            "/settings.fcgi?firmwareupdate=1"
+        )
         form = aiohttp.FormData()
 
         try:
@@ -2137,9 +2141,7 @@ class ModernKefClient(BaseKefClient):
     ) -> str:
         """Build the request URL."""
         endpoint = endpoint if endpoint.startswith("/") else f"/{endpoint}"
-        authority = self._host
-        if self._port != DEFAULT_PORT:
-            authority = f"{authority}:{self._port}"
+        authority = self._http_authority(include_port=self._port != DEFAULT_PORT)
         url = f"http://{authority}{API_ROOT}{endpoint}"
         if not params:
             return url
@@ -2148,6 +2150,17 @@ class ModernKefClient(BaseKefClient):
             doseq=True,
         )
         return f"{url}?{query}"
+
+    def _http_authority(self, *, include_port: bool) -> str:
+        """Return an HTTP authority for a hostname or an IPv6 literal."""
+        host = self._host.strip("[]")
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            authority = host
+        else:
+            authority = f"[{host}]" if address.version == 6 else host
+        return f"{authority}:{self._port}" if include_port else authority
 
     @staticmethod
     def _default_volume_path_for_source(source: str) -> str:

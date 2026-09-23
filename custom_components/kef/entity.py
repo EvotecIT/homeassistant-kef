@@ -7,6 +7,7 @@ from dataclasses import replace
 from typing import Any, TypeVar
 
 from homeassistant.exceptions import HomeAssistantError
+from yarl import URL
 
 from .const import AUTH_FAILURE_MESSAGE
 from .coordinator import KefCoordinator
@@ -47,7 +48,9 @@ class KefEntity:
             "sw_version": device.firmware_version,
             "hw_version": device.hardware_version,
             "serial_number": device.serial_number or device.mac_address,
-            "configuration_url": f"http://{device.host}:{device.port}",
+            "configuration_url": str(
+                URL.build(scheme="http", host=device.host.strip("[]"), port=device.port)
+            ),
         }
 
 
