@@ -491,10 +491,15 @@ async def test_source_volume_publishes_only_the_touched_source() -> None:
             assert updated[source] == value
 
 
-async def test_wall_mounted_is_blocked_while_auto_detect_placement_is_on() -> None:
-    """The soundbar owns wall-mounted placement while auto-detect is on."""
+@pytest.mark.parametrize("auto_detect_placement", [True, None])
+async def test_wall_mounted_requires_confirmed_manual_placement(
+    auto_detect_placement: bool | None,
+) -> None:
+    """Only a confirmed off state allows a manual placement write."""
     coordinator = _coordinator_with_local_updates()
-    coordinator.data = replace(coordinator.data, auto_detect_placement=True)
+    coordinator.data = replace(
+        coordinator.data, auto_detect_placement=auto_detect_placement
+    )
     coordinator.client = SimpleNamespace(async_set_wall_mounted=AsyncMock())
 
     with pytest.raises(ServiceValidationError, match="auto-detect placement"):

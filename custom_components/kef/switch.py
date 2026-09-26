@@ -329,7 +329,7 @@ async def _async_set_wall_mounted(
     """Set wall-mounted placement."""
     # While auto-detect is on the soundbar sets this itself (the KEF app has no
     # manual setting), so manual changes are only allowed with auto-detect off.
-    if coordinator.data.auto_detect_placement:
+    if coordinator.data.auto_detect_placement is not False:
         raise ServiceValidationError(
             "Turn off auto-detect placement before changing wall mounted"
         )
