@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -309,6 +310,48 @@ async def _async_set_high_pass_mode(
     apply_eq_profile_change(coordinator, high_pass_mode=enabled)
 
 
+async def _async_set_auto_detect_placement(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Enable or disable automatic placement detection."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_auto_detect_placement(enabled)
+    coordinator.async_apply_local_change(auto_detect_placement=enabled)
+
+
+async def _async_set_wall_mounted(
+    coordinator: KefCoordinator,
+    mounted: bool,
+) -> None:
+    """Set wall-mounted placement."""
+    # While auto-detect is on the soundbar sets this itself (the KEF app has no
+    # manual setting), so manual changes are only allowed with auto-detect off.
+    if coordinator.data.auto_detect_placement:
+        raise ServiceValidationError(
+            "Turn off auto-detect placement before changing wall mounted"
+        )
+    client = coordinator.client
+    if client is None:
+        return
+    applied = await client.async_set_wall_mounted(mounted)
+    apply_eq_profile_change(coordinator, wall_mounted=bool(applied["wallMounted"]))
+
+
+async def _async_set_prefer_virtual_x(
+    coordinator: KefCoordinator,
+    enabled: bool,
+) -> None:
+    """Prefer DTS Virtual:X over the Dolby virtualizer."""
+    client = coordinator.client
+    if client is None:
+        return
+    await client.async_set_prefer_virtual_x(enabled)
+    coordinator.async_apply_local_change(prefer_virtual_x=enabled)
+
+
 @dataclass(frozen=True, kw_only=True)
 class KefSwitchDescription(SwitchEntityDescription):
     """Describe a KEF configuration switch."""
@@ -519,6 +562,35 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
             data.eq_profile.high_pass_mode if data.eq_profile else None
         ),
         async_set_fn=_async_set_high_pass_mode,
+    ),
+    KefSwitchDescription(
+        key="auto_detect_placement",
+        name="DSP: Auto-detect placement",
+        icon="mdi:crosshairs-gps",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.auto_detect_placement,
+        async_set_fn=_async_set_auto_detect_placement,
+        model_feature="xio",
+    ),
+    KefSwitchDescription(
+        key="wall_mounted",
+        name="DSP: Wall mounted",
+        icon="mdi:wall",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: (
+            data.eq_profile.wall_mounted if data.eq_profile else None
+        ),
+        async_set_fn=_async_set_wall_mounted,
+        model_feature="xio",
+    ),
+    KefSwitchDescription(
+        key="prefer_virtual_x",
+        name="DSP: Prefer DTS Virtual:X",
+        icon="mdi:surround-sound",
+        entity_category=EntityCategory.CONFIG,
+        value_fn=lambda data: data.prefer_virtual_x,
+        async_set_fn=_async_set_prefer_virtual_x,
+        model_feature="xio",
     ),
 )
 

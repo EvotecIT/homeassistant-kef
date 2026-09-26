@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from homeassistant.exceptions import ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef.const import CONF_BACKEND, CONF_TCP_PORT, DOMAIN
@@ -48,6 +49,7 @@ from custom_components.kef.switch import (
     KefSwitch,
     _async_set_analytics,
     _async_set_app_analytics,
+    _async_set_auto_detect_placement,
     _async_set_auto_switch_hdmi,
     _async_set_desk_mode,
     _async_set_front_led,
@@ -56,6 +58,7 @@ from custom_components.kef.switch import (
     _async_set_kw1_wake,
     _async_set_per_input_startup_volume,
     _async_set_phase_correction,
+    _async_set_prefer_virtual_x,
     _async_set_remote_ir,
     _async_set_standby_led,
     _async_set_startup_tone,
@@ -68,6 +71,7 @@ from custom_components.kef.switch import (
     _async_set_usb_charging,
     _async_set_volume_limit,
     _async_set_wall_mode,
+    _async_set_wall_mounted,
 )
 from tests.conftest import TEST_HOST, TEST_PORT, TEST_SNAPSHOT
 
@@ -313,6 +317,18 @@ _SETTERS = [
         25,
     ),
     (_async_set_balance, "async_set_balance", "eq_profile.balance", 10),
+    (
+        _async_set_auto_detect_placement,
+        "async_set_auto_detect_placement",
+        "auto_detect_placement",
+        False,
+    ),
+    (
+        _async_set_prefer_virtual_x,
+        "async_set_prefer_virtual_x",
+        "prefer_virtual_x",
+        True,
+    ),
 ]
 
 
@@ -473,6 +489,34 @@ async def test_source_volume_publishes_only_the_touched_source() -> None:
     for source, value in original_by_source.items():
         if source != "wifi":
             assert updated[source] == value
+
+
+async def test_wall_mounted_is_blocked_while_auto_detect_placement_is_on() -> None:
+    """The soundbar owns wall-mounted placement while auto-detect is on."""
+    coordinator = _coordinator_with_local_updates()
+    coordinator.data = replace(coordinator.data, auto_detect_placement=True)
+    coordinator.client = SimpleNamespace(async_set_wall_mounted=AsyncMock())
+
+    with pytest.raises(ServiceValidationError, match="auto-detect placement"):
+        await _async_set_wall_mounted(coordinator, True)
+
+    coordinator.client.async_set_wall_mounted.assert_not_awaited()
+    coordinator.async_apply_local_change.assert_not_called()
+
+
+async def test_wall_mounted_publishes_client_profile() -> None:
+    """With auto-detect off, the speaker-confirmed value is published."""
+    coordinator = _coordinator_with_local_updates()
+    coordinator.data = replace(coordinator.data, auto_detect_placement=False)
+    coordinator.client = SimpleNamespace(
+        async_set_wall_mounted=AsyncMock(return_value={"wallMounted": True})
+    )
+
+    await _async_set_wall_mounted(coordinator, True)
+
+    coordinator.client.async_set_wall_mounted.assert_awaited_once_with(True)
+    assert coordinator.data.eq_profile is not None
+    assert coordinator.data.eq_profile.wall_mounted is True
 
 
 async def test_switch_entity_keeps_optimistic_value_through_stale_refresh(

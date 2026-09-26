@@ -80,6 +80,7 @@ def test_format_channels_accepts_numeric_and_wire_string_values(
             "Dolby Surround 5.1.2",
         ),
         ("PCM", "2.0", 2, "PCM 2.0", "Direct 2.0"),
+        ("Dolby Atmos", 0, 8, "Dolby Atmos", "Dolby Atmos 5.1.2"),
         (None, None, None, None, None),
     ],
 )
@@ -99,6 +100,16 @@ def test_audio_sensor_values_decode_codec_and_channel_contract(
 
     assert audio_codec_value(snapshot) == expected_codec
     assert audio_virtualizer_value(snapshot) == expected_virtualizer
+
+
+def test_audio_virtualizer_includes_virtual_x_when_active() -> None:
+    """DTS Virtual:X is a separate decoder flag layered on the Dolby upmixer."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    assert snapshot.playback is not None
+    snapshot.playback.codec = "Dolby Digital Plus - Dolby Surround"
+    snapshot.virtual_x_active = True
+
+    assert audio_virtualizer_value(snapshot) == "Dolby Surround 5.1.2 + Virtual:X"
 
 
 @pytest.mark.parametrize(

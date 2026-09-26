@@ -153,6 +153,9 @@ PROBE_PATHS = {
     "calibration_status": "settings:/kef/dsp/calibrationStatus",
     "calibration_result": "settings:/kef/dsp/calibrationResult",
     "calibration_start": "kefdsp:/calibration/start",
+    "auto_detect_placement": "settings:/kef/host/autoDetectPlacement",
+    "prefer_virtual_x": "settings:/kef/dsp/preferVirtualX",
+    "virtual_x_active": "imx8af:decoderInfoVirtualXActive",
     "network_info": "network:info",
     "standby_mode": "settings:/kef/host/standbyMode",
     "startup_tone": "settings:/kef/host/startupTone",
@@ -246,5 +249,7 @@ EVENT_SUBSCRIPTIONS = (
     {"path": PROBE_PATHS["player_notification"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["master_channel"], "type": "itemWithValue"},
     {"path": PROBE_PATHS["cable_mode"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["auto_detect_placement"], "type": "itemWithValue"},
+    {"path": PROBE_PATHS["prefer_virtual_x"], "type": "itemWithValue"},
     {"path": "notifications:/display/queue", "type": "rows"},
 )

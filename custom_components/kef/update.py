@@ -2,17 +2,34 @@
 
 from __future__ import annotations
 
+import logging
+import time
+
+import aiohttp
 from homeassistant.components.update import (
     UpdateEntity,
     UpdateEntityFeature,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend
+from .release_notes import (
+    RELEASE_NOTES_URL,
+    FirmwareRelease,
+    find_release,
+    format_release,
+    parse_release_notes,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+_RELEASE_NOTES_TIMEOUT = aiohttp.ClientTimeout(total=10)
+_RELEASE_NOTES_CACHE_SECONDS = 3600
 
 _IN_PROGRESS_STATES = {
     "checkingForUpdate",
@@ -44,7 +61,9 @@ class KefFirmwareUpdateEntity(
 ):
     """Coordinator-backed KEF firmware update entity."""
 
-    _attr_supported_features = UpdateEntityFeature.INSTALL
+    _attr_supported_features = (
+        UpdateEntityFeature.INSTALL | UpdateEntityFeature.RELEASE_NOTES
+    )
 
     def __init__(self, coordinator: KefCoordinator) -> None:
         """Initialize the update entity."""
@@ -52,6 +71,8 @@ class KefFirmwareUpdateEntity(
         KefEntity.__init__(self, coordinator)
         self._attr_unique_id = f"{coordinator.data.device.unique_id}_firmware"
         self._attr_name = "Firmware"
+        self._releases: dict[str, list[FirmwareRelease]] | None = None
+        self._releases_fetched_at = 0.0
 
     @property
     def installed_version(self) -> str | None:
@@ -87,6 +108,43 @@ class KefFirmwareUpdateEntity(
         """Return a short summary of the current firmware state."""
         update = self.coordinator.data.firmware_update
         return update.state if update is not None else None
+
+    async def async_release_notes(self) -> str | None:
+        """Return KEF's published notes for the version the speaker reports.
+
+        Only called when the update dialog is opened. Versions and update
+        availability always come from the speaker; the notes page is
+        informational, so any fetch or parse failure just means no notes.
+        """
+        releases = await self._async_get_releases()
+        if releases is None:
+            return None
+        release = find_release(
+            releases, self.coordinator.data.device.model, self.latest_version
+        )
+        return format_release(release) if release is not None else None
+
+    async def _async_get_releases(self) -> dict[str, list[FirmwareRelease]] | None:
+        """Fetch and parse the release notes page, cached for an hour."""
+        now = time.monotonic()
+        if (
+            self._releases is not None
+            and now - self._releases_fetched_at < _RELEASE_NOTES_CACHE_SECONDS
+        ):
+            return self._releases
+        session = async_get_clientsession(self.hass)
+        try:
+            async with session.get(
+                RELEASE_NOTES_URL, timeout=_RELEASE_NOTES_TIMEOUT
+            ) as response:
+                response.raise_for_status()
+                page = await response.text()
+        except (aiohttp.ClientError, TimeoutError) as err:
+            _LOGGER.debug("KEF release notes unavailable: %s", err)
+            return self._releases
+        self._releases = parse_release_notes(page)
+        self._releases_fetched_at = now
+        return self._releases
 
     async def async_install(
         self,

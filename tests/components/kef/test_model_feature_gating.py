@@ -90,6 +90,9 @@ async def test_lsx_ii_lt_hides_only_known_unsupported_controls(model: str) -> No
         "top_panel_led",
         "top_panel_standby_led",
         "sub_enable_stereo",
+        "auto_detect_placement",
+        "wall_mounted",
+        "prefer_virtual_x",
     }
     assert unsupported_switches.isdisjoint(switches)
     assert {"desk_mode", "wall_mode", "standby_led"} <= switches
@@ -104,7 +107,14 @@ async def test_xio_keeps_top_panel_controls_and_hides_pair_controls() -> None:
     """The soundbar should expose its physical panel without stereo-pair settings."""
     numbers, switches, selects = await _entity_keys_for_model("XIO")
 
-    assert {"top_panel", "top_panel_led", "top_panel_standby_led"} <= switches
+    assert {
+        "top_panel",
+        "top_panel_led",
+        "top_panel_standby_led",
+        "auto_detect_placement",
+        "wall_mounted",
+        "prefer_virtual_x",
+    } <= switches
     assert {
         "front_led",
         "desk_mode",
@@ -134,9 +144,14 @@ async def test_ls60_hides_desk_mode_but_keeps_unverified_controls_visible(
     assert "desk_mode_db" not in numbers
     assert {"balance", "wall_mode_db"} <= numbers
     assert {"wall_mode", "front_led", "standby_led", "sub_enable_stereo"} <= switches
-    assert {"top_panel", "top_panel_led", "top_panel_standby_led"}.isdisjoint(
-        switches
-    )
+    assert {
+        "top_panel",
+        "top_panel_led",
+        "top_panel_standby_led",
+        "auto_detect_placement",
+        "wall_mounted",
+        "prefer_virtual_x",
+    }.isdisjoint(switches)
     assert {"master_channel", "cable_mode"} <= selects
     assert {"eq_button_1", "eq_button_2", "sound_profile"}.isdisjoint(selects)
     assert "subwoofer_preset" not in selects
@@ -150,6 +165,9 @@ async def test_ls50_wireless_ii_keeps_top_panel_controls(model: str) -> None:
     assert {"top_panel", "top_panel_led", "top_panel_standby_led"} <= switches
     assert "sub_enable_stereo" in switches
     assert "standby_led" in switches
+    assert {"auto_detect_placement", "wall_mounted", "prefer_virtual_x"}.isdisjoint(
+        switches
+    )
     assert {"eq_button_1", "eq_button_2", "sound_profile"}.isdisjoint(selects)
     assert "subwoofer_preset" not in selects
 
@@ -165,6 +183,9 @@ async def test_unknown_models_keep_all_reported_controls() -> None:
         "wall_mode",
         "sub_enable_stereo",
         "standby_led",
+        "auto_detect_placement",
+        "wall_mounted",
+        "prefer_virtual_x",
     } <= switches
     assert {"balance", "desk_mode_db", "wall_mode_db"} <= numbers
     assert {"master_channel", "cable_mode"} <= selects

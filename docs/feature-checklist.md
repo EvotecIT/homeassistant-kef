@@ -18,8 +18,9 @@ integration already exist; this list tracks remaining work.
 - [ ] Investigate alert, timer, and alarm writes before exposing actions.
 - [ ] Determine whether grouping, multiroom, and notification queues provide
   useful, controllable features.
-- [ ] Verify model-specific calibration, BLE subwoofer firmware, XIO dialogue
-  mode, and sound-profile APIs with device captures.
+- [ ] Revisit XIO wireless subwoofer (BLE) firmware versions once wireless rear
+  speakers ship. Reads are safe, but activating an update check disconnected the
+  KW2 receiver; see the [protocol notes](kef-lsx2-investigation.md).
 
 ## Home Assistant usability
 

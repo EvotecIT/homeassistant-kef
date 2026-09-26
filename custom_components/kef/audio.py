@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from .models import KefSnapshot
 
+# Formats the soundbar renders itself. Their codec string carries no
+# " - <processing>" part, yet the output is not a plain passthrough.
+_NATIVE_RENDERERS = {"Dolby Atmos"}
+
 
 def format_channels(channel_count: int | str | None) -> str | None:
     """Convert a channel count to audio format notation (for example, 5.1.2)."""
@@ -46,17 +50,24 @@ def audio_virtualizer_value(data: KefSnapshot) -> str | None:
     """Return the decoded audio virtualizer mode with channel format."""
     if data.playback is None or not data.playback.codec:
         return None
-    virtualizer_name = (
-        data.playback.codec.split(" - ")[1]
-        if " - " in data.playback.codec
-        else "Direct"
-    )
+    codec = data.playback.codec
+    if " - " in codec:
+        virtualizer_name = codec.split(" - ")[1]
+    elif codec in _NATIVE_RENDERERS:
+        virtualizer_name = codec
+    else:
+        virtualizer_name = "Direct"
     if virtualizer_name == "Direct":
         channel_format = format_channels(data.playback.stream_channels)
         if channel_format is None:
             channel_format = format_channels(data.playback.audio_channels)
     else:
         channel_format = format_channels(8)
+    value = virtualizer_name
     if channel_format:
-        return f"{virtualizer_name} {channel_format}"
-    return virtualizer_name
+        value = f"{virtualizer_name} {channel_format}"
+    # The codec string only names the Dolby upmixer; DTS Virtual:X is reported
+    # by a separate decoder flag and runs on top of it.
+    if data.virtual_x_active:
+        value = f"{value} + Virtual:X"
+    return value
