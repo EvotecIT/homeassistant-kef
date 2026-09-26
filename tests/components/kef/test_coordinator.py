@@ -4,18 +4,23 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef.const import (
     CONF_BACKEND,
     CONF_DEVICE_ID,
+    CONF_OFFLINE_RETRY_INTERVAL,
+    CONF_SCAN_INTERVAL,
     CONF_TCP_PORT,
+    DEFAULT_OFFLINE_RETRY_INTERVAL_SECONDS,
+    DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
 )
 from custom_components.kef.coordinator import KefCoordinator
@@ -357,3 +362,178 @@ async def test_successful_refresh_records_when_device_data_was_fetched(
     await coordinator._async_update_data()
 
     assert coordinator.last_device_update_at == refreshed_at
+
+
+async def test_client_creation_failure_is_an_update_failure(monkeypatch, hass) -> None:
+    """An unreachable speaker at startup must not log an unexpected traceback."""
+    coordinator = _coordinator(hass)
+    monkeypatch.setattr(
+        "custom_components.kef.coordinator.async_create_client",
+        AsyncMock(side_effect=KefError("Cannot connect")),
+    )
+
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.client is None
+
+
+async def test_brief_failures_keep_last_snapshot_then_go_offline(hass) -> None:
+    """Two failed polls keep the last state; the third marks the speaker offline."""
+    coordinator = _coordinator(hass)
+    coordinator.data = TEST_SNAPSHOT
+    coordinator.client = SimpleNamespace(
+        async_refresh=AsyncMock(side_effect=KefError("timeout"))
+    )
+
+    assert await coordinator._async_update_data() is TEST_SNAPSHOT
+    assert await coordinator._async_update_data() is TEST_SNAPSHOT
+    assert not coordinator.is_offline
+    assert coordinator.update_interval == timedelta(
+        seconds=DEFAULT_SCAN_INTERVAL_SECONDS
+    )
+
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.is_offline
+    assert coordinator.update_interval == timedelta(
+        seconds=DEFAULT_OFFLINE_RETRY_INTERVAL_SECONDS
+    )
+
+
+async def test_offline_retry_interval_follows_the_option(hass) -> None:
+    """The slower offline retry uses the configured interval."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"host": TEST_HOST, "port": TEST_PORT, CONF_BACKEND: "modern"},
+        options={CONF_SCAN_INTERVAL: 15, CONF_OFFLINE_RETRY_INTERVAL: 300},
+        title="KEF",
+    )
+    coordinator = KefCoordinator(hass, entry)
+    coordinator.data = TEST_SNAPSHOT
+    coordinator.client = SimpleNamespace(
+        async_refresh=AsyncMock(side_effect=KefError("timeout"))
+    )
+
+    for _ in range(2):
+        await coordinator._async_update_data()
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    assert coordinator.update_interval == timedelta(seconds=300)
+
+
+async def test_recovery_restores_the_normal_polling_interval(hass) -> None:
+    """A successful poll after going offline returns to normal polling."""
+    coordinator = _coordinator(hass)
+    coordinator.data = TEST_SNAPSHOT
+    coordinator.client = SimpleNamespace(
+        async_refresh=AsyncMock(
+            side_effect=[KefError("a"), KefError("b"), KefError("c"), TEST_SNAPSHOT]
+        )
+    )
+    for _ in range(2):
+        await coordinator._async_update_data()
+    with pytest.raises(UpdateFailed):
+        await coordinator._async_update_data()
+
+    await coordinator._async_update_data()
+
+    assert not coordinator.is_offline
+    assert coordinator.update_interval == timedelta(
+        seconds=DEFAULT_SCAN_INTERVAL_SECONDS
+    )
+
+
+async def test_failure_count_resets_after_a_successful_poll(hass) -> None:
+    """Only consecutive failures count towards going offline."""
+    coordinator = _coordinator(hass)
+    coordinator.data = TEST_SNAPSHOT
+    coordinator.client = SimpleNamespace(
+        async_refresh=AsyncMock(
+            side_effect=[KefError("a"), KefError("b"), TEST_SNAPSHOT, KefError("c")]
+        )
+    )
+
+    for _ in range(4):
+        await coordinator._async_update_data()
+
+    assert not coordinator.is_offline
+
+
+async def test_auth_failure_is_never_tolerated(hass) -> None:
+    """A password problem must reach reauth even while a snapshot exists."""
+    coordinator = _coordinator(hass)
+    coordinator.data = TEST_SNAPSHOT
+    coordinator.client = SimpleNamespace(
+        async_refresh=AsyncMock(
+            side_effect=KefAuthenticationRequiredError("password required")
+        )
+    )
+
+    with pytest.raises(ConfigEntryAuthFailed):
+        await coordinator._async_update_data()
+
+
+async def test_event_listener_waits_while_offline(monkeypatch, hass) -> None:
+    """An offline speaker's event queue waits for polling instead of retrying."""
+    coordinator = _coordinator(hass)
+    coordinator._online.clear()
+    reset_done = asyncio.Event()
+
+    class _FakeModernClient:
+        backend = KefBackend.MODERN
+        async_poll_events = AsyncMock(
+            side_effect=[KefError("offline"), asyncio.CancelledError]
+        )
+        async_reset_event_queue = AsyncMock(side_effect=reset_done.set)
+
+    coordinator.client = _FakeModernClient()
+    real_sleep = asyncio.sleep
+    retry_delays: list[float] = []
+
+    async def no_retry_sleep(delay: float, *args, **kwargs) -> None:
+        if delay:
+            retry_delays.append(delay)
+        await real_sleep(0)
+
+    monkeypatch.setattr(asyncio, "sleep", no_retry_sleep)
+    task = asyncio.create_task(coordinator._async_event_listener_loop())
+    await reset_done.wait()
+    await real_sleep(0)
+
+    assert not task.done()
+    assert coordinator.client.async_poll_events.await_count == 1
+
+    coordinator._handle_refresh_success()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert coordinator.client.async_poll_events.await_count == 2
+    assert retry_delays == []
+
+
+async def test_device_seen_refreshes_an_offline_speaker(hass) -> None:
+    """A discovery announcement retries an offline speaker right away."""
+    coordinator = _coordinator(hass)
+    coordinator.config_entry.add_to_hass(hass)
+    coordinator.async_request_refresh = AsyncMock()
+    coordinator._online.clear()
+
+    coordinator.async_device_seen()
+    await hass.async_block_till_done()
+
+    coordinator.async_request_refresh.assert_awaited_once_with()
+
+
+async def test_device_seen_ignores_an_online_speaker(hass) -> None:
+    """Routine announcements from a reachable speaker do not add polls."""
+    coordinator = _coordinator(hass)
+    coordinator.config_entry.add_to_hass(hass)
+    coordinator.async_request_refresh = AsyncMock()
+
+    coordinator.async_device_seen()
+    await hass.async_block_till_done()
+
+    coordinator.async_request_refresh.assert_not_awaited()

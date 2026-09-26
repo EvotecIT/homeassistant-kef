@@ -21,14 +21,21 @@ from .api import async_create_client
 from .const import (
     CONF_BACKEND,
     CONF_DEVICE_ID,
+    CONF_OFFLINE_RETRY_INTERVAL,
     CONF_SCAN_INTERVAL,
     CONF_TCP_PORT,
+    DEFAULT_OFFLINE_RETRY_INTERVAL_SECONDS,
     DEFAULT_SCAN_INTERVAL_SECONDS,
 )
 from .exceptions import KefAuthenticationRequiredError, KefError
 from .models import KefBackend, KefSnapshot
 
 _LOGGER = logging.getLogger(__name__)
+
+# Consecutive failed polls before a speaker counts as offline. Earlier failures
+# keep the last snapshot so a single timeout does not flip every entity to
+# unavailable.
+_OFFLINE_FAILURE_THRESHOLD = 3
 
 type KefConfigEntry = ConfigEntry["KefCoordinator"]
 
@@ -47,42 +54,53 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
         self._local_change_at = 0.0
         self._local_change_refreshes_remaining = 0
         self.last_device_update_at: datetime | None = None
+        self._normal_interval = timedelta(
+            seconds=entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS)
+        )
+        self._offline_interval = timedelta(
+            seconds=entry.options.get(
+                CONF_OFFLINE_RETRY_INTERVAL, DEFAULT_OFFLINE_RETRY_INTERVAL_SECONDS
+            )
+        )
+        self._consecutive_failures = 0
+        self._online = asyncio.Event()
+        self._online.set()
         super().__init__(
             hass,
             _LOGGER,
             config_entry=entry,
             name="kef",
-            update_interval=timedelta(
-                seconds=entry.options.get(
-                    CONF_SCAN_INTERVAL,
-                    DEFAULT_SCAN_INTERVAL_SECONDS,
-                )
-            ),
+            update_interval=self._normal_interval,
         )
+
+    @property
+    def is_offline(self) -> bool:
+        """Return whether the speaker stopped responding to repeated polls."""
+        return not self._online.is_set()
 
     async def _async_update_data(self) -> KefSnapshot:
         """Fetch data from the device."""
-        if self.client is None:
-            self.client = await async_create_client(
-                self.config_entry.data[CONF_HOST],
-                self._session,
-                backend=self.config_entry.data[CONF_BACKEND],
-                port=self.config_entry.data.get(CONF_PORT),
-                password=self.config_entry.options.get(
-                    CONF_PASSWORD,
-                    self.config_entry.data.get(CONF_PASSWORD),
-                ),
-                tcp_port=self.config_entry.data.get(CONF_TCP_PORT),
-                async_add_executor_job=self.hass.async_add_executor_job,
-            )
-
-        started_at = time.monotonic()
         try:
+            if self.client is None:
+                self.client = await async_create_client(
+                    self.config_entry.data[CONF_HOST],
+                    self._session,
+                    backend=self.config_entry.data[CONF_BACKEND],
+                    port=self.config_entry.data.get(CONF_PORT),
+                    password=self.config_entry.options.get(
+                        CONF_PASSWORD,
+                        self.config_entry.data.get(CONF_PASSWORD),
+                    ),
+                    tcp_port=self.config_entry.data.get(CONF_TCP_PORT),
+                    async_add_executor_job=self.hass.async_add_executor_job,
+                )
+            started_at = time.monotonic()
             snapshot = await self.client.async_refresh()
         except KefAuthenticationRequiredError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except KefError as err:
-            raise UpdateFailed(str(err)) from err
+            return self._handle_refresh_failure(err)
+        self._handle_refresh_success()
         if snapshot.device.backend is KefBackend.LEGACY:
             stored_id = self.config_entry.data.get(CONF_DEVICE_ID)
             if stored_id and snapshot.device.unique_id != stored_id:
@@ -92,6 +110,50 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
                 )
         self.last_device_update_at = dt_util.utcnow()
         return self._merge_local_changes(snapshot, started_at)
+
+    def _handle_refresh_failure(self, err: KefError) -> KefSnapshot:
+        """Tolerate brief failures, then switch to the slower offline retry."""
+        self._consecutive_failures += 1
+        if self.data is None:
+            # Nothing to fall back on yet; Home Assistant retries the setup.
+            raise UpdateFailed(str(err)) from err
+        if self._consecutive_failures < _OFFLINE_FAILURE_THRESHOLD:
+            _LOGGER.debug(
+                "KEF speaker %s poll failed (%s of %s), keeping last state: %s",
+                self.config_entry.title,
+                self._consecutive_failures,
+                _OFFLINE_FAILURE_THRESHOLD,
+                err,
+            )
+            return self.data
+        if self._online.is_set():
+            self._online.clear()
+            self.update_interval = self._offline_interval
+            _LOGGER.debug(
+                "KEF speaker %s is offline, retrying every %s seconds",
+                self.config_entry.title,
+                int(self._offline_interval.total_seconds()),
+            )
+        raise UpdateFailed(str(err)) from err
+
+    def _handle_refresh_success(self) -> None:
+        """Return to normal polling once the speaker answers again."""
+        self._consecutive_failures = 0
+        if not self._online.is_set():
+            self._online.set()
+            self.update_interval = self._normal_interval
+
+    @callback
+    def async_device_seen(self) -> None:
+        """Retry right away when an offline speaker announces itself again."""
+        if not self.is_offline:
+            return
+        _LOGGER.debug(
+            "KEF speaker %s announced itself, retrying now", self.config_entry.title
+        )
+        self.config_entry.async_create_task(
+            self.hass, self.async_request_refresh(), "kef_device_seen_refresh"
+        )
 
     def _merge_local_changes(
         self, snapshot: KefSnapshot, started_at: float
@@ -191,4 +253,9 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
                     err,
                 )
                 await self.client.async_reset_event_queue()
-                await asyncio.sleep(5)
+                if self.is_offline:
+                    # Polling owns reconnection while offline; resume the queue
+                    # as soon as a poll reaches the speaker again.
+                    await self._online.wait()
+                else:
+                    await asyncio.sleep(5)
