@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -17,6 +18,7 @@ from custom_components.kef.const import (
     CONF_DEVICE_ID,
     CONF_DISCOVERY_ID,
     CONF_ENABLE_DIAGNOSTICS,
+    CONF_OFFLINE_RETRY_INTERVAL,
     CONF_SCAN_INTERVAL,
     CONF_TCP_PORT,
     DOMAIN,
@@ -271,7 +273,8 @@ async def test_options_flow_saves_settings(hass) -> None:
         result["flow_id"],
         {
             CONF_PASSWORD: "new-secret",
-            CONF_SCAN_INTERVAL: 45,
+            CONF_SCAN_INTERVAL: 45.0,
+            CONF_OFFLINE_RETRY_INTERVAL: 300.0,
             CONF_ENABLE_DIAGNOSTICS: True,
         },
     )
@@ -280,8 +283,49 @@ async def test_options_flow_saves_settings(hass) -> None:
     assert entry.options == {
         CONF_PASSWORD: "new-secret",
         CONF_SCAN_INTERVAL: 45,
+        CONF_OFFLINE_RETRY_INTERVAL: 300,
         CONF_ENABLE_DIAGNOSTICS: True,
     }
+    # Slider selectors return floats; the coordinator expects whole seconds.
+    assert type(entry.options[CONF_SCAN_INTERVAL]) is int
+    assert type(entry.options[CONF_OFFLINE_RETRY_INTERVAL]) is int
+
+
+async def test_options_flow_defaults_the_offline_retry_interval(hass) -> None:
+    """Saving options without touching the new field stores the 60s default."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_DEVICE_INFO.unique_id,
+        data={CONF_HOST: TEST_HOST, CONF_BACKEND: "modern"},
+        title=TEST_DEVICE_INFO.device_name,
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {}
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_OFFLINE_RETRY_INTERVAL] == 60
+
+
+@pytest.mark.parametrize("interval", [29, 601])
+async def test_options_flow_rejects_out_of_range_offline_retry(hass, interval) -> None:
+    """The offline retry interval is limited to 30 to 600 seconds."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_DEVICE_INFO.unique_id,
+        data={CONF_HOST: TEST_HOST, CONF_BACKEND: "modern"},
+        title=TEST_DEVICE_INFO.device_name,
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with pytest.raises(InvalidData):
+        await hass.config_entries.options.async_configure(
+            result["flow_id"], {CONF_OFFLINE_RETRY_INTERVAL: interval}
+        )
 
 
 async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) -> None:
@@ -712,6 +756,74 @@ async def test_zeroconf_updates_existing_entry_using_deviceid(hass) -> None:
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
     assert entry.data[CONF_HOST] == "lsxii.local"
+
+
+def _loaded_zeroconf_entry(hass, state: ConfigEntryState) -> MockConfigEntry:
+    """Add a configured speaker whose discovery host already matches."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_DEVICE_INFO.unique_id,
+        data={
+            CONF_HOST: "lsxii.local",
+            CONF_PORT: 80,
+            CONF_TCP_PORT: 50001,
+            CONF_BACKEND: "modern",
+            CONF_DEVICE_ID: TEST_DEVICE_INFO.unique_id,
+        },
+        title=TEST_DEVICE_INFO.device_name,
+    )
+    entry.add_to_hass(hass)
+    entry.mock_state(hass, state)
+    return entry
+
+
+def _lsxii_announcement() -> ZeroconfServiceInfo:
+    return ZeroconfServiceInfo(
+        ip_address="192.0.2.11",
+        ip_addresses=["192.0.2.11"],
+        hostname="lsxii.local.",
+        type=AIRPLAY_ZEROCONF_TYPE,
+        name="Living Room LSX II._airplay._tcp.local.",
+        port=7000,
+        properties={
+            "manufacturer": "KEF",
+            "model": "LSX II",
+            "deviceid": "02:00:00:00:00:01",
+            "serialNumber": "AA-BB-CC",
+        },
+    )
+
+
+async def test_zeroconf_tells_a_loaded_entry_its_speaker_was_seen(hass) -> None:
+    """An announcement from a set-up speaker lets an offline one reconnect now."""
+    entry = _loaded_zeroconf_entry(hass, ConfigEntryState.LOADED)
+    entry.runtime_data = Mock()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_ZEROCONF},
+        data=_lsxii_announcement(),
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    entry.runtime_data.async_device_seen.assert_called_once_with()
+
+
+async def test_zeroconf_skips_device_seen_for_an_entry_that_is_not_loaded(
+    hass,
+) -> None:
+    """An entry still retrying setup has no coordinator to notify."""
+    _loaded_zeroconf_entry(hass, ConfigEntryState.SETUP_RETRY)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_ZEROCONF},
+        data=_lsxii_announcement(),
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
 
 
 async def test_zeroconf_legacy_entry_uses_ipv4_when_ipv6_is_preferred(hass) -> None:

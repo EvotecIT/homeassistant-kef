@@ -86,6 +86,12 @@ _INPUT_SOURCES_BASE = {
 }
 
 _STANDBY_OPTIONS = [20, 60, None]
+# Upper bound for a whole HTTP request, including the host name lookup.
+_REQUEST_TOTAL_TIMEOUT = 30.0
+# Optional reads that may fail on connection errors in a row before the speaker
+# counts as gone. One slow path is tolerated; an unplugged speaker fails every
+# read, and waiting out each remaining optional read would take minutes.
+_OPTIONAL_CONNECTION_FAILURE_LIMIT = 2
 _INPUT_SOURCES: dict[str, dict[int | None, tuple[int, int]]] = {}
 _INPUT_SOURCES_RESPONSE: dict[int, tuple[str, int | None, str]] = {}
 for source, code in _INPUT_SOURCES_BASE.items():
@@ -433,6 +439,18 @@ class BaseKefClient(ABC):
         return None
 
 
+def _artwork_url(icon: Any) -> str | None:
+    """Return the track icon only when it is a fetchable URL.
+
+    Physical inputs report a firmware skin reference such as ``skin:iconTv``
+    instead of artwork. Passing that on makes Home Assistant log a failed image
+    fetch on every refresh.
+    """
+    if isinstance(icon, str) and icon.startswith(("http://", "https://")):
+        return icon
+    return None
+
+
 def _set_subwoofer_tuning_field(dsp: dict[str, Any], key: str, value: Any) -> None:
     """Set a subwoofer-tuning field and drop the preset to "custom".
 
@@ -472,6 +490,7 @@ class ModernKefClient(BaseKefClient):
         self._event_queue_id: str | None = None
         self._auth_mode: str | None = None
         self._eq_profile_lock = asyncio.Lock()
+        self._optional_connection_failures = 0
 
     async def async_identify(self) -> KefDeviceInfo:
         """Probe the modern HTTP API."""
@@ -522,6 +541,7 @@ class ModernKefClient(BaseKefClient):
 
     async def async_refresh(self) -> KefSnapshot:
         """Fetch the current state from the speaker."""
+        self._optional_connection_failures = 0
         device = await self.async_identify()
         speaker_status = self._extract_string(
             await self._get_path_value(
@@ -1633,13 +1653,17 @@ class ModernKefClient(BaseKefClient):
     async def async_poll_events(self, timeout: int = 10) -> list[dict[str, Any]]:
         """Poll the KEF event queue and return any pending updates."""
         queue_id = await self._async_ensure_event_queue()
+        hold_seconds = max(1, timeout)
         payload = await self._request_json(
             "GET",
             EVENT_POLL_QUEUE_ENDPOINT,
             params={
                 "queueId": queue_id,
-                "timeout": max(1, timeout),
+                "timeout": hold_seconds,
             },
+            # The speaker holds the request open until an event arrives or
+            # the hold time passes, so reading must be allowed to take longer.
+            read_timeout=hold_seconds + self._request_timeout,
         )
         if not isinstance(payload, list):
             raise KefResponseError("Unexpected KEF event queue payload")
@@ -1657,9 +1681,21 @@ class ModernKefClient(BaseKefClient):
     ) -> dict[str, Any] | Any | None:
         """Get a value from an optional path."""
         try:
-            return await self._get_path_value(path, typed_key=typed_key)
-        except KefError:
+            value = await self._get_path_value(path, typed_key=typed_key)
+        except KefError as err:
+            self._optional_read_failed(err)
             return None
+        self._optional_connection_failures = 0
+        return value
+
+    def _optional_read_failed(self, err: KefError) -> None:
+        """Ignore an unsupported optional path, but not a speaker that is gone."""
+        if not isinstance(err, KefConnectionError):
+            return
+        self._optional_connection_failures += 1
+        if self._optional_connection_failures >= _OPTIONAL_CONNECTION_FAILURE_LIMIT:
+            self._optional_connection_failures = 0
+            raise err
 
     async def _get_value(
         self,
@@ -1759,9 +1795,12 @@ class ModernKefClient(BaseKefClient):
     async def _get_optional_path_item(self, path: str, *, roles: str = "value") -> Any:
         """Fetch an optional raw item from a KEF API path."""
         try:
-            return await self._get_path_item(path, roles=roles)
-        except KefError:
+            item = await self._get_path_item(path, roles=roles)
+        except KefError as err:
+            self._optional_read_failed(err)
             return None
+        self._optional_connection_failures = 0
+        return item
 
     async def _set_data(self, path: str, *, role: str, value: Any) -> None:
         """Set a value on the speaker."""
@@ -1825,6 +1864,7 @@ class ModernKefClient(BaseKefClient):
         *,
         params: Mapping[str, object] | None = None,
         json_payload: Mapping[str, object] | None = None,
+        read_timeout: float | None = None,
     ) -> Any:
         """Issue an HTTP request to the speaker."""
         path = self._extract_nsdk_path(
@@ -1845,12 +1885,14 @@ class ModernKefClient(BaseKefClient):
                     endpoint,
                     params=params,
                     json_payload=json_payload,
+                    read_timeout=read_timeout,
                 )
             return await self._request_json_plain(
                 method,
                 endpoint,
                 params=params,
                 json_payload=json_payload,
+                read_timeout=read_timeout,
             )
         except KefAuthenticationRequiredError:
             if use_secure or endpoint not in {GET_DATA_ENDPOINT, SET_DATA_ENDPOINT}:
@@ -1862,6 +1904,7 @@ class ModernKefClient(BaseKefClient):
                     endpoint,
                     params=params,
                     json_payload=json_payload,
+                    read_timeout=read_timeout,
                 )
             raise
 
@@ -1932,6 +1975,7 @@ class ModernKefClient(BaseKefClient):
         *,
         params: Mapping[str, object] | None = None,
         json_payload: Mapping[str, object] | None = None,
+        read_timeout: float | None = None,
     ) -> Any:
         """Issue a plain-text JSON request to the speaker."""
         url = self._build_url(endpoint, params=params)
@@ -1947,6 +1991,7 @@ class ModernKefClient(BaseKefClient):
             body=body,
             headers=headers or None,
             authenticated=False,
+            read_timeout=read_timeout,
         )
 
     async def _request_json_secure(
@@ -1956,6 +2001,7 @@ class ModernKefClient(BaseKefClient):
         *,
         params: Mapping[str, object] | None = None,
         json_payload: Mapping[str, object] | None = None,
+        read_timeout: float | None = None,
     ) -> Any:
         """Issue an authenticated request using the KEF HMAC/AES scheme."""
         url = self._build_url(endpoint, params=params)
@@ -2003,6 +2049,26 @@ class ModernKefClient(BaseKefClient):
             body=body,
             headers=headers,
             authenticated=True,
+            read_timeout=read_timeout,
+        )
+
+    def _client_timeout(
+        self, read_timeout: float | None = None
+    ) -> aiohttp.ClientTimeout:
+        """Limit connecting and reading, but let host lookups finish.
+
+        Speakers are usually configured by ``.local`` name. Once a speaker is
+        switched off, looking that name up can take several seconds to fail.
+        If the request timeout ran out first, aiohttp would leave the lookup
+        running on its own and Home Assistant would log its eventual failure
+        with a traceback on every retry. Letting the lookup finish turns it
+        into an ordinary connection error instead.
+        """
+        sock_read = read_timeout or self._request_timeout
+        return aiohttp.ClientTimeout(
+            total=max(_REQUEST_TOTAL_TIMEOUT, sock_read + self._request_timeout),
+            sock_connect=self._request_timeout,
+            sock_read=sock_read,
         )
 
     async def _execute_json_request(
@@ -2014,11 +2080,12 @@ class ModernKefClient(BaseKefClient):
         body: str | None = None,
         headers: Mapping[str, str] | None = None,
         authenticated: bool,
+        read_timeout: float | None = None,
     ) -> Any:
         """Execute a request and parse the JSON response."""
         kwargs: dict[str, object] = {
             "allow_redirects": False,
-            "timeout": aiohttp.ClientTimeout(total=self._request_timeout),
+            "timeout": self._client_timeout(read_timeout),
         }
         if headers:
             kwargs["headers"] = dict(headers)
@@ -2319,7 +2386,7 @@ class ModernKefClient(BaseKefClient):
             artist=metadata.get("artist"),
             album_artist=metadata.get("albumArtist") or metadata.get("artist"),
             album=metadata.get("album"),
-            image_url=track_roles.get("icon"),
+            image_url=_artwork_url(track_roles.get("icon")),
             service_id=metadata.get("serviceID"),
             codec=(
                 active_resource.get("codec")

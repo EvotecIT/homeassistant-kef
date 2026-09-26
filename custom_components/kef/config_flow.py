@@ -13,11 +13,17 @@ from homeassistant.config_entries import (
     SOURCE_REAUTH,
     SOURCE_RECONFIGURE,
     SOURCE_ZEROCONF,
+    ConfigEntryState,
     ConfigFlow,
     OptionsFlow,
 )
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+)
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .api import async_create_client
@@ -27,14 +33,18 @@ from .const import (
     CONF_DEVICE_ID,
     CONF_DISCOVERY_ID,
     CONF_ENABLE_DIAGNOSTICS,
+    CONF_OFFLINE_RETRY_INTERVAL,
     CONF_SCAN_INTERVAL,
     CONF_TCP_PORT,
     DEFAULT_ENABLE_DIAGNOSTICS,
     DEFAULT_LEGACY_PORT,
+    DEFAULT_OFFLINE_RETRY_INTERVAL_SECONDS,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
+    MAX_OFFLINE_RETRY_INTERVAL_SECONDS,
     MAX_SCAN_INTERVAL_SECONDS,
+    MIN_OFFLINE_RETRY_INTERVAL_SECONDS,
     MIN_SCAN_INTERVAL_SECONDS,
 )
 from .exceptions import (
@@ -229,6 +239,10 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_HOST: legacy_host,
                         CONF_DISCOVERY_ID: discovery_unique_id,
                     }
+                if existing.state is ConfigEntryState.LOADED:
+                    # The announcement means the speaker is reachable again;
+                    # skip the rest of the offline retry wait.
+                    existing.runtime_data.async_device_seen()
                 await self.async_set_unique_id(existing.unique_id)
                 self._abort_if_unique_id_configured(updates=updates)
             await self.async_set_unique_id(discovery_unique_id)
@@ -435,6 +449,22 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         return True
 
 
+def _seconds_slider(minimum: int, maximum: int, *, step: int) -> vol.All:
+    """Return a seconds slider that stores a whole number."""
+    return vol.All(
+        NumberSelector(
+            NumberSelectorConfig(
+                min=minimum,
+                max=maximum,
+                step=step,
+                mode=NumberSelectorMode.SLIDER,
+                unit_of_measurement="s",
+            )
+        ),
+        vol.Coerce(int),
+    )
+
+
 class KefOptionsFlow(OptionsFlow):
     """Handle KEF options."""
 
@@ -460,12 +490,19 @@ class KefOptionsFlow(OptionsFlow):
                             CONF_SCAN_INTERVAL,
                             DEFAULT_SCAN_INTERVAL_SECONDS,
                         ),
-                    ): vol.All(
-                        vol.Coerce(int),
-                        vol.Range(
-                            min=MIN_SCAN_INTERVAL_SECONDS,
-                            max=MAX_SCAN_INTERVAL_SECONDS,
+                    ): _seconds_slider(
+                        MIN_SCAN_INTERVAL_SECONDS, MAX_SCAN_INTERVAL_SECONDS, step=1
+                    ),
+                    vol.Optional(
+                        CONF_OFFLINE_RETRY_INTERVAL,
+                        default=self.config_entry.options.get(
+                            CONF_OFFLINE_RETRY_INTERVAL,
+                            DEFAULT_OFFLINE_RETRY_INTERVAL_SECONDS,
                         ),
+                    ): _seconds_slider(
+                        MIN_OFFLINE_RETRY_INTERVAL_SECONDS,
+                        MAX_OFFLINE_RETRY_INTERVAL_SECONDS,
+                        step=1,
                     ),
                     vol.Optional(
                         CONF_ENABLE_DIAGNOSTICS,

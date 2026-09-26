@@ -432,13 +432,16 @@ async def test_modern_poll_events_creates_queue_and_polls(monkeypatch, hass) -> 
     """Modern client should subscribe to the event queue before polling it."""
     calls = []
 
-    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+    async def fake_request(
+        self, method, endpoint, *, params=None, json_payload=None, read_timeout=None
+    ):
         calls.append(
             {
                 "method": method,
                 "endpoint": endpoint,
                 "params": params,
                 "json_payload": json_payload,
+                "read_timeout": read_timeout,
             }
         )
         if endpoint == EVENT_MODIFY_QUEUE_ENDPOINT:
@@ -468,6 +471,8 @@ async def test_modern_poll_events_creates_queue_and_polls(monkeypatch, hass) -> 
         "endpoint": EVENT_POLL_QUEUE_ENDPOINT,
         "params": {"queueId": "{queue-123}", "timeout": 2},
         "json_payload": None,
+        # The speaker holds the poll open for 2s, so reading gets that on top.
+        "read_timeout": 2 + client._request_timeout,
     }
 
 
@@ -479,7 +484,9 @@ async def test_modern_reset_event_queue_recreates_subscription(
     queue_ids = iter(["{queue-a}", "{queue-b}"])
     polled_with = []
 
-    async def fake_request(self, method, endpoint, *, params=None, json_payload=None):
+    async def fake_request(
+        self, method, endpoint, *, params=None, json_payload=None, read_timeout=None
+    ):
         if endpoint == EVENT_MODIFY_QUEUE_ENDPOINT:
             return next(queue_ids)
         if endpoint == EVENT_POLL_QUEUE_ENDPOINT:
@@ -657,6 +664,123 @@ def test_lsxiilt_model_uses_the_limited_source_set() -> None:
         "optical",
         "usb",
     )
+
+
+@pytest.mark.parametrize(
+    ("icon", "expected"),
+    [
+        ("skin:iconTv", None),
+        ("", None),
+        (None, None),
+        ("https://i.scdn.co/image/abc", "https://i.scdn.co/image/abc"),
+        ("http://192.0.2.1/art.jpg", "http://192.0.2.1/art.jpg"),
+    ],
+)
+async def test_playback_artwork_only_uses_fetchable_urls(
+    hass, icon, expected
+) -> None:
+    """Input skin references such as skin:iconTv must not become artwork."""
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    player_data = copy.deepcopy(PLAYER_DATA_VALUE)
+    player_data["trackRoles"]["icon"] = icon
+
+    playback = client._parse_playback(player_data, None)
+
+    assert playback is not None
+    assert playback.image_url == expected
+
+
+async def test_request_timeout_leaves_room_for_host_lookup(hass) -> None:
+    """A slow .local lookup must fail on its own, not be cut off by the timeout."""
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+
+    timeout = client._client_timeout()
+
+    assert timeout.connect is None
+    assert timeout.sock_connect == client._request_timeout
+    assert timeout.sock_read == client._request_timeout
+    assert timeout.total > 10
+
+
+async def test_event_poll_read_timeout_outlasts_the_speaker_hold(hass) -> None:
+    """A long event poll must not be cut off while the speaker holds it open."""
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+
+    timeout = client._client_timeout(read_timeout=24)
+
+    assert timeout.sock_read == 24
+    assert timeout.sock_connect == client._request_timeout
+    assert timeout.total > timeout.sock_read
+
+
+def _client_with_path_results(monkeypatch, hass, results) -> ModernKefClient:
+    """Return a client whose path reads return or raise the given results."""
+    pending = iter(results)
+
+    async def fake_get_value(self, path, *, typed_key=None):
+        result = next(pending)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(ModernKefClient, "_get_path_value", fake_get_value)
+    return ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+
+
+async def test_optional_reads_abort_when_the_speaker_is_gone(monkeypatch, hass) -> None:
+    """Two connection failures in a row mean the speaker stopped answering."""
+    client = _client_with_path_results(
+        monkeypatch,
+        hass,
+        [KefConnectionError("timed out"), KefConnectionError("cannot connect")],
+    )
+
+    assert await client._get_optional_path_value("settings:/a") is None
+    with pytest.raises(KefConnectionError):
+        await client._get_optional_path_value("settings:/b")
+
+
+async def test_one_slow_optional_path_is_still_ignored(monkeypatch, hass) -> None:
+    """A single timed-out path followed by a good read keeps the refresh going."""
+    client = _client_with_path_results(
+        monkeypatch,
+        hass,
+        [KefConnectionError("timed out"), 7, KefConnectionError("timed out")],
+    )
+
+    assert await client._get_optional_path_value("settings:/a") is None
+    assert await client._get_optional_path_value("settings:/b") == 7
+    assert await client._get_optional_path_value("settings:/c") is None
+
+
+async def test_unsupported_optional_paths_never_abort(monkeypatch, hass) -> None:
+    """Paths a model does not support keep returning no value."""
+    client = _client_with_path_results(
+        monkeypatch,
+        hass,
+        [KefResponseError("missing path")] * 5,
+    )
+
+    for index in range(5):
+        assert await client._get_optional_path_value(f"settings:/{index}") is None
+
+
+async def test_refresh_starts_with_a_clean_failure_count(monkeypatch, hass) -> None:
+    """A failure left over from an earlier refresh must not count again."""
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    client._optional_connection_failures = 1
+    seen: list[int] = []
+
+    async def fake_identify(self):
+        seen.append(self._optional_connection_failures)
+        raise KefConnectionError("stop here")
+
+    monkeypatch.setattr(ModernKefClient, "async_identify", fake_identify)
+
+    with pytest.raises(KefConnectionError):
+        await client.async_refresh()
+
+    assert seen == [0]
 
 
 async def test_modern_optional_network_info_is_absent_when_unavailable(
@@ -2369,11 +2493,15 @@ async def test_modern_request_json_uses_secure_post_for_setdata_mode(
     async def fake_auth_mode(self):
         return AUTH_MODE_SETDATA
 
-    async def fake_plain(self, method, endpoint, *, params=None, json_payload=None):
+    async def fake_plain(
+        self, method, endpoint, *, params=None, json_payload=None, read_timeout=None
+    ):
         calls.append(("plain", method, endpoint))
         return {}
 
-    async def fake_secure(self, method, endpoint, *, params=None, json_payload=None):
+    async def fake_secure(
+        self, method, endpoint, *, params=None, json_payload=None, read_timeout=None
+    ):
         calls.append(("secure", method, endpoint, json_payload))
         return {"ok": True}
 
@@ -2416,11 +2544,15 @@ async def test_modern_request_json_uses_secure_get_for_all_mode(
     async def fake_auth_mode(self):
         return AUTH_MODE_ALL
 
-    async def fake_plain(self, method, endpoint, *, params=None, json_payload=None):
+    async def fake_plain(
+        self, method, endpoint, *, params=None, json_payload=None, read_timeout=None
+    ):
         calls.append(("plain", method, endpoint))
         return {}
 
-    async def fake_secure(self, method, endpoint, *, params=None, json_payload=None):
+    async def fake_secure(
+        self, method, endpoint, *, params=None, json_payload=None, read_timeout=None
+    ):
         calls.append(("secure", method, endpoint, params))
         return [{"string_": "3.0.135.0x60acbcf", "type": "string_"}]
 

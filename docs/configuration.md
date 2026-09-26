@@ -32,7 +32,23 @@ Open the integration's **Configure** dialog.
 | --- | --- |
 | Speaker password | Used when the local web/API interface requires authentication |
 | Polling interval | 10 seconds; accepts 5–120 seconds |
+| Offline retry interval | 60 seconds; accepts 30–600 seconds. How often an offline speaker is retried |
 | Diagnostics | Off by default; enables optional diagnostic entities |
+
+### Offline speakers
+
+A speaker on a switched-off power strip or desk socket goes offline without
+warning. One or two missed polls keep the last known state, so a brief network
+hiccup does not flip every entity to unavailable. After three missed polls in a
+row the entities become unavailable and the integration retries at the offline
+retry interval instead of the polling interval. The live event queue pauses
+while the speaker is offline. Home Assistant logs one error when the speaker
+goes offline and one message when it comes back.
+
+A speaker announces itself on the network when it powers up. That announcement
+triggers an immediate retry, so a speaker usually comes back within seconds of
+being switched on, whatever the offline retry interval is set to. The interval
+only matters if the announcement is missed.
 
 ## Daily controls and settings
 
