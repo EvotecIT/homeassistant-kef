@@ -358,6 +358,9 @@ class KefSnapshot:
     player_notification_active: bool | None
     calibration_status: KefCalibrationStatus | None
     calibration_result: float | None
+    auto_detect_placement: bool | None
+    prefer_virtual_x: bool | None
+    virtual_x_active: bool | None
     source_list: tuple[str, ...]
     default_volume_by_source: dict[str, int] = field(default_factory=dict)
 

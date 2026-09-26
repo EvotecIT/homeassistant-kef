@@ -44,10 +44,21 @@ Additional entities expose supported startup-volume, standby, wake-source, LED,
 hardware, privacy, streaming-quality, and regional settings. Not every family or
 firmware provides every setting. Use the controls visible on your own device.
 
+On the XIO, **Wall mounted** can only be changed while **Auto-detect placement**
+is off; with auto-detect on, the soundbar sets it itself. The KEF Connect app
+has no manual wall-mounted setting, so this switch is the only way to override
+the detected placement. Turning auto-detect off here keeps the existing room
+calibration; run **Start calibration** if the soundbar is physically moved.
+
 ## Firmware updates
 
 The update entity exposes supported firmware updates. Use a maintenance window
 and follow the speaker's update requirements.
+
+Update availability and versions always come from the speaker itself. When the
+update dialog is opened, KEF's published release notes for the reported version
+are fetched from kef.com; if that page is unreachable, the dialog simply shows
+no notes.
 
 Advanced users can upload a local `.swu` using `kef.install_firmware_file`.
 The action requires the KEF **update entity** in `entity_id` and a `file_path`

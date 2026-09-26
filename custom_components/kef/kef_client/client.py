@@ -310,6 +310,18 @@ class BaseKefClient(ABC):
         """Set the sound profile preset (XIO only)."""
 
     @abstractmethod
+    async def async_set_wall_mounted(self, mounted: bool) -> dict[str, Any]:
+        """Set wall-mounted placement and return the applied native profile."""
+
+    @abstractmethod
+    async def async_set_auto_detect_placement(self, enabled: bool) -> None:
+        """Enable or disable automatic placement detection (XIO only)."""
+
+    @abstractmethod
+    async def async_set_prefer_virtual_x(self, enabled: bool) -> None:
+        """Prefer DTS Virtual:X over the Dolby virtualizer (XIO only)."""
+
+    @abstractmethod
     async def async_get_calibration_status(self) -> dict[str, Any] | None:
         """Return the room calibration status (XIO only)."""
 
@@ -804,6 +816,24 @@ class ModernKefClient(BaseKefClient):
                 typed_key="double_",
             )
         )
+        auto_detect_placement = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["auto_detect_placement"],
+                typed_key="bool_",
+            )
+        )
+        prefer_virtual_x = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["prefer_virtual_x"],
+                typed_key="bool_",
+            )
+        )
+        virtual_x_active = self._extract_bool(
+            await self._get_optional_path_value(
+                PROBE_PATHS["virtual_x_active"],
+                typed_key="bool_",
+            )
+        )
 
         return KefSnapshot(
             device=device,
@@ -892,6 +922,9 @@ class ModernKefClient(BaseKefClient):
                 else None
             ),
             calibration_result=calibration_result,
+            auto_detect_placement=auto_detect_placement,
+            prefer_virtual_x=prefer_virtual_x,
+            virtual_x_active=virtual_x_active,
             source_list=source_list,
             default_volume_by_source=default_volume_by_source,
         )
@@ -1263,6 +1296,28 @@ class ModernKefClient(BaseKefClient):
         """Set the sound profile preset."""
         await self._update_eq_profile(
             lambda dsp: dsp.__setitem__("soundProfile", value)
+        )
+
+    async def async_set_wall_mounted(self, mounted: bool) -> dict[str, Any]:
+        """Set wall-mounted placement."""
+        return await self._update_eq_profile(
+            lambda dsp: dsp.__setitem__("wallMounted", mounted)
+        )
+
+    async def async_set_auto_detect_placement(self, enabled: bool) -> None:
+        """Enable or disable automatic placement detection."""
+        await self._set_data(
+            PROBE_PATHS["auto_detect_placement"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
+        )
+
+    async def async_set_prefer_virtual_x(self, enabled: bool) -> None:
+        """Prefer DTS Virtual:X over the Dolby virtualizer."""
+        await self._set_data(
+            PROBE_PATHS["prefer_virtual_x"],
+            role="value",
+            value={"type": "bool_", "bool_": enabled},
         )
 
     async def async_get_calibration_status(self) -> dict[str, Any] | None:
@@ -2433,6 +2488,9 @@ class LegacyBinaryClient(BaseKefClient):
             player_notification_active=None,
             calibration_status=None,
             calibration_result=None,
+            auto_detect_placement=None,
+            prefer_virtual_x=None,
+            virtual_x_active=None,
             source_list=LEGACY_SOURCE_LIST,
             default_volume_by_source={},
         )
@@ -2688,6 +2746,24 @@ class LegacyBinaryClient(BaseKefClient):
         """Legacy speakers do not expose sound profile configuration."""
         raise KefUnsupportedDeviceError(
             "Sound profile is not supported for legacy KEF"
+        )
+
+    async def async_set_wall_mounted(self, mounted: bool) -> dict[str, Any]:
+        """Legacy speakers do not expose placement configuration."""
+        raise KefUnsupportedDeviceError(
+            "Wall-mounted placement is not supported for legacy KEF"
+        )
+
+    async def async_set_auto_detect_placement(self, enabled: bool) -> None:
+        """Legacy speakers do not expose placement configuration."""
+        raise KefUnsupportedDeviceError(
+            "Placement auto-detection is not supported for legacy KEF"
+        )
+
+    async def async_set_prefer_virtual_x(self, enabled: bool) -> None:
+        """Legacy speakers do not expose virtualizer configuration."""
+        raise KefUnsupportedDeviceError(
+            "Virtualizer preference is not supported for legacy KEF"
         )
 
     async def async_get_calibration_status(self) -> dict[str, Any] | None:

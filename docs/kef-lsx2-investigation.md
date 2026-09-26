@@ -151,6 +151,41 @@ The path `kef:eqProfile` returned a structured object like:
 - `dspInfo.balance`
 - `dspInfo.highPassMode`
 
+## Modern EQ profile v2 findings
+
+`kef:eqProfile/v2` returns a flat `kefEqProfileV2` object. Beyond the v1
+`dspInfo` fields above it adds `subwooferOut`, `soundProfile`,
+`dialogueMode`, `wallMounted`, `wirelessSub`, and `isEqMode`.
+
+An LSX II and an XIO report the same schema: the LSX II includes
+`soundProfile`, `dialogueMode`, and `wallMounted` even though the KEF Connect
+app only offers those on the XIO. The same applies to the XIO settings paths
+`settings:/kef/host/autoDetectPlacement` and `settings:/kef/dsp/preferVirtualX`,
+which an LSX II also answers. A field or path being present does not mean the
+model uses it, so these controls are gated by model rather than by value.
+
+`dialogueMode` is accepted and persisted by both models, but a live listening
+test on each produced no audible change. The KEF Connect app has no separate
+dialogue setting; dialogue enhancement on the XIO is the `dialogue` value of
+`soundProfile`. The integration does not expose `dialogueMode` for that reason.
+
+## XIO virtualizer status
+
+The playback codec string (for example `Dolby Digital Plus - Dolby Surround`)
+only names the Dolby upmixer. Whether DTS Virtual:X is also processing is a
+separate flag, `imx8af:decoderInfoVirtualXActive`, which turns true when
+`settings:/kef/dsp/preferVirtualX` is enabled. The KEF Connect app lists both
+("Dolby Surround, Virtual:X").
+
+## XIO wireless subwoofer paths
+
+Reading `kef:ble/updateStatus`, `kef:ble/updateServer/txVersion`, and
+per-device `kef:ble/ui/<device>/version` is safe. Activating
+`kef:ble/checkForUpdates` is not: on a live XIO it woke the soundbar from
+standby and disconnected the paired KW2 receiver until the subwoofer was
+power-cycled. Leave firmware checks and updates for the wireless subwoofer
+module to the KEF Connect app.
+
 ## Fixture guidance
 
 Capture partially populated playback responses as well as streaming metadata.
