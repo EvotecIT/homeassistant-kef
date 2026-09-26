@@ -177,6 +177,12 @@ separate flag, `imx8af:decoderInfoVirtualXActive`, which turns true when
 `settings:/kef/dsp/preferVirtualX` is enabled. The KEF Connect app lists both
 ("Dolby Surround, Virtual:X").
 
+DTS content reports a bare `DTS` codec string with no processing part, and the
+flag is true even with `preferVirtualX` off (observed with DTS 5.1: six stream
+channels, `nrAudioChannels` 12). The Dolby upmixer cannot process DTS, so
+Virtual:X renders it; the KEF Connect app shows just "DTS Virtual:X". The
+virtualizer sensor reports this as "DTS Virtual:X 5.1.2" rather than "Direct".
+
 ## XIO wireless subwoofer paths
 
 Reading `kef:ble/updateStatus`, `kef:ble/updateServer/txVersion`, and
