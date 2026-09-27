@@ -57,6 +57,10 @@ def audio_virtualizer_value(data: KefSnapshot) -> str | None:
         virtualizer_name = codec
     else:
         virtualizer_name = "Direct"
+    if virtualizer_name == "Direct" and data.virtual_x_active:
+        # Without a Dolby processing part (e.g. DTS, which the Dolby upmixer
+        # cannot process), Virtual:X is the renderer itself, not passthrough.
+        return f"DTS Virtual:X {format_channels(8)}"
     if virtualizer_name == "Direct":
         channel_format = format_channels(data.playback.stream_channels)
         if channel_format is None:

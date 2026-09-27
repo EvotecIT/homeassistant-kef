@@ -112,6 +112,30 @@ def test_audio_virtualizer_includes_virtual_x_when_active() -> None:
     assert audio_virtualizer_value(snapshot) == "Dolby Surround 5.1.2 + Virtual:X"
 
 
+def test_audio_virtualizer_names_virtual_x_as_renderer_for_dts() -> None:
+    """DTS has no Dolby processing part, so Virtual:X renders it, not passthrough."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    assert snapshot.playback is not None
+    snapshot.playback.codec = "DTS"
+    snapshot.playback.stream_channels = 6
+    snapshot.playback.audio_channels = 12
+    snapshot.virtual_x_active = True
+
+    assert audio_codec_value(snapshot) == "DTS 5.1"
+    assert audio_virtualizer_value(snapshot) == "DTS Virtual:X 5.1.2"
+
+
+def test_audio_virtualizer_keeps_direct_when_virtual_x_is_off() -> None:
+    """Real passthrough without the Virtual:X flag stays Direct."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    assert snapshot.playback is not None
+    snapshot.playback.codec = "DTS"
+    snapshot.playback.stream_channels = 6
+    snapshot.virtual_x_active = False
+
+    assert audio_virtualizer_value(snapshot) == "Direct 5.1"
+
+
 @pytest.mark.parametrize(
     ("status", "expected"),
     [
