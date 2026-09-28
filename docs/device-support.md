@@ -14,9 +14,9 @@ support and real-hardware validation are different things.
 | LS50 Wireless II, LS60 | Modern API compatibility targets; model-specific hardware reports are welcome |
 | First-generation LSX / LS50 Wireless | Legacy transport implemented; further real-hardware validation is needed |
 
-Coda W and Muo are Bluetooth-only speakers without a network API and are not
-supported. What each model reports and supports is in the
-[model notes](model-notes.md).
+Coda W and Muo have Bluetooth connectivity but no supported network API for
+this integration, so they are not supported. What each model reports and
+supports is in the [model notes](model-notes.md).
 
 Supported devices can expose volume, mute, sources, playback controls, startup
 volume, standby, wake behavior, LEDs, and additional settings. Playback controls

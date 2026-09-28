@@ -31,6 +31,9 @@ Modern speakers advertise `_airplay._tcp`, `_raop._tcp`, `_http._tcp`, and
 does not reliably carry a per-speaker name, so the name is read from
 `settings:/deviceName` instead.
 
+An April 2026 LSX II probe also read `settings:/airplay/deviceName` and
+`network:profile`. Neither is in the KEF Connect 1.31.0 path list below.
+
 ## HTTP API
 
 | Endpoint | Use |
@@ -243,8 +246,9 @@ The Integration column shows how the integration covers each path:
 
 - ✓: the integration reads or writes this path directly (75 paths).
 - ✓ via EQ profile: the setting is available as an entity, but the integration
-  reads and writes it as a field of `kef:eqProfile/v2`, not through this path
-  (19 paths). The individual DSP paths mostly return 500.
+  reads and writes it through `kef:eqProfile` when available, falling back to
+  `kef:eqProfile/v2`, rather than through this individual path (19 paths). The
+  individual DSP paths mostly return 500.
 - Empty: not used by the integration (95 paths).
 
 ### `settings:/kef/host/`

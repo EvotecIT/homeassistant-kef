@@ -22,7 +22,8 @@ tested on hardware. Device identifiers are omitted.
 
 The version string (`settings:/version`) has the form `3.0.137.0xf884312`.
 `settings:/system/memberId` starts with a model prefix: `lsxii-`, `lsxlite-`,
-or `xio-`. Coda W and Muo are Bluetooth-only and have no network API.
+or `xio-`. Coda W and Muo have Bluetooth connectivity but no supported network
+API for this integration.
 
 ## Inputs
 
