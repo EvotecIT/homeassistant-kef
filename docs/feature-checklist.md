@@ -16,11 +16,15 @@ integration already exist; this list tracks remaining work.
 ## Undocumented capabilities
 
 - [ ] Investigate alert, timer, and alarm writes before exposing actions.
-- [ ] Determine whether grouping, multiroom, and notification queues provide
-  useful, controllable features.
+- [ ] Determine whether KEF grouping (`grouping:members`, answered by the LSX II
+  models but not the XIO) and the notification queue provide useful,
+  controllable features.
+- [ ] Consider exposing the scheduled reboot settings
+  (`settings:/kef/scheduledReboot/*`), present on the LSX II, LSX II LT, and
+  XIO, and the Bluetooth connection state from `bluetooth:state`.
 - [ ] Revisit XIO wireless subwoofer (BLE) firmware versions once wireless rear
   speakers ship. Reads are safe, but activating an update check disconnected the
-  KW2 receiver; see the [protocol notes](kef-lsx2-investigation.md).
+  KW2 receiver; see the [model notes](model-notes.md#wireless-subwoofer).
 
 ## Home Assistant usability
 

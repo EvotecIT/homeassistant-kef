@@ -84,7 +84,7 @@ if its network address changes.
 | Configure the speaker, password, or settings | [Configuration and troubleshooting](docs/configuration.md) |
 | Add playback or volume automations | [Automations](docs/automations.md) |
 | Use KEF from Python | [Python library](docs/python-library.md) |
-| Contribute or investigate a device | [Development](docs/development.md) · [Open work](docs/feature-checklist.md) |
+| Contribute or investigate a device | [Development](docs/development.md) · [API notes](docs/api-notes.md) · [Model notes](docs/model-notes.md) · [Open work](docs/feature-checklist.md) |
 
 ## Screenshots
 
