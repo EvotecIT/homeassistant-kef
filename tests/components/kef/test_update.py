@@ -51,15 +51,27 @@ def test_firmware_update_reports_downloading_update_in_progress() -> None:
     assert entity.in_progress is True
 
 
+class _PlatformUpdateEntity(KefFirmwareUpdateEntity):
+    """The real entity without device info, for the platform tests.
+
+    Recent Home Assistant versions read `device_info` when an entity is added,
+    and the real one needs a real config entry. These tests are about the
+    update step and the schedule, not about the device registry.
+    """
+
+    device_info = None
+
+
 def _checking_entity(
     *,
     model: str = "LSXII",
     state: str | None = "idle",
     last_update_success: bool = True,
     check: AsyncMock | None = None,
+    entity_class: type[KefFirmwareUpdateEntity] = KefFirmwareUpdateEntity,
 ):
     """Create an update entity with a fake coordinator and client."""
-    entity = KefFirmwareUpdateEntity.__new__(KefFirmwareUpdateEntity)
+    entity = entity_class.__new__(entity_class)
     entity.coordinator = SimpleNamespace(
         data=SimpleNamespace(
             device=replace(TEST_DEVICE_INFO, model=model),
@@ -72,7 +84,7 @@ def _checking_entity(
         ),
         async_request_refresh=AsyncMock(),
         last_update_success=last_update_success,
-        config_entry=SimpleNamespace(title="Bedroom"),
+        config_entry=SimpleNamespace(title="Bedroom", domain="kef"),
     )
     return entity
 
@@ -185,7 +197,7 @@ async def _platform_entity(hass):
     """Add an update entity to Home Assistant's update platform."""
     assert await async_setup_component(hass, "homeassistant", {})
     assert await async_setup_component(hass, "update", {})
-    entity = _checking_entity()
+    entity = _checking_entity(entity_class=_PlatformUpdateEntity)
     entity.coordinator.async_add_listener = Mock(return_value=Mock())
     entity.coordinator_context = None
     entity.hass = hass
