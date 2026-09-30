@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import aiohttp
+import pytest
 
 from custom_components.kef.models import KefFirmwareUpdateInfo
 from custom_components.kef.release_notes import (
@@ -12,6 +13,7 @@ from custom_components.kef.release_notes import (
     find_release,
     format_release,
     parse_release_notes,
+    release_notes_url,
 )
 from custom_components.kef.update import KefFirmwareUpdateEntity
 
@@ -130,6 +132,27 @@ def test_format_release_renders_markdown() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("model", "section"),
+    [
+        ("LSXII", "lsxii"),
+        ("LSX2", "lsxii"),
+        ("LSXIILT", "lsxiilt"),
+        ("LS50WII", "ls50wii"),
+        ("LS60W", "ls60w"),
+        ("xio", "xio"),
+    ],
+)
+def test_release_notes_url_points_at_the_model_section(model, section) -> None:
+    """A known model opens its own section of KEF's page."""
+    assert release_notes_url(model) == f"{RELEASE_NOTES_URL}#{section}"
+
+
+def test_release_notes_url_falls_back_to_the_page_for_unknown_models() -> None:
+    """An unknown model still gets a page, just not a section anchor."""
+    assert release_notes_url("UNKNOWN") == RELEASE_NOTES_URL
+
+
 def _update_entity(hass, firmware_version: str, available: str | None = None):
     """Create an XIO firmware update entity backed by a static snapshot."""
     entity = KefFirmwareUpdateEntity.__new__(KefFirmwareUpdateEntity)
@@ -146,6 +169,26 @@ def _update_entity(hass, firmware_version: str, available: str | None = None):
         ),
     )
     return entity
+
+
+def test_update_entity_release_url_is_a_page_not_the_firmware_image(hass) -> None:
+    """The release announcements link must not be the .swu download."""
+    entity = _update_entity(hass, "1.4.135", available="1.4.136")
+    entity.coordinator.data.firmware_update = KefFirmwareUpdateInfo(
+        state="downloaded",
+        available_version="1.4.136",
+        url="https://assets.kef.com/pm/pm_firmware/xio/XIO_V14136-signed.swu",
+    )
+
+    assert entity.release_url == f"{RELEASE_NOTES_URL}#xio"
+
+
+def test_update_entity_has_no_release_url_without_update_info(hass) -> None:
+    """No firmware-update data from the speaker means no link."""
+    entity = _update_entity(hass, "1.4.135")
+    entity.coordinator.data.firmware_update = None
+
+    assert entity.release_url is None
 
 
 async def test_update_entity_returns_notes_for_the_reported_version(
