@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import time
+import zlib
+from datetime import datetime
 
 import aiohttp
 from homeassistant.components.update import (
@@ -13,10 +15,12 @@ from homeassistant.components.update import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
+from .exceptions import KefError
 from .models import KefBackend
 from .release_notes import (
     RELEASE_NOTES_URL,
@@ -28,6 +32,13 @@ from .release_notes import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# Once a night, each speaker is asked to look for a newer firmware image. The
+# window matches when the speakers run their own overnight update cycle
+# (installs were seen between 02:30 and 04:00), and every speaker gets its own
+# fixed minute in it so they are not all asked at the same moment.
+_CHECK_WINDOW_START_MINUTE = 2 * 60 + 30
+_CHECK_WINDOW_MINUTES = 90
 
 _RELEASE_NOTES_TIMEOUT = aiohttp.ClientTimeout(total=10)
 _RELEASE_NOTES_CACHE_SECONDS = 3600
@@ -41,6 +52,20 @@ _IN_PROGRESS_STATES = {
     "installing",
     "updateInProgress",
 }
+
+# Never ask a speaker to check while it is already handling an image.
+_NO_CHECK_STATES = _IN_PROGRESS_STATES | {"downloaded"}
+
+
+def nightly_check_time(unique_id: str) -> tuple[int, int]:
+    """Return the (hour, minute) of a speaker's nightly check.
+
+    The minute inside the window is derived from the unique ID, so a speaker
+    always gets the same time and different speakers get different ones.
+    """
+    offset = zlib.crc32(unique_id.encode()) % _CHECK_WINDOW_MINUTES
+    hour, minute = divmod(_CHECK_WINDOW_START_MINUTE + offset, 60)
+    return hour, minute
 
 
 async def async_setup_entry(
@@ -115,6 +140,61 @@ class KefFirmwareUpdateEntity(
         """Return a short summary of the current firmware state."""
         update = self.coordinator.data.firmware_update
         return update.state if update is not None else None
+
+    async def async_added_to_hass(self) -> None:
+        """Schedule the nightly firmware check."""
+        await super().async_added_to_hass()
+        hour, minute = nightly_check_time(self.unique_id or "")
+        _LOGGER.debug(
+            "Nightly firmware check for %s scheduled at %02d:%02d",
+            self.coordinator.config_entry.title,
+            hour,
+            minute,
+        )
+        self.async_on_remove(
+            async_track_time_change(
+                self.hass,
+                self._async_nightly_check,
+                hour=hour,
+                minute=minute,
+                second=0,
+            )
+        )
+
+    async def _async_nightly_check(self, now: datetime) -> None:
+        """Run the scheduled check."""
+        await self.async_update()
+
+    async def async_update(self) -> None:
+        """Ask the speaker to check for firmware, then refresh its status.
+
+        Home Assistant calls this for "Check for updates" in Settings >
+        Updates and for the homeassistant.update_entity service, and the
+        nightly schedule calls it too.
+        The coordinator's own update step only re-reads the status, which
+        never makes the speaker look for a new image. Only the speaker's main
+        firmware check is used; the XIO's wireless subwoofer module has its own
+        separate check (kef:ble/*), which this integration never activates.
+        """
+        if not self.enabled:
+            return
+        if self._can_check_firmware():
+            _LOGGER.debug(
+                "Asking KEF speaker %s to check for firmware",
+                self.coordinator.config_entry.title,
+            )
+            try:
+                await self.coordinator.client.async_check_for_firmware_update()
+            except KefError as err:
+                _LOGGER.debug("KEF firmware check failed: %s", err)
+        await self.coordinator.async_request_refresh()
+
+    def _can_check_firmware(self) -> bool:
+        """Return whether the speaker can safely be asked to check now."""
+        if not self.coordinator.last_update_success:
+            return False
+        update = self.coordinator.data.firmware_update
+        return update is None or update.state not in _NO_CHECK_STATES
 
     async def async_release_notes(self) -> str | None:
         """Return KEF's published notes for the version the speaker reports.

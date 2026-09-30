@@ -210,5 +210,31 @@ the favourite button setting cannot be gated by model.
 
 The speaker's own update check is the source of truth for available firmware.
 KEF's published release notes listed LSX II `3.0.138` while the speakers still
-reported no update. Checking for main firmware updates on a playing LSX II was
-harmless; whether a check wakes a speaker from standby has not been tested.
+reported no update.
+
+`firmwareupdate:updateStatus` reports `idle` when nothing is pending,
+`newUpdateAvailable` once the speaker has found an image, and `downloaded` after
+it has fetched it. Speakers check on their own overnight: one LSX II reported
+`downloaded` at 02:38. On that speaker the download later reverted to `idle`
+about five hours afterwards, without any firmware request from Home Assistant,
+and `newUpdateAvailable` returned about twenty minutes after that. The cause is
+not known.
+
+Speakers also update themselves overnight. Four LSX II speakers became
+unreachable for about two minutes between 02:32 and 03:59, without any request
+from Home Assistant, and came back on the newest version, which fits an install
+reboot. One LSX II that was playing overnight received the download on two
+nights (at 03:29 and at 02:38) and had lost it again by morning.
+
+Activating `firmwareupdate:checkForUpdate` on an LSX II answered within a few
+seconds in both states tested. In standby (`networkStandby`) it answered `idle`
+and the speaker stayed in standby for the following minute. On a playing LSX II
+that already reported `newUpdateAvailable` the status did not change and playback
+was not affected. A playing LSX II LT answered `idle` as well.
+
+On the XIO in standby the check left the speaker in standby with the status
+`idle`. The wireless subwoofer module's own status (`kef:ble/updateStatus` and
+`kef:ble/updateServer/txVersion`) was unchanged afterwards. The main firmware
+check is a separate action from the subwoofer module's check
+(`kef:ble/checkForUpdates`, a different menu in the KEF Connect app), which must
+not be activated. A check on an LSX II LT in standby has not been tried.

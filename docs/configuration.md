@@ -74,7 +74,18 @@ and follow the speaker's update requirements.
 Update availability and versions always come from the speaker itself. When the
 update dialog is opened, KEF's published release notes for the reported version
 are fetched from kef.com; if that page is unreachable, the dialog simply shows
-no notes.
+no notes. **Read release announcements** opens KEF's release notes page at the
+section for the speaker's model.
+
+Once a night, and whenever **Check for updates** is used in Settings > Updates
+(or the `homeassistant.update_entity` action), the integration asks the speaker
+to run its own firmware check. Nothing is installed by a check. The nightly
+check falls between 02:30 and 04:00 Home Assistant time, when the speakers run
+their own overnight update cycle, and each speaker has its own fixed time in
+that window. A speaker that is offline, or is already checking, downloading, or
+installing, is not asked. The XIO's wireless
+subwoofer module has its own separate update check, which this integration does
+not use; check it in the KEF Connect app.
 
 Advanced users can upload a local `.swu` using `kef.install_firmware_file`.
 The action requires the KEF **update entity** in `entity_id` and a `file_path`
