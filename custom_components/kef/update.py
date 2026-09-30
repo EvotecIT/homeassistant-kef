@@ -24,6 +24,7 @@ from .release_notes import (
     find_release,
     format_release,
     parse_release_notes,
+    release_notes_url,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -99,9 +100,15 @@ class KefFirmwareUpdateEntity(
 
     @property
     def release_url(self) -> str | None:
-        """Return the firmware package URL when exposed by the speaker."""
-        update = self.coordinator.data.firmware_update
-        return update.url if update is not None else None
+        """Return KEF's release notes page for this model.
+
+        Home Assistant opens this as "Read release announcements", so it must
+        be a page. The speaker's own update URL is the firmware image, which
+        a browser would download.
+        """
+        if self.coordinator.data.firmware_update is None:
+            return None
+        return release_notes_url(self.coordinator.data.device.model)
 
     @property
     def release_summary(self) -> str | None:

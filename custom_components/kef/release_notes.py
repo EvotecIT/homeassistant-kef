@@ -33,6 +33,12 @@ _LI_RE = re.compile(r"<li[^>]*>", re.IGNORECASE)
 _TAG_RE = re.compile(r"<[^>]*>")
 
 
+def release_notes_url(model: str) -> str:
+    """Return the release notes page, at the model's section when it is known."""
+    section = _MODEL_SECTIONS.get(model.upper())
+    return f"{RELEASE_NOTES_URL}#{section}" if section else RELEASE_NOTES_URL
+
+
 @dataclass(frozen=True, slots=True)
 class FirmwareRelease:
     """One firmware release listed on KEF's release notes page."""
