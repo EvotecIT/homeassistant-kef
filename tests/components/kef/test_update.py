@@ -15,7 +15,10 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
-from custom_components.kef.exceptions import KefConnectionError
+from custom_components.kef.exceptions import (
+    KefAuthenticationRequiredError,
+    KefConnectionError,
+)
 from custom_components.kef.models import KefFirmwareUpdateInfo
 from custom_components.kef.update import KefFirmwareUpdateEntity, nightly_check_time
 from tests.conftest import TEST_DEVICE_INFO
@@ -223,6 +226,27 @@ async def test_homeassistant_update_entity_service_reaches_the_speaker(hass) -> 
     )
 
     entity.coordinator.client.async_check_for_firmware_update.assert_awaited_once()
+    await entity.async_remove()
+
+
+async def test_firmware_check_starts_reauth_when_reads_still_succeed(hass) -> None:
+    """Write-only authentication must prompt reauth despite a successful refresh."""
+    entity = await _platform_entity(hass)
+    entity.coordinator.config_entry.async_start_reauth = Mock()
+    entity.coordinator.client.async_check_for_firmware_update.side_effect = (
+        KefAuthenticationRequiredError("API password required for writes")
+    )
+
+    await hass.services.async_call(
+        "homeassistant",
+        "update_entity",
+        {"entity_id": entity.entity_id},
+        blocking=True,
+    )
+
+    entity.coordinator.config_entry.async_start_reauth.assert_called_once_with(hass)
+    entity.coordinator.async_request_refresh.assert_awaited_once()
+    await entity.async_remove()
 
 
 async def test_nightly_schedule_asks_the_speaker_to_check(hass) -> None:
@@ -237,3 +261,9 @@ async def test_nightly_schedule_asks_the_speaker_to_check(hass) -> None:
 
     entity.coordinator.client.async_check_for_firmware_update.assert_awaited_once()
     entity.coordinator.async_request_refresh.assert_awaited()
+
+    await entity.async_remove()
+    async_fire_time_changed(hass, due + timedelta(days=1))
+    await hass.async_block_till_done()
+
+    entity.coordinator.client.async_check_for_firmware_update.assert_awaited_once()

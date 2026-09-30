@@ -20,7 +20,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
-from .exceptions import KefError
+from .exceptions import KefAuthenticationRequiredError, KefError
 from .models import KefBackend
 from .release_notes import (
     RELEASE_NOTES_URL,
@@ -185,6 +185,8 @@ class KefFirmwareUpdateEntity(
             )
             try:
                 await self.coordinator.client.async_check_for_firmware_update()
+            except KefAuthenticationRequiredError:
+                self.coordinator.config_entry.async_start_reauth(self.hass)
             except KefError as err:
                 _LOGGER.debug("KEF firmware check failed: %s", err)
         await self.coordinator.async_request_refresh()
