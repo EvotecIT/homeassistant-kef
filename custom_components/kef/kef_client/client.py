@@ -978,7 +978,12 @@ class ModernKefClient(BaseKefClient):
 
     async def async_get_volume_raw(self) -> int | None:
         """Read just the volume level (one request, unlike async_refresh)."""
-        return await self._get_path_value(PROBE_PATHS["volume"], typed_key="i32_")
+        value = await self._get_path_value(PROBE_PATHS["volume"], typed_key="i32_")
+        if value is not None and (
+            not isinstance(value, int) or isinstance(value, bool)
+        ):
+            raise KefResponseError("Unexpected KEF volume payload")
+        return value
 
     async def async_toggle_play_pause(self) -> None:
         """Toggle play/pause."""
@@ -1731,12 +1736,16 @@ class ModernKefClient(BaseKefClient):
             raise KefResponseError(f"Unexpected KEF payload for {path}")
         return payload[0]
 
-    async def _update_eq_profile(self, mutator) -> dict[str, Any]:
+    async def _update_eq_profile(
+        self, mutator: Callable[[dict[str, Any]], None],
+    ) -> dict[str, Any]:
         """Serialize a complete EQ profile read-modify-write transaction."""
         async with self._eq_profile_lock:
             return await self._update_eq_profile_unlocked(mutator)
 
-    async def _update_eq_profile_unlocked(self, mutator) -> dict[str, Any]:
+    async def _update_eq_profile_unlocked(
+        self, mutator: Callable[[dict[str, Any]], None],
+    ) -> dict[str, Any]:
         """Fetch, mutate, and write back the typed EQ profile wrapper."""
         payload = await self._get_optional_path_item(
             PROBE_PATHS["eq_profile"],
@@ -1777,7 +1786,9 @@ class ModernKefClient(BaseKefClient):
         await self._set_data(PROBE_PATHS["eq_profile"], role="value", value=wrapper)
         return _legacy_eq_profile_to_native(dsp_info)
 
-    async def _update_eq_profile_v2(self, mutator) -> dict[str, Any]:
+    async def _update_eq_profile_v2(
+        self, mutator: Callable[[dict[str, Any]], None],
+    ) -> dict[str, Any]:
         """Fetch, mutate, and write back the modern v2 EQ profile wrapper."""
         payload = await self._get_path_item(PROBE_PATHS["eq_profile_v2"], roles="value")
         if not isinstance(payload, dict) or payload.get("type") != "kefEqProfileV2":
@@ -2083,17 +2094,12 @@ class ModernKefClient(BaseKefClient):
         read_timeout: float | None = None,
     ) -> Any:
         """Execute a request and parse the JSON response."""
-        kwargs: dict[str, object] = {
-            "allow_redirects": False,
-            "timeout": self._client_timeout(read_timeout),
-        }
-        if headers:
-            kwargs["headers"] = dict(headers)
-        if body is not None:
-            kwargs["data"] = body
-
         try:
-            async with self._session.request(method, url, **kwargs) as response:
+            async with self._session.request(
+                method, url, allow_redirects=False,
+                timeout=self._client_timeout(read_timeout),
+                headers=dict(headers) if headers else None, data=body,
+            ) as response:
                 text = await response.text()
         except aiohttp.ClientError as err:
             raise KefConnectionError(str(err)) from err
@@ -3044,6 +3050,7 @@ async def async_create_client(
 ) -> BaseKefClient:
     """Create the appropriate KEF backend client."""
     normalized_backend = KefBackend(backend) if backend is not None else None
+    client: BaseKefClient
 
     if normalized_backend is KefBackend.MODERN:
         client = ModernKefClient(

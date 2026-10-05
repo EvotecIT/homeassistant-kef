@@ -4,6 +4,9 @@ KEF targets the [Home Assistant Integration Quality Scale](https://developers.ho
 through Platinum while remaining a custom integration. Qualification is incomplete.
 A manifest label or passing CI does not establish an official HA rating.
 
+The [rule ledger](quality-rules.md) tracks every rule, existing evidence, and the
+next acceptance step. All rows remain open until their full contract is proven.
+
 ## Reproduce the evidence
 
 Run the existing test environment on Linux, including WSL:
@@ -11,12 +14,17 @@ Run the existing test environment on Linux, including WSL:
 ```bash
 python -m pip install -e '.[test]'
 ruff check .
+python -m mypy --strict custom_components/kef
 pytest --cov=custom_components.kef --cov-report=term-missing
 ```
 
 Coverage includes the bundled reusable client. Do not exclude it to improve the
 reported percentage. Full config-flow coverage and above 95% coverage throughout
 the integration remain qualification targets; the current suite does not meet them.
+
+Strict typing is a maintained development/CI gate. Dynamic vendor JSON remains
+at the transport boundary; volume reads validate their integer contract before
+returning data to entities.
 
 ## Verified contracts
 
@@ -38,8 +46,8 @@ corresponding HA rules or physical speaker behavior.
 ## Remaining qualification
 
 - [ ] Complete measured config-flow and integration/client coverage.
-- [ ] Enable strict typing across the integration and reusable client without
-  broad ignores that hide production boundaries.
+- [x] Enable strict typing across all 25 integration and bundled-client modules
+  with mypy 2.4.0 and no broad import or production-code ignores.
 - [ ] Audit all applicable HA rules and record evidence or rule-permitted
   exemptions, including discovery updates, reconfiguration, repairs, registry
   cleanup, concurrency, action errors, translated entities, and icons.

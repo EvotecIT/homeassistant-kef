@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import voluptuous as vol
 from homeassistant.const import ATTR_ENTITY_ID, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -183,7 +185,7 @@ async def _async_cleanup_optional_entities(
             }
         )
     expected_binary_sensor_keys = set(_ACTIVE_BINARY_SENSOR_ENTITY_KEYS)
-    model_features_by_platform = {
+    model_features_by_platform: dict[str, Mapping[str, str | None]] = {
         "button": BUTTON_MODEL_FEATURES,
         "select": {
             description.key: description.model_feature for description in SELECTS

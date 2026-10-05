@@ -11,13 +11,13 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import async_create_client
+from .api import BaseKefClient, async_create_client
 from .const import (
     CONF_BACKEND,
     CONF_DEVICE_ID,
@@ -45,10 +45,10 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
 
     config_entry: KefConfigEntry
 
-    def __init__(self, hass, entry: KefConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant, entry: KefConfigEntry) -> None:
         """Initialize the coordinator."""
         self._session = async_get_clientsession(hass)
-        self.client = None
+        self.client: BaseKefClient | None = None
         self._event_listener_task: asyncio.Task[None] | None = None
         self._local_changes: dict[str, Any] = {}
         self._local_change_at = 0.0
@@ -238,7 +238,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
     async def _async_event_listener_loop(self) -> None:
         """Poll the live KEF event queue and trigger targeted refreshes."""
         assert self.client is not None
-        timeout = max(1, int(min(self.update_interval.total_seconds(), 15)))
+        timeout = max(1, int(min(self._normal_interval.total_seconds(), 15)))
         while True:
             try:
                 events = await self.client.async_poll_events(timeout=timeout)

@@ -6,7 +6,7 @@ import asyncio
 import builtins
 import copy
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -2606,3 +2606,18 @@ async def test_modern_get_webserver_auth_mode_parses_setdata_value(
     client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
 
     assert await client._get_webserver_auth_mode() == AUTH_MODE_SETDATA
+
+
+@pytest.mark.parametrize("value", [0, 42, None, "42", True, {"value": 42}])
+async def test_volume_read_validates_device_payload(monkeypatch, hass, value) -> None:
+    """Only integer volume values or an absent value reach the media player."""
+    monkeypatch.setattr(
+        ModernKefClient, "_request_json",
+        AsyncMock(return_value=[{"type": "i32_", "i32_": value}]),
+    )
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+    if value is None or (isinstance(value, int) and not isinstance(value, bool)):
+        assert await client.async_get_volume_raw() == value
+    else:
+        with pytest.raises(KefResponseError, match="volume payload"):
+            await client.async_get_volume_raw()

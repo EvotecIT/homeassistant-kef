@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from homeassistant.components.update import UpdateEntityFeature
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
@@ -41,17 +42,27 @@ def test_firmware_latest_version_reports_downloaded_update() -> None:
     assert entity.latest_version == "3.0.135.0x60acbcf"
 
 
-def test_firmware_update_reports_downloading_update_in_progress() -> None:
+@pytest.mark.parametrize("progress", [None, 0, 42, 100])
+def test_firmware_update_reports_downloading_update_in_progress(progress) -> None:
     """Downloading-update firmware state should be exposed as in progress."""
     entity = KefFirmwareUpdateEntity.__new__(KefFirmwareUpdateEntity)
     entity.coordinator = SimpleNamespace(
         data=SimpleNamespace(
             device=TEST_DEVICE_INFO,
-            firmware_update=KefFirmwareUpdateInfo(state="downloadingUpdate"),
+            firmware_update=KefFirmwareUpdateInfo(
+                state="downloadingUpdate", download_progress=progress,
+            ),
         ),
     )
 
     assert entity.in_progress is True
+    assert entity.update_percentage == progress
+    assert entity.supported_features & UpdateEntityFeature.PROGRESS
+    entity.coordinator.data.firmware_update = KefFirmwareUpdateInfo(
+        state="idle", download_progress=progress,
+    )
+    assert entity.in_progress is False
+    assert entity.update_percentage is None
 
 
 class _PlatformUpdateEntity(KefFirmwareUpdateEntity):

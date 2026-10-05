@@ -50,5 +50,5 @@ class KefStartCalibrationButton(
 
     async def async_press(self) -> None:
         """Start room calibration."""
-        await self.async_call_kef(self.coordinator.client.async_start_calibration)
+        await self.async_call_kef(self.client.async_start_calibration)
         await self.coordinator.async_request_refresh()

@@ -18,7 +18,8 @@ test = [
   "pytest-asyncio>=0.24.0",
   "pytest-cov>=6.0.0",
   "pytest-homeassistant-custom-component>=0.13.218",
-  "ruff>=0.11.0"
+  "ruff>=0.11.0",
+  "mypy==2.4.0"
 ]
 
 [tool.setuptools.packages.find]
@@ -39,3 +40,7 @@ exclude = [".codex_tmp", "old"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+strict = true
+files = ["custom_components/kef"]

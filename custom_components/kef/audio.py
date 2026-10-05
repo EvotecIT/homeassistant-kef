@@ -15,13 +15,13 @@ def format_channels(channel_count: int | str | None) -> str | None:
         return None
 
     if isinstance(channel_count, str):
-        channel_count = channel_count.strip()
-        if not channel_count:
+        channel_text = channel_count.strip()
+        if not channel_text:
             return None
         try:
-            channel_count = int(channel_count)
+            channel_count = int(channel_text)
         except ValueError:
-            return None if channel_count == "0.0" else channel_count
+            return None if channel_text == "0.0" else channel_text
 
     if channel_count <= 0:
         return None

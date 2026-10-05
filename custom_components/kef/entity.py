@@ -7,8 +7,10 @@ from dataclasses import replace
 from typing import Any, TypeVar
 
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.device_registry import DeviceInfo
 from yarl import URL
 
+from .api import BaseKefClient
 from .const import AUTH_FAILURE_MESSAGE
 from .coordinator import KefCoordinator
 from .exceptions import KefAuthenticationRequiredError, KefError
@@ -25,6 +27,14 @@ class KefEntity:
         """Initialize the entity."""
         self.coordinator = coordinator
 
+    @property
+    def client(self) -> BaseKefClient:
+        """Return the initialized client for an entity action."""
+        client = self.coordinator.client
+        if client is None:
+            raise HomeAssistantError("KEF speaker is not initialized")
+        return client
+
     async def async_call_kef(self, action: Callable[[], Awaitable[_T]]) -> _T:
         """Run a KEF client action and surface integration-friendly errors."""
         try:
@@ -36,7 +46,7 @@ class KefEntity:
             raise HomeAssistantError(str(err)) from err
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Return device information."""
         device = self.coordinator.data.device
         return {
@@ -50,7 +60,7 @@ class KefEntity:
             "serial_number": device.serial_number or device.mac_address,
             "configuration_url": str(
                 URL.build(scheme="http", host=device.host.strip("[]"), port=device.port)
-            ),
+            ) if device.host else None,
         }
 
 

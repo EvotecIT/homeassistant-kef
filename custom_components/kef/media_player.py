@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime
 
-from homeassistant.components.media_player import (
-    MediaPlayerEntity,
+from homeassistant.components.media_player import MediaPlayerEntity
+from homeassistant.components.media_player.const import (
     MediaPlayerEntityFeature,
     MediaPlayerState,
     MediaType,
@@ -248,7 +248,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         eq_profile = snapshot.eq_profile
         firmware_update = snapshot.firmware_update
         model = snapshot.device.model
-        attrs = {
+        attrs: dict[str, object] = {
             "backend": snapshot.device.backend.value,
             "speaker_status": snapshot.speaker_status,
             "cable_mode": snapshot.cable_mode,
@@ -357,12 +357,12 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
 
     async def async_turn_on(self) -> None:
         """Turn on the speaker."""
-        await self.async_call_kef(self.coordinator.client.async_turn_on)
+        await self.async_call_kef(self.client.async_turn_on)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self) -> None:
         """Turn off the speaker."""
-        await self.async_call_kef(self.coordinator.client.async_turn_off)
+        await self.async_call_kef(self.client.async_turn_off)
         await self.coordinator.async_request_refresh()
 
     async def async_set_volume_level(self, volume: float) -> None:
@@ -411,7 +411,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         even when the cached level would otherwise make a step a no-op.
         """
         try:
-            live = await self.coordinator.client.async_get_volume_raw()
+            live = await self.client.async_get_volume_raw()
         except KefAuthenticationRequiredError as err:
             self.coordinator.config_entry.async_start_reauth(self.coordinator.hass)
             raise HomeAssistantError(AUTH_FAILURE_MESSAGE) from err
@@ -426,7 +426,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
     async def _async_write_volume(self, raw_volume: int) -> None:
         """Write an absolute volume and publish the level the speaker accepted."""
         await self.async_call_kef(
-            lambda: self.coordinator.client.async_set_volume_raw(raw_volume)
+            lambda: self.client.async_set_volume_raw(raw_volume)
         )
         accepted_volume = await self._async_live_volume(fallback=raw_volume)
         self.coordinator.async_apply_local_change(
@@ -441,7 +441,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
             self._last_volume_before_mute = max(1, self._last_volume_before_mute)
         async with self._volume_lock:
             await self.async_call_kef(
-                lambda: self.coordinator.client.async_set_muted(mute)
+                lambda: self.client.async_set_muted(mute)
             )
             if self.coordinator.data.device.backend is KefBackend.LEGACY:
                 await self.coordinator.async_request_refresh()
@@ -451,7 +451,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
     async def async_select_source(self, source: str) -> None:
         """Select the input source."""
         await self.async_call_kef(
-            lambda: self.coordinator.client.async_select_source(source)
+            lambda: self.client.async_select_source(source)
         )
         await self.coordinator.async_request_refresh()
 
@@ -459,7 +459,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         """Play or resume playback."""
         if self.state != MediaPlayerState.PLAYING:
             await self.async_call_kef(
-                self.coordinator.client.async_toggle_play_pause
+                self.client.async_toggle_play_pause
             )
             await self.coordinator.async_request_refresh()
 
@@ -467,16 +467,16 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         """Pause playback."""
         if self.state == MediaPlayerState.PLAYING:
             await self.async_call_kef(
-                self.coordinator.client.async_toggle_play_pause
+                self.client.async_toggle_play_pause
             )
             await self.coordinator.async_request_refresh()
 
     async def async_media_next_track(self) -> None:
         """Skip to the next track."""
-        await self.async_call_kef(self.coordinator.client.async_next_track)
+        await self.async_call_kef(self.client.async_next_track)
         await self.coordinator.async_request_refresh()
 
     async def async_media_previous_track(self) -> None:
         """Go to the previous track."""
-        await self.async_call_kef(self.coordinator.client.async_previous_track)
+        await self.async_call_kef(self.client.async_previous_track)
         await self.coordinator.async_request_refresh()

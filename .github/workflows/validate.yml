@@ -44,3 +44,6 @@ jobs:
 
       - name: Pytest
         run: pytest
+
+      - name: Strict typing
+        run: python -m mypy --strict custom_components/kef

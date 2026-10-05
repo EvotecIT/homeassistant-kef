@@ -355,7 +355,7 @@ async def async_setup_entry(
     if coordinator.data.device.backend is not KefBackend.MODERN:
         return
 
-    entities: list[KefNumber] = [
+    entities: list[NumberEntity] = [
         KefNumber(coordinator, description)
         for description in NUMBERS
         if description.value_fn(coordinator.data) is not None
@@ -399,7 +399,6 @@ class KefNumber(KefEntity, CoordinatorEntity[KefCoordinator], NumberEntity):
         self._attr_unique_id = (
             f"{coordinator.data.device.unique_id}_{description.key}"
         )
-        self._attr_name = description.name
 
     @property
     def native_value(self) -> float | None:
