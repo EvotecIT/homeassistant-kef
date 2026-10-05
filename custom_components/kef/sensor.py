@@ -27,6 +27,9 @@ from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefSnapshot
 
+# The coordinator owns all reads; these entities send no actions.
+PARALLEL_UPDATES = 0
+
 
 def _room_calibration_value(data: KefSnapshot) -> str | None:
     """Return the room calibration status as a date, or a plain status string."""

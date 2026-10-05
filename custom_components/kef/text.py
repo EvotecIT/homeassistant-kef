@@ -15,6 +15,9 @@ from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend, KefSnapshot
 
+# Ask HA to serialize action calls within this platform for each entry.
+PARALLEL_UPDATES = 1
+
 
 async def _async_set_ui_language(
     coordinator: KefCoordinator,

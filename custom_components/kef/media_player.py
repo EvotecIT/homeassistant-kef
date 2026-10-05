@@ -23,6 +23,9 @@ from .entity import KefEntity
 from .exceptions import KefAuthenticationRequiredError, KefError
 from .models import KefBackend
 
+# Ask HA to serialize action calls within this platform for each entry.
+PARALLEL_UPDATES = 1
+
 VOLUME_STEP = 4
 
 # Sources with no real track metadata, where the speaker just passes audio

@@ -31,6 +31,9 @@ from .entity import KefEntity, apply_eq_profile_change
 from .kef_client.const import model_has_subwoofer_preset_values
 from .models import KefBackend, KefSnapshot
 
+# Ask HA to serialize action calls within this platform for each entry.
+PARALLEL_UPDATES = 1
+
 
 async def _async_set_standby_mode(
     coordinator: KefCoordinator,

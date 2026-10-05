@@ -16,6 +16,9 @@ from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity, apply_eq_profile_change
 from .models import KefBackend, KefSnapshot
 
+# Ask HA to serialize action calls within this platform for each entry.
+PARALLEL_UPDATES = 1
+
 
 async def _async_set_default_volume_global(
     coordinator: KefCoordinator,

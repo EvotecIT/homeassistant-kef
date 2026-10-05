@@ -45,7 +45,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | entity-unavailable | Partial | Coordinator drives availability; verify offline startup, disconnect, recovery, and dependent entities. |
 | integration-owner | Partial | Manifest names maintainers and issue tracker; confirm support and security-reporting paths. |
 | log-when-unavailable | Review | Exercise one disconnect/reconnect cycle and inspect logs for useful, non-repeating messages. |
-| parallel-updates | Gap | Platform concurrency limits are not explicitly declared; select and test limits against client serialization. |
+| parallel-updates | Partial | All nine platforms explicitly declare their limits: coordinator-only sensors use 0; writable platforms serialize actions with 1. A real HA multi-entity service regression checks serialized switch writes. Limits apply per platform and entry, not across different platforms. HA 2025.1 bypasses this semaphore for separate single-entity calls; installed-device request budgets remain open. |
 | reauthentication-flow | Partial | Reauth steps exist; prove credentials are replaced only after successful validation. |
 | test-coverage | Gap | Current measured integration/client coverage is 82%; all applicable modules must meet the rule. |
 
@@ -85,7 +85,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 
 ## Qualification beyond the rule ledger
 
-- [x] 340 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
+- [x] 341 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
 - [ ] Install the published artifact and upgrade from the previous stable release.
 - [ ] Verify real model/firmware behaviour, resource use, reconnection, and supported actions.
 - [ ] Record release version, commit, artifact identity, environment, and evidence date.

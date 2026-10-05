@@ -12,6 +12,9 @@ from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend
 
+# Ask HA to serialize action calls within this platform for each entry.
+PARALLEL_UPDATES = 1
+
 BUTTON_MODEL_FEATURES = {"start_calibration": "xio"}
 
 

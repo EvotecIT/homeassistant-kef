@@ -17,6 +17,9 @@ from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefSnapshot
 
+# The coordinator owns all reads; these entities send no actions.
+PARALLEL_UPDATES = 0
+
 
 @dataclass(frozen=True, kw_only=True)
 class KefBinarySensorDescription(BinarySensorEntityDescription):

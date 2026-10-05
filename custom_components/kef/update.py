@@ -32,6 +32,9 @@ from .release_notes import (
     release_notes_url,
 )
 
+# Ask HA to serialize action calls within this platform for each entry.
+PARALLEL_UPDATES = 1
+
 _LOGGER = logging.getLogger(__name__)
 
 # Once a night, each speaker is asked to look for a newer firmware image. The
