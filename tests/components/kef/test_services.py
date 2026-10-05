@@ -9,6 +9,7 @@ import pytest
 from homeassistant.const import ATTR_ENTITY_ID, Platform
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef import (
@@ -18,6 +19,23 @@ from custom_components.kef import (
 )
 from custom_components.kef.const import DOMAIN
 from custom_components.kef.exceptions import KefAuthenticationRequiredError
+
+
+async def test_action_registered_without_config_entries(hass) -> None:
+    """Users can discover KEF actions before any speaker entry is ready."""
+    assert await async_setup_component(hass, DOMAIN, {})
+    assert hass.services.has_service(DOMAIN, SERVICE_INSTALL_FIRMWARE_FILE)
+
+    with pytest.raises(HomeAssistantError, match="Target must be a KEF"):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_INSTALL_FIRMWARE_FILE,
+            {
+                ATTR_ENTITY_ID: "update.missing_speaker",
+                ATTR_FIRMWARE_FILE_PATH: "/config/firmware/speaker.swu",
+            },
+            blocking=True,
+        )
 
 
 async def test_install_firmware_file_service_uploads_to_update_entity(hass) -> None:

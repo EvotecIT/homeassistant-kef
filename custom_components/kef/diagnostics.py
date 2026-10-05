@@ -3,26 +3,43 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.core import HomeAssistant
 
 from .coordinator import KefConfigEntry
 
 TO_REDACT = {
+    "album",
+    "album_artist",
+    "artist",
     "bssid",
+    "device_id",
+    "device_name",
+    "discovery_id",
     "dns",
     "gateways",
     "host",
     "ip",
+    "image_url",
     "mac_address",
     "password",
+    "profile_id",
+    "profile_name",
+    "raw",
     "serial_number",
     "ssid",
+    "speaker_location",
+    "title",
+    "unique_id",
     "kef_id",
 }
 
 
-async def async_get_config_entry_diagnostics(hass, entry: KefConfigEntry):
+async def async_get_config_entry_diagnostics(
+    hass: HomeAssistant, entry: KefConfigEntry
+) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
     snapshot = entry.runtime_data.data
     data = {
