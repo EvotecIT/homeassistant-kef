@@ -10,7 +10,6 @@ from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
-from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef.const import (
@@ -31,6 +30,11 @@ from custom_components.kef.exceptions import (
 )
 from custom_components.kef.models import KefBackend, KefDeviceInfo
 from tests.conftest import TEST_DEVICE_INFO, TEST_HOST
+
+try:
+    from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
+except ImportError:  # HA 2025.1 stores discovery information in the component.
+    from homeassistant.components.zeroconf import ZeroconfServiceInfo
 
 
 @pytest.fixture(autouse=True)

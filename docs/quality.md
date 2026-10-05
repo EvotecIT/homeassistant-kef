@@ -52,7 +52,7 @@ corresponding HA rules or physical speaker behavior.
   exemptions, including discovery updates, reconfiguration, repairs, registry
   cleanup, concurrency, action errors, translated entities, and icons.
 - [ ] Verify partial setup failures and repeated unload/reload release resources.
-- [ ] Test the declared minimum and current stable HA versions explicitly.
+- [x] Run all 340 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
 - [ ] Install the published HACS artifact and upgrade from the previous stable
   version while retaining user names, entity IDs, and automation bindings.
 - [ ] Record model/firmware-specific offline startup, reconnection, authentication,
@@ -63,3 +63,15 @@ corresponding HA rules or physical speaker behavior.
 Keep model and hardware evidence in [device support](device-support.md) and
 [model notes](model-notes.md). Source tests, published packages, and installed
 runtime proof are separate evidence boundaries.
+
+## Compatibility environments
+
+CI pins HA 2025.1.0 and 2026.9.4 with matching fixture releases. Reproduce the
+minimum lane with `python -m pip install -r requirements-test-minimum.txt` in a
+Python 3.13 environment. The older fixture needs its compatible josepy and pycares
+versions; zeroconf is installed for the legacy discovery test type.
+
+Strict typing runs against current stable HA. The minimum lane exercises runtime
+compatibility; its old discovery type lives in a different HA module. Production
+imports that type only for static annotations. Beta HA versions are outside these
+stable qualification lanes and require separate compatibility work.

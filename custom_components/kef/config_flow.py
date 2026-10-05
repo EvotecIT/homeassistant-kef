@@ -6,7 +6,7 @@ import asyncio
 import ipaddress
 import logging
 import socket
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
@@ -26,7 +26,6 @@ from homeassistant.helpers.selector import (
     NumberSelectorConfig,
     NumberSelectorMode,
 )
-from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .api import async_create_client
 from .const import (
@@ -58,6 +57,9 @@ from .models import KefBackend
 
 _LOGGER = logging.getLogger(__name__)
 
+
+if TYPE_CHECKING:
+    from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 class KefConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a KEF config flow."""
