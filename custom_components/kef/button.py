@@ -49,7 +49,7 @@ class KefStartCalibrationButton(
         CoordinatorEntity.__init__(self, coordinator)
         KefEntity.__init__(self, coordinator)
         self._attr_unique_id = f"{coordinator.data.device.unique_id}_start_calibration"
-        self._attr_name = "DSP: Start calibration"
+        self._attr_translation_key = "start_calibration"
 
     async def async_press(self) -> None:
         """Start room calibration."""

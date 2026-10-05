@@ -9,6 +9,7 @@ import pytest
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import CONF_HOST
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.translation import async_get_translations
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef.audio import (
@@ -193,6 +194,7 @@ async def test_sensor_platform_registers_distinct_names_and_metadata(hass) -> No
         await hass.async_block_till_done()
 
     registry = er.async_get(hass)
+    translations = await async_get_translations(hass, "en", "entity", {DOMAIN})
     sensor_entries = {
         entity_entry.unique_id: entity_entry
         for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id)
@@ -208,7 +210,9 @@ async def test_sensor_platform_registers_distinct_names_and_metadata(hass) -> No
         unique_id = f"{TEST_SNAPSHOT.device.unique_id}_{description.key}"
         entity_entry = sensor_entries[unique_id]
 
-        assert entity_entry.original_name == description.name
+        assert entity_entry.original_name == translations[
+            f"component.kef.entity.sensor.{description.translation_key}.name"
+        ]
         assert entity_entry.entity_id.startswith("sensor.lsx_ii_test_")
         assert description.device_class is not None or description.icon is not None
         if description.device_class is SensorDeviceClass.ENUM:

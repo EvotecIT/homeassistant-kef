@@ -205,7 +205,7 @@ class KefNumberDescription(NumberEntityDescription):
 NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="default_volume_global",
-        name="VOL: Startup volume",
+        translation_key="default_volume_global",
         icon="mdi:volume-medium",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
@@ -216,7 +216,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="maximum_volume",
-        name="VOL: Maximum volume",
+        translation_key="maximum_volume",
         icon="mdi:volume-high",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
@@ -227,7 +227,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="volume_step",
-        name="VOL: Step",
+        translation_key="volume_step",
         icon="mdi:stairs",
         entity_category=EntityCategory.CONFIG,
         native_min_value=1,
@@ -238,7 +238,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="fixed_volume_level",
-        name="VOL: Fixed level",
+        translation_key="fixed_volume_level",
         icon="mdi:volume-equal",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
@@ -249,7 +249,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="balance",
-        name="DSP: Balance",
+        translation_key="balance",
         icon="mdi:arrow-left-right",
         entity_category=EntityCategory.CONFIG,
         native_min_value=-30,
@@ -261,7 +261,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="treble_amount",
-        name="DSP: Treble amount",
+        translation_key="treble_amount",
         icon="mdi:tune-vertical",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
@@ -275,7 +275,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="subwoofer_gain",
-        name="SW: Gain",
+        translation_key="subwoofer_gain",
         icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
@@ -289,7 +289,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="high_pass_frequency",
-        name="SW: High-pass frequency",
+        translation_key="high_pass_frequency",
         icon="mdi:sine-wave",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="Hz",
@@ -303,7 +303,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="sub_out_low_pass_frequency",
-        name="SW: Low-pass frequency",
+        translation_key="sub_out_low_pass_frequency",
         icon="mdi:sine-wave",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="Hz",
@@ -317,7 +317,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="desk_mode_db",
-        name="DSP: Desk mode attenuation",
+        translation_key="desk_mode_db",
         icon="mdi:desk",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
@@ -332,7 +332,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="wall_mode_db",
-        name="DSP: Wall mode attenuation",
+        translation_key="wall_mode_db",
         icon="mdi:wall",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
@@ -440,7 +440,8 @@ class KefSourceVolumeNumber(KefEntity, CoordinatorEntity[KefCoordinator], Number
         self._attr_unique_id = (
             f"{coordinator.data.device.unique_id}_default_volume_{source}"
         )
-        self._attr_name = f"VOL: {_friendly_source_name(source)} startup volume"
+        self._attr_translation_key = "source_startup_volume"
+        self._attr_translation_placeholders = {"source": _friendly_source_name(source)}
 
     @property
     def available(self) -> bool:

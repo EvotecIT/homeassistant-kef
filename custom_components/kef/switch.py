@@ -368,7 +368,7 @@ class KefSwitchDescription(SwitchEntityDescription):
 SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="startup_tone",
-        name="SYS: Startup tone",
+        translation_key="startup_tone",
         icon="mdi:music-note",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.startup_tone_enabled,
@@ -376,7 +376,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="auto_switch_hdmi",
-        name="HW: Auto-switch to HDMI",
+        translation_key="auto_switch_hdmi",
         icon="mdi:video-switch",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.auto_switch_hdmi,
@@ -384,7 +384,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="front_led",
-        name="LED: Front",
+        translation_key="front_led",
         icon="mdi:led-strip-variant",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.front_led_enabled,
@@ -393,7 +393,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="standby_led",
-        name="LED: Standby",
+        translation_key="standby_led",
         icon="mdi:led-outline",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.standby_led_enabled,
@@ -402,7 +402,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="top_panel",
-        name="LED: Top touch panel",
+        translation_key="top_panel",
         icon="mdi:gesture-tap-button",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_enabled,
@@ -411,7 +411,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="top_panel_led",
-        name="LED: Top panel",
+        translation_key="top_panel_led",
         icon="mdi:led-on",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_led_enabled,
@@ -420,7 +420,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="top_panel_standby_led",
-        name="LED: Top panel standby",
+        translation_key="top_panel_standby_led",
         icon="mdi:led-outline",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_standby_led_enabled,
@@ -429,7 +429,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="usb_charging",
-        name="HW: USB charging",
+        translation_key="usb_charging",
         icon="mdi:usb-port",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.usb_charging_enabled,
@@ -438,7 +438,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="startup_volume",
-        name="VOL: Use startup volume",
+        translation_key="startup_volume",
         icon="mdi:volume-source",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.startup_volume_enabled,
@@ -446,7 +446,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="per_input_startup_volume",
-        name="VOL: Per-input startup volumes",
+        translation_key="per_input_startup_volume",
         icon="mdi:tune-variant",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.per_input_startup_volume_enabled,
@@ -454,7 +454,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="volume_limit",
-        name="VOL: Limiter",
+        translation_key="volume_limit",
         icon="mdi:volume-off",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.volume_limit_enabled,
@@ -462,7 +462,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="subwoofer_wake",
-        name="SW: Wake on startup",
+        translation_key="subwoofer_wake",
         icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.subwoofer_wake_enabled,
@@ -470,7 +470,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="kw1_wake",
-        name="SW: KW1 wake on startup",
+        translation_key="kw1_wake",
         icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.kw1_wake_enabled,
@@ -478,7 +478,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="subwoofer",
-        name="SW: Enabled",
+        translation_key="subwoofer",
         icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
@@ -488,7 +488,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="kw1_adapter",
-        name="SW: KW1 adapter",
+        translation_key="kw1_adapter",
         icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_profile.is_kw1 if data.eq_profile else None,
@@ -496,7 +496,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="sub_enable_stereo",
-        name="SW: Stereo subwoofers",
+        translation_key="sub_enable_stereo",
         icon="mdi:speaker-multiple",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
@@ -507,7 +507,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="remote_ir",
-        name="IR: Remote",
+        translation_key="remote_ir",
         icon="mdi:remote",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.remote_ir_enabled,
@@ -515,7 +515,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="analytics",
-        name="SYS: KEF analytics",
+        translation_key="analytics",
         icon="mdi:chart-line",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.analytics_enabled,
@@ -523,7 +523,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="app_analytics",
-        name="SYS: App analytics",
+        translation_key="app_analytics",
         icon="mdi:cellphone-cog",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.app_analytics_enabled,
@@ -531,7 +531,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="desk_mode",
-        name="DSP: Desk mode",
+        translation_key="desk_mode",
         icon="mdi:desk",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_profile.desk_mode if data.eq_profile else None,
@@ -540,7 +540,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="wall_mode",
-        name="DSP: Wall mode",
+        translation_key="wall_mode",
         icon="mdi:wall",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_profile.wall_mode if data.eq_profile else None,
@@ -549,7 +549,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="phase_correction",
-        name="DSP: Phase correction",
+        translation_key="phase_correction",
         icon="mdi:waveform",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
@@ -559,7 +559,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="high_pass_mode",
-        name="SW: High-pass mode",
+        translation_key="high_pass_mode",
         icon="mdi:chart-bell-curve-cumulative",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
@@ -569,7 +569,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="auto_detect_placement",
-        name="DSP: Auto-detect placement",
+        translation_key="auto_detect_placement",
         icon="mdi:crosshairs-gps",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.auto_detect_placement,
@@ -578,7 +578,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="wall_mounted",
-        name="DSP: Wall mounted",
+        translation_key="wall_mounted",
         icon="mdi:wall",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
@@ -589,7 +589,7 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     ),
     KefSwitchDescription(
         key="prefer_virtual_x",
-        name="DSP: Prefer DTS Virtual:X",
+        translation_key="prefer_virtual_x",
         icon="mdi:surround-sound",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.prefer_virtual_x,

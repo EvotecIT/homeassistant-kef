@@ -102,7 +102,7 @@ class KefFirmwareUpdateEntity(
         CoordinatorEntity.__init__(self, coordinator)
         KefEntity.__init__(self, coordinator)
         self._attr_unique_id = f"{coordinator.data.device.unique_id}_firmware"
-        self._attr_name = "Firmware"
+        self._attr_translation_key = "firmware"
         self._releases: dict[str, list[FirmwareRelease]] | None = None
         self._releases_fetched_at = 0.0
 

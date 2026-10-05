@@ -224,7 +224,7 @@ class KefSelectDescription(SelectEntityDescription):
 SELECTS: tuple[KefSelectDescription, ...] = (
     KefSelectDescription(
         key="standby_mode",
-        name="HW: Standby mode",
+        translation_key="standby_mode",
         icon="mdi:sleep",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.standby_mode,
@@ -233,7 +233,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="wake_source",
-        name="HW: Wake source",
+        translation_key="wake_source",
         icon="mdi:power-plug",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.wake_source,
@@ -242,7 +242,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="master_channel",
-        name="HW: Master channel",
+        translation_key="master_channel",
         icon="mdi:speaker",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.master_channel,
@@ -252,7 +252,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="cable_mode",
-        name="HW: Cable mode",
+        translation_key="cable_mode",
         icon="mdi:cable-data",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.cable_mode,
@@ -262,7 +262,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="bass_extension",
-        name="DSP: Bass extension",
+        translation_key="bass_extension",
         icon="mdi:waveform",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
@@ -273,7 +273,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="remote_ir_code",
-        name="IR: Remote code",
+        translation_key="remote_ir_code",
         icon="mdi:remote",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.remote_ir_code,
@@ -282,7 +282,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="streaming_quality",
-        name="HW: Streaming quality",
+        translation_key="streaming_quality",
         icon="mdi:music-circle",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.streaming_quality,
@@ -291,7 +291,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="favourite_button",
-        name="IR: Favourite button",
+        translation_key="favourite_button",
         icon="mdi:star",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.favourite_button,
@@ -300,7 +300,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="eq_button_1",
-        name="IR: EQ 1",
+        translation_key="eq_button_1",
         icon="mdi:gesture-tap-button",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_button_1,
@@ -310,7 +310,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="eq_button_2",
-        name="IR: EQ 2",
+        translation_key="eq_button_2",
         icon="mdi:gesture-tap-button",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_button_2,
@@ -320,7 +320,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="subwoofer_polarity",
-        name="SW: Polarity",
+        translation_key="subwoofer_polarity",
         icon="mdi:sine-wave",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
@@ -331,7 +331,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="audio_polarity",
-        name="DSP: Audio polarity",
+        translation_key="audio_polarity",
         icon="mdi:sine-wave",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
@@ -342,7 +342,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="subwoofer_preset",
-        name="SW: Model preset",
+        translation_key="subwoofer_preset",
         icon="mdi:speaker",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
@@ -354,7 +354,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="sound_profile",
-        name="DSP: Sound profile",
+        translation_key="sound_profile",
         icon="mdi:surround-sound",
         value_fn=lambda data: (
             data.eq_profile.sound_profile if data.eq_profile else None

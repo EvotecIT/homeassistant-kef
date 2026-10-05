@@ -68,7 +68,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | entity-category | Partial | Entity metadata exists; audit configuration and diagnostic categories across platforms. |
 | entity-device-class | Partial | Sensor metadata exists; audit classes, units, and state classes across models. |
 | entity-disabled-by-default | Partial | Diagnostic feature gating exists; audit noisy or rarely useful entities and user opt-in behaviour. |
-| entity-translations | Gap | Complete translated entity names and verify fallback behaviour in the HA host. |
+| entity-translations | Partial | Child entity translation keys and dynamic source placeholders resolve in minimum/current HA, including English fallback for French and preserved custom names/IDs on LSX II and XIO fixtures. English is the provided language; installed frontend qualification remains open. |
 | exception-translations | Review | Audit user-facing action exceptions and translation keys. |
 | icon-translations | Gap | Add applicable state-aware icon definitions and verify them against entity states. |
 | reconfiguration-flow | Partial | Reconfigure step exists; verify identity checks, address changes, and retained settings. |

@@ -39,6 +39,12 @@ returning data to entities.
   Parsed model, codec, and operating-state fields remain available. Redaction
   does not mutate the coordinator snapshot or config entry.
   Evidence: `tests/components/kef/test_diagnostics.py`.
+- Child entities use HA translation keys, including placeholders for per-input
+  startup volumes. English labels retain their existing prefixes. HA-host tests
+  cover LSX II and XIO, English fallback for an untranslated language, and existing
+  entity IDs and custom names. This proves backend name resolution; installed
+  frontend and upgrade qualification remain separate.
+  Evidence: `tests/components/kef/test_entity_translations.py`.
 
 These tests establish the listed contracts, not complete qualification of the
 corresponding HA rules or physical speaker behavior.
@@ -52,7 +58,7 @@ corresponding HA rules or physical speaker behavior.
   exemptions, including discovery updates, reconfiguration, repairs, registry
   cleanup, concurrency, action errors, translated entities, and icons.
 - [ ] Verify partial setup failures and repeated unload/reload release resources.
-- [x] Run all 340 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
+- [x] Run all 370 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
 - [ ] Install the published HACS artifact and upgrade from the previous stable
   version while retaining user names, entity IDs, and automation bindings.
 - [ ] Record model/firmware-specific offline startup, reconnection, authentication,
