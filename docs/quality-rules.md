@@ -17,7 +17,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | appropriate-polling | Partial | Coordinator and scan/retry options exist; document and measure normal/offline request budgets. |
 | brands | Partial | Local `brand/` assets exist; verify rendered HACS/HA assets and applicable custom-integration requirements. |
 | common-modules | Partial | `entity.py`, `coordinator.py`, and `kef_client/` own shared behaviour; inspect remaining adapter duplication. |
-| config-flow-test-coverage | Gap | `test_config_flow.py` exists; reach full measured flow coverage without excluding error paths. |
+| config-flow-test-coverage | Partial | Config-flow coverage is 98.6% (216/219 statements). Real HA flows cover authentication/connection failures, identity mismatch, discovery rejection, IPv6-only legacy rediscovery, and DNS aliases without replacing saved credentials. Three remaining statements and installed UI proof are open. |
 | config-flow | Partial | Manual and discovered setup exist; prove the installed artifact's UI flow. |
 | dependency-transparency | Review | Document bundled client ownership, transport, and requirements from the shipped manifest. |
 | docs-actions | Partial | `services.yaml` and automation guide exist; exercise each documented action example. |
@@ -47,7 +47,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | log-when-unavailable | Review | Exercise one disconnect/reconnect cycle and inspect logs for useful, non-repeating messages. |
 | parallel-updates | Partial | All nine platforms explicitly declare their limits: coordinator-only sensors use 0; writable platforms serialize actions with 1. A real HA multi-entity service regression checks serialized switch writes. Limits apply per platform and entry, not across different platforms. HA 2025.1 bypasses this semaphore for separate single-entity calls; installed-device request budgets remain open. |
 | reauthentication-flow | Partial | Reauth steps exist; prove credentials are replaced only after successful validation. |
-| test-coverage | Gap | Current measured integration/client coverage is 82%; all applicable modules must meet the rule. |
+| test-coverage | Gap | Current measured integration/client coverage is 83%; all applicable modules must meet the rule. |
 
 ## Gold
 
@@ -85,7 +85,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 
 ## Qualification beyond the rule ledger
 
-- [x] 341 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
+- [x] 361 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
 - [ ] Install the published artifact and upgrade from the previous stable release.
 - [ ] Verify real model/firmware behaviour, resource use, reconnection, and supported actions.
 - [ ] Record release version, commit, artifact identity, environment, and evidence date.
