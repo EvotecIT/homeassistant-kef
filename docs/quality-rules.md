@@ -80,12 +80,12 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | Rule | State | Evidence and next acceptance step |
 | --- | --- | --- |
 | async-dependency | Partial | Bundled client uses async transports; inspect blocking calls, cancellation, and resource lifetime. |
-| inject-websession | Partial | Config flow uses HA's session; verify injection and ownership in every HTTP client creation path. |
+| inject-websession | Partial | Config flow and setup inject HA's session. Loopback HTTP tests verify caller ownership, authentication error classification for reads/uploads, and decoded JSON even when session defaults differ. Remaining artifact/path qualification stays open. |
 | strict-typing | Partial | mypy 2.4.0 strict checking passes all 25 production modules, including the bundled client, on HA 2026.9.4. CI enforces it; release-scoped proof remains open. |
 
 ## Qualification beyond the rule ledger
 
-- [x] 361 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
+- [x] 366 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
 - [ ] Install the published artifact and upgrade from the previous stable release.
 - [ ] Verify real model/firmware behaviour, resource use, reconnection, and supported actions.
 - [ ] Record release version, commit, artifact identity, environment, and evidence date.

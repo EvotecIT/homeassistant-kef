@@ -1598,6 +1598,8 @@ class ModernKefClient(BaseKefClient):
                     upload_url,
                     data=form,
                     allow_redirects=False,
+                    raise_for_status=False,
+                    auto_decompress=True,
                     timeout=aiohttp.ClientTimeout(total=None),
                 ) as response:
                     await response.text()
@@ -2097,6 +2099,7 @@ class ModernKefClient(BaseKefClient):
         try:
             async with self._session.request(
                 method, url, allow_redirects=False,
+                raise_for_status=False, auto_decompress=True,
                 timeout=self._client_timeout(read_timeout),
                 headers=dict(headers) if headers else None, data=body,
             ) as response:

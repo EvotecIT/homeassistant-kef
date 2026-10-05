@@ -2408,7 +2408,7 @@ async def test_modern_upload_firmware_update_detects_auth_redirect(
             return ""
 
     class FakeSession:
-        def post(self, url, *, data, allow_redirects, timeout):
+        def post(self, url, *, data, allow_redirects, timeout, **request_options):
             assert allow_redirects is False
             return FakeResponse()
 
@@ -2445,7 +2445,7 @@ async def test_modern_upload_firmware_update_opens_file_in_executor(
             return ""
 
     class FakeSession:
-        def post(self, url, *, data, allow_redirects, timeout):
+        def post(self, url, *, data, allow_redirects, timeout, **request_options):
             return FakeResponse()
 
     async def fake_poll(self, *, attempts=10, delay_seconds=1.0):
