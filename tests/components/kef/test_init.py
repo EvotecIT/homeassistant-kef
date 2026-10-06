@@ -154,14 +154,20 @@ async def test_platform_setup_failure_recovers_without_starting_old_listener(
         assert await hass.config_entries.async_unload(entry.entry_id)
 
 
-async def test_offline_startup_retries_without_entities_then_recovers(hass):
+@pytest.mark.parametrize("authentication_failed", [False, True])
+async def test_failed_startup_has_no_entities_and_recovers(
+    hass, authentication_failed
+):
     from homeassistant.config_entries import ConfigEntryState
     from homeassistant.const import CONF_HOST
     from homeassistant.helpers import entity_registry as er
 
     from custom_components.kef.const import CONF_BACKEND
     from custom_components.kef.coordinator import KefCoordinator
-    from custom_components.kef.exceptions import KefConnectionError
+    from custom_components.kef.exceptions import (
+        KefAuthenticationRequiredError,
+        KefConnectionError,
+    )
     from tests.conftest import TEST_HOST, TEST_SNAPSHOT
 
     entry = MockConfigEntry(
@@ -173,17 +179,32 @@ async def test_offline_startup_retries_without_entities_then_recovers(hass):
     client = SimpleNamespace(
         async_refresh=AsyncMock(return_value=deepcopy(TEST_SNAPSHOT))
     )
+    failure = (
+        KefAuthenticationRequiredError("password required")
+        if authentication_failed else KefConnectionError("speaker offline")
+    )
     with (
         patch(
             "custom_components.kef.coordinator.async_create_client",
-            AsyncMock(side_effect=KefConnectionError("speaker offline")),
+            AsyncMock(side_effect=failure),
         ) as connect,
         patch.object(
             KefCoordinator, "async_start_event_listener", new_callable=AsyncMock
         ) as start,
     ):
         assert not await hass.config_entries.async_setup(entry.entry_id)
-        assert entry.state is ConfigEntryState.SETUP_RETRY
+        await hass.async_block_till_done()
+        expected_state = (
+            ConfigEntryState.SETUP_ERROR
+            if authentication_failed else ConfigEntryState.SETUP_RETRY
+        )
+        assert entry.state is expected_state
+        if authentication_failed:
+            assert any(
+                flow["context"].get("source") == "reauth"
+                and flow["context"].get("entry_id") == entry.entry_id
+                for flow in hass.config_entries.flow.async_progress()
+            )
         assert not hasattr(entry, "runtime_data")
         assert not er.async_entries_for_config_entry(
             er.async_get(hass), entry.entry_id

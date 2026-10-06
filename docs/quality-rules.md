@@ -32,7 +32,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | has-entity-name | Partial | Entity base enables entity names; audit primary and child entity naming. |
 | runtime-data | Source verified | The coordinator is stored in typed `KefConfigEntry.runtime_data`; all eight platforms, diagnostics and unload access that owner. [Coordinator](../custom_components/kef/coordinator.py), [setup/unload tests](../tests/components/kef/test_init.py) and [HA action tests](../tests/components/kef/test_configuration_actions.py). Setup-failure qualification remains tracked under `config-entry-unloading`. |
 | test-before-configure | Partial | Config flow validates the host; cover all supported transports and failure classes. |
-| test-before-setup | Partial | Real HA setup with a connection failure enters retry state without runtime data, entities, or event-listener startup. Reload after connection recovery creates entities and a successful runtime. Authentication-failure qualification remains open. |
+| test-before-setup | Partial | Real HA setup with a connection failure enters retry state without runtime data, entities, or event-listener startup. Reload after connection recovery creates entities and a successful runtime. Authentication failure starts HA reauthentication for the entry without publishing runtime data, entities, or the event listener. Recovery reload succeeds after restoring the client connection; installed-device qualification remains separate. |
 | unique-config-entry | Partial | Flow duplicate checks exist; test discovered/manual and changed-address combinations. |
 
 ## Silver

@@ -64,6 +64,7 @@ corresponding HA rules or physical speaker behavior.
 - [x] Verify a platform-forwarding failure starts no event listener and recovers with a fresh runtime on reload.
 - [x] Verify offline startup enters retry state without publishing runtime data or entities and recovers on reload.
 - [x] Verify cleanup after a real sensor platform loads and the remaining setup fails, including recovery with a fresh owner.
+- [x] Verify authentication failure starts HA reauthentication without publishing entities or runtime data.
 - [ ] Verify installed-artifact lifecycle behavior.
 - [x] Run all 385 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
 - [ ] Install the published HACS artifact and upgrade from the previous stable
