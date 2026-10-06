@@ -96,7 +96,10 @@ async def test_reloads_replace_event_listener_and_preserve_entities(hass):
         clients[-1].async_reset_event_queue.assert_awaited_once()
 
 
-async def test_platform_setup_failure_recovers_without_starting_old_listener(hass):
+@pytest.mark.parametrize("partial_setup", [False, True])
+async def test_platform_setup_failure_recovers_without_starting_old_listener(
+    hass, partial_setup
+):
     from homeassistant.config_entries import ConfigEntryState
     from homeassistant.const import CONF_HOST
 
@@ -111,6 +114,15 @@ async def test_platform_setup_failure_recovers_without_starting_old_listener(has
     )
     entry.add_to_hass(hass)
     owners = []
+    forward = hass.config_entries.async_forward_entry_setups
+
+    async def fail_forward(config_entry, platforms):
+        if partial_setup:
+            from homeassistant.const import Platform
+
+            await forward(config_entry, [Platform.SENSOR])
+            assert config_entry.runtime_data._listeners
+        raise RuntimeError("platform setup failed")
 
     async def refresh(coordinator):
         owners.append(coordinator)
@@ -125,17 +137,19 @@ async def test_platform_setup_failure_recovers_without_starting_old_listener(has
         with patch.object(
             hass.config_entries,
             "async_forward_entry_setups",
-            AsyncMock(side_effect=RuntimeError("platform setup failed")),
+            fail_forward,
         ):
             assert not await hass.config_entries.async_setup(entry.entry_id)
         assert entry.state is ConfigEntryState.SETUP_ERROR
         start.assert_not_awaited()
         assert owners[0]._event_listener_task is None
+        assert not owners[0]._listeners
         assert await hass.config_entries.async_reload(entry.entry_id)
         await hass.async_block_till_done()
         assert entry.state is ConfigEntryState.LOADED
         assert entry.runtime_data is owners[1]
         assert owners[1] is not owners[0]
+        assert not owners[0]._listeners
         start.assert_awaited_once()
         assert await hass.config_entries.async_unload(entry.entry_id)
 
