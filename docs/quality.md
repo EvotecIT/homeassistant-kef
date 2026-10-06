@@ -21,7 +21,7 @@ pytest --cov=custom_components.kef --cov-report=term-missing
 
 Coverage includes the bundled reusable client. Do not exclude it to improve the
 reported percentage. The preceding 384-test coverage measurement records 85.5% of statements and
-67.5% of branches; config flow covers 99.1% of statements and 96.2% of branches.
+67.5% of branches; the focused 47-test flow suite covers 99.1% of statements (217/219) and 98.7% of branches (77/78).
 Full config-flow coverage and above 95% coverage throughout
 the integration remain qualification targets; the current suite does not meet them.
 

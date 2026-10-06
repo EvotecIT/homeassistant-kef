@@ -165,6 +165,11 @@ async def test_legacy_manual_setup_checks_ipv4_aliases_at_dns_boundary(
 
     from custom_components.kef.models import KefBackend
 
+    MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="other-legacy-speaker",
+        data={CONF_HOST: "192.0.2.99", CONF_BACKEND: "legacy"},
+    ).add_to_hass(hass)
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="existing-legacy-speaker",
@@ -323,13 +328,20 @@ async def test_ipv6_only_discovery_does_not_use_legacy_address(
     assert not hass.config_entries.async_entries(DOMAIN)
 
 
+@pytest.mark.parametrize(
+    ("device_name", "model", "expected_title"),
+    [
+        ("KEF", TEST_DEVICE_INFO.model, "Speaker"),
+        ("Living Room", "KEF legacy", "Living Room"),
+    ],
+)
 async def test_discovery_without_advertised_identity_uses_probed_speaker(
-    hass, monkeypatch,
+    hass, monkeypatch, device_name, model, expected_title,
 ):
     """A sparse mDNS advertisement uses the identity returned by the device API."""
     discovery = discovery_info()
     discovery.properties.pop("deviceid")
-    device = replace(TEST_DEVICE_INFO, device_name="KEF")
+    device = replace(TEST_DEVICE_INFO, device_name=device_name, model=model)
     probe = AsyncMock(return_value=SimpleNamespace(
         async_identify=AsyncMock(return_value=device),
     ))
@@ -342,6 +354,7 @@ async def test_discovery_without_advertised_identity_uses_probed_speaker(
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "confirm"
+    assert result["description_placeholders"]["title"] == expected_title
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_DEVICE_ID] == TEST_DEVICE_INFO.unique_id
