@@ -288,3 +288,62 @@ async def test_discovery_confirmation_keeps_form_after_both_transports_fail(
         "speaker.local",
         "192.0.2.11",
     ]
+
+
+@pytest.mark.parametrize("legacy_identified", [False, True])
+async def test_ipv6_only_discovery_does_not_use_legacy_address(
+    hass, monkeypatch, legacy_identified
+):
+    """Discovery must not configure an IPv4-only client without an IPv4 address."""
+    from custom_components.kef.models import KefBackend
+
+    probe = AsyncMock()
+    if legacy_identified:
+        probe.return_value = SimpleNamespace(
+            async_identify=AsyncMock(return_value=replace(
+                TEST_DEVICE_INFO, backend=KefBackend.LEGACY,
+            )),
+        )
+    else:
+        probe.side_effect = KefConnectionError("offline")
+    monkeypatch.setattr("custom_components.kef.config_flow.async_create_client", probe)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "zeroconf"}, data=discovery_info(ipv4=False),
+    )
+
+    if legacy_identified:
+        assert result["type"] is FlowResultType.ABORT
+        assert result["reason"] == "unsupported"
+    else:
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "confirm"
+    assert probe.await_count == 1
+    assert probe.await_args.args[0] == "speaker.local"
+    assert not hass.config_entries.async_entries(DOMAIN)
+
+
+async def test_discovery_without_advertised_identity_uses_probed_speaker(
+    hass, monkeypatch,
+):
+    """A sparse mDNS advertisement uses the identity returned by the device API."""
+    discovery = discovery_info()
+    discovery.properties.pop("deviceid")
+    device = replace(TEST_DEVICE_INFO, device_name="KEF")
+    probe = AsyncMock(return_value=SimpleNamespace(
+        async_identify=AsyncMock(return_value=device),
+    ))
+    monkeypatch.setattr("custom_components.kef.config_flow.async_create_client", probe)
+    monkeypatch.setattr(
+        "custom_components.kef.async_setup_entry", AsyncMock(return_value=True),
+    )
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "zeroconf"}, data=discovery,
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "confirm"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_DEVICE_ID] == TEST_DEVICE_INFO.unique_id
+    assert result["result"].unique_id == TEST_DEVICE_INFO.unique_id
+    assert result["data"][CONF_HOST] == "speaker.local"

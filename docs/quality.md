@@ -19,7 +19,9 @@ pytest --cov=custom_components.kef --cov-report=term-missing
 ```
 
 Coverage includes the bundled reusable client. Do not exclude it to improve the
-reported percentage. Full config-flow coverage and above 95% coverage throughout
+reported percentage. The current 373-test suite covers 84.7% of statements and
+66.3% of branches; config flow covers 99.1% of statements and 96.2% of branches.
+Full config-flow coverage and above 95% coverage throughout
 the integration remain qualification targets; the current suite does not meet them.
 
 Strict typing is a maintained development/CI gate. Dynamic vendor JSON remains
@@ -58,7 +60,7 @@ corresponding HA rules or physical speaker behavior.
   exemptions, including discovery updates, reconfiguration, repairs, registry
   cleanup, concurrency, action errors, translated entities, and icons.
 - [ ] Verify partial setup failures and repeated unload/reload release resources.
-- [x] Run all 370 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
+- [x] Run all 373 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
 - [ ] Install the published HACS artifact and upgrade from the previous stable
   version while retaining user names, entity IDs, and automation bindings.
 - [ ] Record model/firmware-specific offline startup, reconnection, authentication,
