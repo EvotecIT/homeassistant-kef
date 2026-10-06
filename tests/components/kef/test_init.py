@@ -1,5 +1,7 @@
 """KEF config-entry lifecycle contracts."""
 
+import asyncio
+from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -27,3 +29,68 @@ async def test_unload_preserves_listener_when_platforms_refuse(hass, unload_succ
         entry.runtime_data.async_stop_event_listener.assert_awaited_once_with()
     else:
         entry.runtime_data.async_stop_event_listener.assert_not_awaited()
+
+
+async def test_reloads_replace_event_listener_and_preserve_entities(hass):
+    from homeassistant.const import CONF_HOST
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.kef.const import CONF_BACKEND
+    from custom_components.kef.coordinator import KefCoordinator
+    from custom_components.kef.models import KefBackend
+    from tests.conftest import TEST_HOST, TEST_SNAPSHOT
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_SNAPSHOT.device.unique_id,
+        data={CONF_HOST: TEST_HOST, CONF_BACKEND: TEST_SNAPSHOT.device.backend},
+    )
+    entry.add_to_hass(hass)
+    clients = []
+
+    async def refresh(coordinator):
+        started = asyncio.Event()
+
+        async def poll(*, timeout):
+            started.set()
+            await asyncio.Event().wait()
+
+        client = SimpleNamespace(
+            backend=KefBackend.MODERN,
+            async_poll_events=poll,
+            async_reset_event_queue=AsyncMock(),
+            started=started,
+        )
+        clients.append(client)
+        coordinator.client = client
+        coordinator.async_set_updated_data(deepcopy(TEST_SNAPSHOT))
+
+    with patch.object(KefCoordinator, "async_config_entry_first_refresh", refresh):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await asyncio.wait_for(clients[-1].started.wait(), timeout=5)
+        registry = er.async_get(hass)
+        entity_ids = {
+            entity.entity_id
+            for entity in er.async_entries_for_config_entry(registry, entry.entry_id)
+        }
+        assert entity_ids
+        for _ in range(2):
+            previous = entry.runtime_data
+            previous_task = previous._event_listener_task
+            previous_client = clients[-1]
+            assert await hass.config_entries.async_reload(entry.entry_id)
+            await asyncio.wait_for(clients[-1].started.wait(), timeout=5)
+            assert entry.runtime_data is not previous
+            assert previous_task.cancelled()
+            assert previous._event_listener_task is None
+            previous_client.async_reset_event_queue.assert_awaited_once()
+            assert {
+                entity.entity_id
+                for entity in er.async_entries_for_config_entry(
+                    registry, entry.entry_id
+                )
+            } == entity_ids
+        final_task = entry.runtime_data._event_listener_task
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        assert final_task.cancelled()
+        clients[-1].async_reset_event_queue.assert_awaited_once()

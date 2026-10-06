@@ -20,7 +20,7 @@ pytest --cov=custom_components.kef --cov-report=term-missing
 ```
 
 Coverage includes the bundled reusable client. Do not exclude it to improve the
-reported percentage. The current 384-test suite covers 85.5% of statements and
+reported percentage. The preceding 384-test coverage measurement records 85.5% of statements and
 67.5% of branches; config flow covers 99.1% of statements and 96.2% of branches.
 Full config-flow coverage and above 95% coverage throughout
 the integration remain qualification targets; the current suite does not meet them.
@@ -60,8 +60,9 @@ corresponding HA rules or physical speaker behavior.
 - [ ] Audit all applicable HA rules and record evidence or rule-permitted
   exemptions, including discovery updates, reconfiguration, repairs, registry
   cleanup, concurrency, action errors, translated entities, and icons.
-- [ ] Verify partial setup failures and repeated unload/reload release resources.
-- [x] Run all 384 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
+- [x] Verify repeated HA reloads preserve entity IDs and cancel/reset each old event listener, including final unload.
+- [ ] Verify partial setup-failure cleanup and installed-artifact lifecycle behavior.
+- [x] Run all 385 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
 - [ ] Install the published HACS artifact and upgrade from the previous stable
   version while retaining user names, entity IDs, and automation bindings.
 - [ ] Record model/firmware-specific offline startup, reconnection, authentication,

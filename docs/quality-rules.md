@@ -30,7 +30,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | entity-event-setup | Partial | Coordinator cancellation tests exist; audit every entity listener's registration and removal. |
 | entity-unique-id | Partial | Entity base supplies identity; verify uniqueness and persistence across migration/reconfiguration. |
 | has-entity-name | Partial | Entity base enables entity names; audit primary and child entity naming. |
-| runtime-data | Source verified | The coordinator is stored in typed `KefConfigEntry.runtime_data`; all eight platforms, diagnostics and unload access that owner. [Coordinator](../custom_components/kef/coordinator.py), [setup/unload tests](../tests/components/kef/test_init.py) and [HA action tests](../tests/components/kef/test_configuration_actions.py). Setup-failure and repeated-reload qualification remain tracked under `config-entry-unloading`. |
+| runtime-data | Source verified | The coordinator is stored in typed `KefConfigEntry.runtime_data`; all eight platforms, diagnostics and unload access that owner. [Coordinator](../custom_components/kef/coordinator.py), [setup/unload tests](../tests/components/kef/test_init.py) and [HA action tests](../tests/components/kef/test_configuration_actions.py). Setup-failure qualification remains tracked under `config-entry-unloading`. |
 | test-before-configure | Partial | Config flow validates the host; cover all supported transports and failure classes. |
 | test-before-setup | Partial | Setup refreshes the coordinator; verify retry/authentication failure behaviour. |
 | unique-config-entry | Partial | Flow duplicate checks exist; test discovered/manual and changed-address combinations. |
@@ -40,7 +40,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | Rule | State | Evidence and next acceptance step |
 | --- | --- | --- |
 | action-exceptions | Partial | Invalid firmware target regression exists; audit validation and transport errors across actions. |
-| config-entry-unloading | Partial | Failed unload preserves event listener; successful unload stops it. Prove repeated reload and setup-failure cleanup. |
+| config-entry-unloading | Partial | Failed unload preserves the event listener; successful unload stops it. Real HA tests verify two reloads preserve entity IDs, replace runtime owners, cancel old event tasks, and reset their queues. Setup-failure cleanup and installed-artifact qualification remain open. |
 | docs-configuration-parameters | Partial | Configuration guide exists; reconcile all options, defaults, ranges, and effects. |
 | docs-installation-parameters | Partial | Configuration guide exists; reconcile setup fields, credentials, and network prerequisites. |
 | entity-unavailable | Partial | Coordinator drives availability; verify offline startup, disconnect, recovery, and dependent entities. |
