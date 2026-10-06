@@ -62,6 +62,7 @@ corresponding HA rules or physical speaker behavior.
   cleanup, concurrency, action errors, translated entities, and icons.
 - [x] Verify repeated HA reloads preserve entity IDs and cancel/reset each old event listener, including final unload.
 - [x] Verify a platform-forwarding failure starts no event listener and recovers with a fresh runtime on reload.
+- [x] Verify offline startup enters retry state without publishing runtime data or entities and recovers on reload.
 - [ ] Verify cleanup after partially loaded platforms and installed-artifact lifecycle behavior.
 - [x] Run all 385 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
 - [ ] Install the published HACS artifact and upgrade from the previous stable

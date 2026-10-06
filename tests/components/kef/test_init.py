@@ -138,3 +138,50 @@ async def test_platform_setup_failure_recovers_without_starting_old_listener(has
         assert owners[1] is not owners[0]
         start.assert_awaited_once()
         assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_offline_startup_retries_without_entities_then_recovers(hass):
+    from homeassistant.config_entries import ConfigEntryState
+    from homeassistant.const import CONF_HOST
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.kef.const import CONF_BACKEND
+    from custom_components.kef.coordinator import KefCoordinator
+    from custom_components.kef.exceptions import KefConnectionError
+    from tests.conftest import TEST_HOST, TEST_SNAPSHOT
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_SNAPSHOT.device.unique_id,
+        data={CONF_HOST: TEST_HOST, CONF_BACKEND: TEST_SNAPSHOT.device.backend},
+    )
+    entry.add_to_hass(hass)
+    client = SimpleNamespace(
+        async_refresh=AsyncMock(return_value=deepcopy(TEST_SNAPSHOT))
+    )
+    with (
+        patch(
+            "custom_components.kef.coordinator.async_create_client",
+            AsyncMock(side_effect=KefConnectionError("speaker offline")),
+        ) as connect,
+        patch.object(
+            KefCoordinator, "async_start_event_listener", new_callable=AsyncMock
+        ) as start,
+    ):
+        assert not await hass.config_entries.async_setup(entry.entry_id)
+        assert entry.state is ConfigEntryState.SETUP_RETRY
+        assert not hasattr(entry, "runtime_data")
+        assert not er.async_entries_for_config_entry(
+            er.async_get(hass), entry.entry_id
+        )
+        start.assert_not_awaited()
+        connect.side_effect = None
+        connect.return_value = client
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.LOADED
+        assert entry.runtime_data.client is client
+        assert entry.runtime_data.last_update_success
+        assert er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+        start.assert_awaited_once()
+        assert await hass.config_entries.async_unload(entry.entry_id)
