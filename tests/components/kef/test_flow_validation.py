@@ -16,6 +16,7 @@ from custom_components.kef.exceptions import (
     KefConnectionError,
     KefUnsupportedDeviceError,
 )
+from custom_components.kef.models import KefBackend
 from tests.conftest import TEST_DEVICE_INFO, TEST_HOST
 
 try:
@@ -97,7 +98,10 @@ async def test_failed_validation_preserves_credentials(
 
 
 @pytest.mark.parametrize("source", ["reauth", "reconfigure"])
-async def test_wrong_speaker_cannot_replace_existing_entry(hass, monkeypatch, source):
+@pytest.mark.parametrize("backend", [KefBackend.MODERN, KefBackend.LEGACY])
+async def test_wrong_speaker_cannot_replace_existing_entry(
+    hass, monkeypatch, source, backend
+):
     original = {
         CONF_HOST: TEST_HOST,
         CONF_PASSWORD: "saved-password",
@@ -113,7 +117,9 @@ async def test_wrong_speaker_cannot_replace_existing_entry(hass, monkeypatch, so
     entry.add_to_hass(hass)
     reload = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_reload", reload)
-    device = replace(TEST_DEVICE_INFO, unique_id="different-speaker")
+    device = replace(
+        TEST_DEVICE_INFO, unique_id="different-speaker", backend=backend
+    )
     monkeypatch.setattr(
         "custom_components.kef.config_flow.async_create_client",
         AsyncMock(
