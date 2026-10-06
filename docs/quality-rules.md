@@ -1,11 +1,12 @@
 # Integration rule ledger
 
 This is KEF's self-assessment against the [Home Assistant rules](https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/),
-checked on 2026-10-05. It is an implementation checklist, not an official rating.
-The current index contains 54 rules. Every row stays open until the complete
-applicable contract has evidence; a source pointer alone is not a pass.
+checked on 2026-10-06. It is an implementation checklist, not an official rating.
+The current index contains 54 rules. `Source verified` means the applicable
+implementation contract has source and test evidence at this candidate. It does
+not certify a published release or replace the artifact and hardware gates below.
 
-`Partial` identifies existing implementation or focused proof. `Gap` identifies
+`Partial` identifies incomplete implementation or focused proof. `Gap` identifies
 known missing work. `Review` requires an applicability or contract audit. An
 exemption needs the rule's permitted reason and product-specific evidence.
 
@@ -13,11 +14,11 @@ exemption needs the rule's permitted reason and product-specific evidence.
 
 | Rule | State | Evidence and next acceptance step |
 | --- | --- | --- |
-| action-setup | Partial | Setup registration and invalid target tests in `test_services.py`; audit every action failure path. |
+| action-setup | Source verified | The only custom action is registered in `async_setup`. [Service tests](../tests/components/kef/test_services.py) prove registration without entries, validation errors for missing targets/unavailable runtime, successful dispatch and authentication failure handling. [Source](../custom_components/kef/__init__.py). |
 | appropriate-polling | Partial | Coordinator and scan/retry options exist; document and measure normal/offline request budgets. |
 | brands | Partial | Local `brand/` assets exist; verify rendered HACS/HA assets and applicable custom-integration requirements. |
 | common-modules | Partial | `entity.py`, `coordinator.py`, and `kef_client/` own shared behaviour; inspect remaining adapter duplication. |
-| config-flow-test-coverage | Partial | Config-flow coverage is 98.6% (216/219 statements). Real HA flows cover authentication/connection failures, identity mismatch, discovery rejection, IPv6-only legacy rediscovery, and DNS aliases without replacing saved credentials. Three remaining statements and installed UI proof are open. |
+| config-flow-test-coverage | Partial | 217/219 statements (99.1%) and 75/78 branches (96.2%). Real HA flows cover authentication/connection failures, identity mismatch, sparse discovery, IPv6-only discovery and DNS aliases. The invalid discovery-address handler remains uncovered; full flow coverage is not achieved. |
 | config-flow | Partial | Manual and discovered setup exist; prove the installed artifact's UI flow. |
 | dependency-transparency | Review | Document bundled client ownership, transport, and requirements from the shipped manifest. |
 | docs-actions | Partial | `services.yaml` and automation guide exist; exercise each documented action example. |
@@ -29,7 +30,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | entity-event-setup | Partial | Coordinator cancellation tests exist; audit every entity listener's registration and removal. |
 | entity-unique-id | Partial | Entity base supplies identity; verify uniqueness and persistence across migration/reconfiguration. |
 | has-entity-name | Partial | Entity base enables entity names; audit primary and child entity naming. |
-| runtime-data | Partial | Entry owns coordinator in `runtime_data`; verify partial-setup and unload ownership. |
+| runtime-data | Source verified | The coordinator is stored in typed `KefConfigEntry.runtime_data`; all eight platforms, diagnostics and unload access that owner. [Coordinator](../custom_components/kef/coordinator.py), [setup/unload tests](../tests/components/kef/test_init.py) and [HA action tests](../tests/components/kef/test_configuration_actions.py). Setup-failure and repeated-reload qualification remain tracked under `config-entry-unloading`. |
 | test-before-configure | Partial | Config flow validates the host; cover all supported transports and failure classes. |
 | test-before-setup | Partial | Setup refreshes the coordinator; verify retry/authentication failure behaviour. |
 | unique-config-entry | Partial | Flow duplicate checks exist; test discovered/manual and changed-address combinations. |
@@ -45,9 +46,9 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | entity-unavailable | Partial | Coordinator drives availability; verify offline startup, disconnect, recovery, and dependent entities. |
 | integration-owner | Partial | Manifest names maintainers and issue tracker; confirm support and security-reporting paths. |
 | log-when-unavailable | Review | Exercise one disconnect/reconnect cycle and inspect logs for useful, non-repeating messages. |
-| parallel-updates | Partial | All nine platforms explicitly declare their limits: coordinator-only sensors use 0; writable platforms serialize actions with 1. A real HA multi-entity service regression checks serialized switch writes. Limits apply per platform and entry, not across different platforms. HA 2025.1 bypasses this semaphore for separate single-entity calls; installed-device request budgets remain open. |
+| parallel-updates | Source verified | All eight platforms explicitly set limits: coordinator-only sensors use 0 and writable platforms use 1. [HA multi-entity action test](../tests/components/kef/test_parallel_actions.py) verifies serialized switch writes. These are per-platform limits; minimum HA bypasses them for separate single-entity calls. Physical request-budget measurements remain a separate qualification gate. |
 | reauthentication-flow | Partial | Reauth steps exist; prove credentials are replaced only after successful validation. |
-| test-coverage | Gap | Current measured integration/client coverage is 83%; all applicable modules must meet the rule. |
+| test-coverage | Gap | Integration and bundled-client statement coverage is 85.5%, with 67.5% branch coverage. Several modules remain below the required threshold; tests and exclusions must reflect supported behaviour. |
 
 ## Gold
 
@@ -81,11 +82,11 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | --- | --- | --- |
 | async-dependency | Partial | Bundled client uses async transports; inspect blocking calls, cancellation, and resource lifetime. |
 | inject-websession | Partial | Config flow and setup inject HA's session. Loopback HTTP tests verify caller ownership, authentication error classification for reads/uploads, and decoded JSON even when session defaults differ. Remaining artifact/path qualification stays open. |
-| strict-typing | Partial | mypy 2.4.0 strict checking passes all 25 production modules, including the bundled client, on HA 2026.9.4. CI enforces it; release-scoped proof remains open. |
+| strict-typing | Partial | mypy 2.4.0 strict checking passes all 24 production modules, including the bundled client, on HA 2026.9.4 and is enforced by CI. The standalone wrapper still needs PEP 561 package/type-consumer evidence; no `py.typed` marker is shipped. Source annotations alone do not prove that installed consumers receive types. |
 
 ## Qualification beyond the rule ledger
 
-- [x] 366 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
+- [x] 384 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
 - [ ] Install the published artifact and upgrade from the previous stable release.
 - [ ] Verify real model/firmware behaviour, resource use, reconnection, and supported actions.
 - [ ] Record release version, commit, artifact identity, environment, and evidence date.

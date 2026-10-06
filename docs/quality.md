@@ -5,7 +5,8 @@ through Platinum while remaining a custom integration. Qualification is incomple
 A manifest label or passing CI does not establish an official HA rating.
 
 The [rule ledger](quality-rules.md) tracks every rule, existing evidence, and the
-next acceptance step. All rows remain open until their full contract is proven.
+next acceptance step. Source-verified rows identify proven implementation contracts; release, installed
+artifact and device qualification remain separate.
 
 ## Reproduce the evidence
 
@@ -19,8 +20,8 @@ pytest --cov=custom_components.kef --cov-report=term-missing
 ```
 
 Coverage includes the bundled reusable client. Do not exclude it to improve the
-reported percentage. The current 383-test suite covers 85.5% of statements and
-67.4% of branches; config flow covers 99.1% of statements and 96.2% of branches.
+reported percentage. The current 384-test suite covers 85.5% of statements and
+67.5% of branches; config flow covers 99.1% of statements and 96.2% of branches.
 Full config-flow coverage and above 95% coverage throughout
 the integration remain qualification targets; the current suite does not meet them.
 
@@ -60,7 +61,7 @@ corresponding HA rules or physical speaker behavior.
   exemptions, including discovery updates, reconfiguration, repairs, registry
   cleanup, concurrency, action errors, translated entities, and icons.
 - [ ] Verify partial setup failures and repeated unload/reload release resources.
-- [x] Run all 383 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
+- [x] Run all 384 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
 - [ ] Install the published HACS artifact and upgrade from the previous stable
   version while retaining user names, entity IDs, and automation bindings.
 - [ ] Record model/firmware-specific offline startup, reconnection, authentication,

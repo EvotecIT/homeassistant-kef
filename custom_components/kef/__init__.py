@@ -7,7 +7,7 @@ from collections.abc import Mapping
 import voluptuous as vol
 from homeassistant.const import ATTR_ENTITY_ID, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
@@ -92,12 +92,12 @@ async def _async_handle_install_firmware_file(
         or entity_entry.platform != DOMAIN
         or entity_entry.config_entry_id is None
     ):
-        raise HomeAssistantError("Target must be a KEF firmware update entity")
+        raise ServiceValidationError("Target must be a KEF firmware update entity")
 
     config_entry = hass.config_entries.async_get_entry(entity_entry.config_entry_id)
     coordinator = getattr(config_entry, "runtime_data", None)
     if config_entry is None or coordinator is None or coordinator.client is None:
-        raise HomeAssistantError("KEF config entry is not ready")
+        raise ServiceValidationError("KEF config entry is not ready")
 
     try:
         await coordinator.client.async_upload_firmware_update(
