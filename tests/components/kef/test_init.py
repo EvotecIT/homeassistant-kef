@@ -94,3 +94,47 @@ async def test_reloads_replace_event_listener_and_preserve_entities(hass):
         assert await hass.config_entries.async_unload(entry.entry_id)
         assert final_task.cancelled()
         clients[-1].async_reset_event_queue.assert_awaited_once()
+
+
+async def test_platform_setup_failure_recovers_without_starting_old_listener(hass):
+    from homeassistant.config_entries import ConfigEntryState
+    from homeassistant.const import CONF_HOST
+
+    from custom_components.kef.const import CONF_BACKEND
+    from custom_components.kef.coordinator import KefCoordinator
+    from tests.conftest import TEST_HOST, TEST_SNAPSHOT
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_SNAPSHOT.device.unique_id,
+        data={CONF_HOST: TEST_HOST, CONF_BACKEND: TEST_SNAPSHOT.device.backend},
+    )
+    entry.add_to_hass(hass)
+    owners = []
+
+    async def refresh(coordinator):
+        owners.append(coordinator)
+        coordinator.async_set_updated_data(deepcopy(TEST_SNAPSHOT))
+
+    with (
+        patch.object(KefCoordinator, "async_config_entry_first_refresh", refresh),
+        patch.object(
+            KefCoordinator, "async_start_event_listener", new_callable=AsyncMock
+        ) as start,
+    ):
+        with patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            AsyncMock(side_effect=RuntimeError("platform setup failed")),
+        ):
+            assert not await hass.config_entries.async_setup(entry.entry_id)
+        assert entry.state is ConfigEntryState.SETUP_ERROR
+        start.assert_not_awaited()
+        assert owners[0]._event_listener_task is None
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.LOADED
+        assert entry.runtime_data is owners[1]
+        assert owners[1] is not owners[0]
+        start.assert_awaited_once()
+        assert await hass.config_entries.async_unload(entry.entry_id)

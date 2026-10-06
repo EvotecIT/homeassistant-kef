@@ -40,7 +40,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | Rule | State | Evidence and next acceptance step |
 | --- | --- | --- |
 | action-exceptions | Partial | Invalid firmware target regression exists; audit validation and transport errors across actions. |
-| config-entry-unloading | Partial | Failed unload preserves the event listener; successful unload stops it. Real HA tests verify two reloads preserve entity IDs, replace runtime owners, cancel old event tasks, and reset their queues. Setup-failure cleanup and installed-artifact qualification remain open. |
+| config-entry-unloading | Partial | Failed unload preserves the event listener; successful unload stops it. Real HA tests verify two reloads preserve entity IDs, replace runtime owners, cancel old event tasks, and reset their queues. A forwarding failure enters HA setup-error state without starting the event listener; a later reload replaces the runtime owner and succeeds. Cleanup after partially loaded platforms and installed-artifact qualification remain open. |
 | docs-configuration-parameters | Partial | Configuration guide exists; reconcile all options, defaults, ranges, and effects. |
 | docs-installation-parameters | Partial | Configuration guide exists; reconcile setup fields, credentials, and network prerequisites. |
 | entity-unavailable | Partial | Coordinator drives availability; verify offline startup, disconnect, recovery, and dependent entities. |
