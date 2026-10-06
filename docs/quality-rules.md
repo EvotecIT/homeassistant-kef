@@ -82,7 +82,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | --- | --- | --- |
 | async-dependency | Partial | Bundled client uses async transports; inspect blocking calls, cancellation, and resource lifetime. |
 | inject-websession | Partial | Config flow and setup inject HA's session. Loopback HTTP tests verify caller ownership, authentication error classification for reads/uploads, and decoded JSON even when session defaults differ. Remaining artifact/path qualification stays open. |
-| strict-typing | Partial | mypy 2.4.0 strict checking passes all 24 production modules, including the bundled client, on HA 2026.9.4 and is enforced by CI. The standalone wrapper still needs PEP 561 package/type-consumer evidence; no `py.typed` marker is shipped. Source annotations alone do not prove that installed consumers receive types. |
+| strict-typing | Partial | mypy 2.4.0 strict checking passes all 24 production modules, including the bundled client, on HA 2026.9.4 and is enforced by CI. The standalone package includes PEP 561 markers and thin stubs re-exporting the canonical client types. An isolated wheel consumer passes strict checking and rejects an invalid argument without Home Assistant installed. CI checks this installed contract in both compatibility lanes; published-release evidence remains outstanding. |
 
 ## Qualification beyond the rule ledger
 
