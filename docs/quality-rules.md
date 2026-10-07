@@ -20,7 +20,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | common-modules | Partial | `entity.py`, `coordinator.py`, and `kef_client/` own shared behaviour; inspect remaining adapter duplication. |
 | config-flow-test-coverage | Partial | 217/219 statements (99.1%) and 75/78 branches (96.2%). Real HA flows cover authentication/connection failures, identity mismatch, sparse discovery, IPv6-only discovery and DNS aliases. The invalid discovery-address handler remains uncovered; full flow coverage is not achieved. |
 | config-flow | Partial | Manual and discovered setup exist; prove the installed artifact's UI flow. |
-| dependency-transparency | Review | Document bundled client ownership, transport, and requirements from the shipped manifest. |
+| dependency-transparency | Partial | [Development guide](development.md#runtime-dependencies) identifies the bundled client, standalone wrapper, HTTP/TCP transports and cryptography role. HA supplies the external libraries; standalone requirements are declared in pyproject.toml. Verify upstream OSI licenses, PyPI packages, tagged releases and public publication pipelines before marking this rule complete. |
 | docs-actions | Partial | `services.yaml` and automation guide exist; exercise each documented action example. |
 | docs-triggers | Review | Audit custom trigger support and document supported automation usage or applicability. |
 | docs-conditions | Review | Audit custom condition support and document supported automation usage or applicability. |
