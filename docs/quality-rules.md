@@ -48,7 +48,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | log-when-unavailable | Review | Exercise one disconnect/reconnect cycle and inspect logs for useful, non-repeating messages. |
 | parallel-updates | Source verified | All eight platforms explicitly set limits: coordinator-only sensors use 0 and writable platforms use 1. [HA multi-entity action test](../tests/components/kef/test_parallel_actions.py) verifies serialized switch writes. These are per-platform limits; minimum HA bypasses them for separate single-entity calls. Physical request-budget measurements remain a separate qualification gate. |
 | reauthentication-flow | Partial | Reauth steps exist; prove credentials are replaced only after successful validation. |
-| test-coverage | Gap | The measured 36cd65b baseline including the bundled client has 85.6% statement and 68.4% branch coverage. Later 401-test runs did not remeasure coverage. Several modules remain below the required threshold; tests and exclusions must reflect supported behaviour. |
+| test-coverage | Gap | The measured 4b75b57 production baseline including the bundled client has 86.6% statement coverage (2637/3046) and 69.2% branch coverage (501/724) across 401 passing tests. Several modules remain below the required threshold; tests and exclusions must reflect supported behaviour. |
 
 ## Gold
 

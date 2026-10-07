@@ -16,16 +16,17 @@ Run the existing test environment on Linux, including WSL:
 python -m pip install -e '.[test]'
 ruff check .
 python -m mypy --strict custom_components/kef
-pytest --cov=custom_components.kef --cov-report=term-missing
+pytest --cov=custom_components.kef --cov-branch --cov-report=term-missing
 ```
 
 Coverage includes the bundled reusable client. Do not exclude it to improve the
 reported percentage. All 401 tests pass on HA 2025.1.0 and HA 2026.9.4;
-Ruff and strict typing pass on the current lane. These runs include the legacy
-acknowledgement regressions but do not remeasure coverage.
+Ruff and strict typing pass on the current lane. The coverage run includes the
+legacy acknowledgement regressions with a TCP deadline that tolerates test
+instrumentation while still requiring multiple partial response chunks.
 
-The measured baseline at `36cd65b` contains 392 tests and covers
-85.6% of statements (2600/3037) and 68.4% of branches (491/718). Config-flow
+The measured production baseline at `4b75b57` contains 401 tests and covers
+86.6% of statements (2637/3046) and 69.2% of branches (501/724). Config-flow
 coverage is 99.1% of statements (217/219) and 100% of branches (78/78); the
 remaining statements handle invalid discovery addresses. All 49 focused flow
 cases also pass on HA 2025.1.0.
@@ -80,7 +81,7 @@ corresponding HA rules or physical speaker behavior.
 - [x] Verify cleanup after a real sensor platform loads and the remaining setup fails, including recovery with a fresh owner.
 - [x] Verify authentication failure starts HA reauthentication without publishing entities or runtime data.
 - [ ] Verify installed-artifact lifecycle behavior.
-- [x] Run all 385 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
+- [x] Run all 401 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
 - [ ] Install the published HACS artifact and upgrade from the previous stable
   version while retaining user names, entity IDs, and automation bindings.
 - [ ] Record model/firmware-specific offline startup, reconnection, authentication,

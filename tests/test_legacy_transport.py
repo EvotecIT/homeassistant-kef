@@ -80,22 +80,26 @@ async def test_eof_without_acknowledgement_is_a_response_error(reply):
 
 
 async def test_partial_data_does_not_restart_acknowledgement_deadline():
+    chunks_sent = []
+
     async def handler(reader, writer):
         while True:
             writer.write(b"R")
             await writer.drain()
+            chunks_sent.append(b"R")
             try:
-                if await asyncio.wait_for(reader.read(1), 0.02) == b"":
+                if await asyncio.wait_for(reader.read(1), 0.05) == b"":
                     return
             except TimeoutError:
                 pass
 
     async with legacy_server(handler) as (port, received, disconnected):
-        client = LegacyBinaryClient("127.0.0.1", port=port, request_timeout=0.1)
+        client = LegacyBinaryClient("127.0.0.1", port=port, request_timeout=1)
         with pytest.raises(KefConnectionError):
-            await asyncio.wait_for(client.async_set_volume_raw(42), 0.5)
+            await asyncio.wait_for(client.async_set_volume_raw(42), 3)
         await asyncio.wait_for(disconnected.wait(), 1)
         assert len(received) == 1
+        assert len(chunks_sent) >= 2
 
 
 async def test_cancelling_acknowledgement_wait_closes_connection():
