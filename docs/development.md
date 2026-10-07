@@ -38,7 +38,16 @@ Legacy speakers use Python's asynchronous IPv4 TCP transport. The standalone
 package declares `aiohttp` and `cryptography` in `pyproject.toml`; the HA manifest
 has no additional package requirements and uses the libraries supplied by HA.
 
-Dependency qualification also requires evidence for licenses, public package
-availability, release tags, and the upstream publication pipelines. The
-[rule ledger](quality-rules.md) tracks that remaining provenance check separately
-from the integration's transport and packaging tests.
+The dependency provenance check on 2026-10-07 covers the versions resolved in
+both qualification environments. These are evidence snapshots, not additional
+installation pins.
+
+| Dependency | Minimum/current environment | Public source and publication |
+| --- | --- | --- |
+| aiohttp | 3.11.11 / 3.14.3 | Apache 2.0; public PyPI releases correspond to upstream `v3.11.11` and `v3.14.3` tags. The tagged [CI workflow](https://github.com/aio-libs/aiohttp/blob/v3.14.3/.github/workflows/ci-cd.yml) builds source distributions and wheels and publishes to PyPI. |
+| cryptography | 44.0.0 / 48.0.1 | Apache-2.0 OR BSD-3-Clause; public PyPI releases correspond to upstream `44.0.0` and `48.0.1` tags. The tagged [wheel builder](https://github.com/pyca/cryptography/blob/48.0.1/.github/workflows/wheel-builder.yml) supplies the [publishing workflow](https://github.com/pyca/cryptography/blob/48.0.1/.github/workflows/pypi-publish.yml). |
+
+PyPI source-archive provenance identifies these upstream GitHub publishers for
+all four versions. This verifies public dependency ownership and publication
+paths; it does not certify a particular installed Home Assistant artifact.
+Recheck this evidence when the supported environments change.
