@@ -3006,11 +3006,22 @@ class LegacyBinaryClient(BaseKefClient):
 
         try:
             writer.write(payload)
-            await writer.drain()
-            raw_reply = await asyncio.wait_for(
-                reader.read(100),
-                timeout=self._request_timeout,
-            )
+            async with asyncio.timeout(self._request_timeout):
+                await writer.drain()
+                raw_reply = await reader.read(100)
+                if payload[0] == _LEGACY_SET_START:
+                    # TCP may deliver the acknowledgement over several reads.
+                    # Keep one deadline and the existing 100-byte response bound;
+                    # never resend a command merely because its reply is split.
+                    while raw_reply and len(raw_reply) < 100:
+                        try:
+                            self._parse_response(payload, raw_reply)
+                            break
+                        except KefResponseError:
+                            chunk = await reader.read(100 - len(raw_reply))
+                            if not chunk:
+                                break
+                            raw_reply += chunk
         except (OSError, TimeoutError) as err:
             raise KefConnectionError(str(err)) from err
         finally:

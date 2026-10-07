@@ -20,7 +20,11 @@ pytest --cov=custom_components.kef --cov-report=term-missing
 ```
 
 Coverage includes the bundled reusable client. Do not exclude it to improve the
-reported percentage. The current 392-test suite passes on HA 2026.9.4 and covers
+reported percentage. All 401 tests pass on HA 2025.1.0 and HA 2026.9.4;
+Ruff and strict typing pass on the current lane. These runs include the legacy
+acknowledgement regressions but do not remeasure coverage.
+
+The measured baseline at `36cd65b` contains 392 tests and covers
 85.6% of statements (2600/3037) and 68.4% of branches (491/718). Config-flow
 coverage is 99.1% of statements (217/219) and 100% of branches (78/78); the
 remaining statements handle invalid discovery addresses. All 49 focused flow
@@ -33,6 +37,13 @@ at the transport boundary; volume reads validate their integer contract before
 returning data to entities.
 
 ## Verified contracts
+
+- Legacy commands accept the documented acknowledgement across TCP reads,
+  without resending a command. The response remains limited to 100 bytes and
+  one request deadline. Loopback tests cover truncated/rejected replies,
+  deadline expiry, cancellation, and connection closure.
+  Evidence: `tests/test_legacy_transport.py`. Legacy GET framing and physical
+  firmware behavior still need separate qualification.
 
 - Actions are registered during integration setup before a speaker entry is
   ready. Invalid firmware targets raise an error without uploading a file.
