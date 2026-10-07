@@ -20,18 +20,18 @@ pytest --cov=custom_components.kef --cov-branch --cov-report=term-missing
 ```
 
 Coverage includes the bundled reusable client. Do not exclude it to improve the
-reported percentage. All 401 tests pass on HA 2025.1.0 and HA 2026.9.4;
-Ruff and strict typing pass on the current lane. The coverage run includes the
-legacy acknowledgement regressions with a TCP deadline that tolerates test
-instrumentation while still requiring multiple partial response chunks.
+reported percentage. The current suite passes all 413 tests on HA 2026.9.4.
+The preceding 401-test baseline also passes on HA 2025.1.0; the latest config-flow
+change passes all 23 component flow tests on that minimum version. Ruff and
+strict typing pass on the current lane.
 
 The measured production baseline at `4b75b57` contains 401 tests and covers
-86.6% of statements (2637/3046) and 69.2% of branches (501/724). Config-flow
-coverage is 99.1% of statements (217/219) and 100% of branches (78/78); the
-remaining statements handle invalid discovery addresses. All 49 focused flow
-cases also pass on HA 2025.1.0.
-Full config-flow coverage and above 95% coverage throughout
-the integration remain qualification targets; the current suite does not meet them.
+86.6% of statements (2637/3046) and 69.2% of branches (501/724). This remains a
+historical integration-wide measurement, not a measurement of the latest source.
+The current full-suite config-flow measurement covers all 216 statements and
+78 branches (100%). Both supported HA discovery producers supply parsed IP
+addresses; the unreachable invalid-address exception handler has been removed.
+Above 95% coverage throughout the integration remains a qualification target.
 
 Strict typing is a maintained development/CI gate. Dynamic vendor JSON remains
 at the transport boundary; volume reads validate their integer contract before
@@ -69,7 +69,8 @@ corresponding HA rules or physical speaker behavior.
 
 ## Remaining qualification
 
-- [ ] Complete measured config-flow and integration/client coverage.
+- [x] Achieve full config-flow statement and branch coverage.
+- [ ] Complete integration/client coverage above the required threshold.
 - [x] Enable strict typing across all 24 integration and bundled-client modules
   with mypy 2.4.0 and no broad import or production-code ignores.
 - [ ] Audit all applicable HA rules and record evidence or rule-permitted

@@ -323,11 +323,8 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
     def _legacy_ipv4_host(discovery_info: ZeroconfServiceInfo) -> str | None:
         """Pick an IPv4 address for the legacy client's IPv4-only socket."""
         for host in (*discovery_info.ip_addresses, discovery_info.host):
-            try:
-                if isinstance(ipaddress.ip_address(host), ipaddress.IPv4Address):
-                    return str(host)
-            except ValueError:
-                continue
+            if isinstance(ipaddress.ip_address(host), ipaddress.IPv4Address):
+                return str(host)
         return None
 
     @staticmethod
