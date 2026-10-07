@@ -369,7 +369,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="startup_tone",
         translation_key="startup_tone",
-        icon="mdi:music-note",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.startup_tone_enabled,
         async_set_fn=_async_set_startup_tone,
@@ -377,7 +376,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="auto_switch_hdmi",
         translation_key="auto_switch_hdmi",
-        icon="mdi:video-switch",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.auto_switch_hdmi,
         async_set_fn=_async_set_auto_switch_hdmi,
@@ -385,7 +383,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="front_led",
         translation_key="front_led",
-        icon="mdi:led-strip-variant",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.front_led_enabled,
         async_set_fn=_async_set_front_led,
@@ -394,7 +391,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="standby_led",
         translation_key="standby_led",
-        icon="mdi:led-outline",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.standby_led_enabled,
         async_set_fn=_async_set_standby_led,
@@ -403,7 +399,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="top_panel",
         translation_key="top_panel",
-        icon="mdi:gesture-tap-button",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_enabled,
         async_set_fn=_async_set_top_panel,
@@ -412,7 +407,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="top_panel_led",
         translation_key="top_panel_led",
-        icon="mdi:led-on",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_led_enabled,
         async_set_fn=_async_set_top_panel_led,
@@ -421,7 +415,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="top_panel_standby_led",
         translation_key="top_panel_standby_led",
-        icon="mdi:led-outline",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.top_panel_standby_led_enabled,
         async_set_fn=_async_set_top_panel_standby_led,
@@ -430,7 +423,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="usb_charging",
         translation_key="usb_charging",
-        icon="mdi:usb-port",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.usb_charging_enabled,
         async_set_fn=_async_set_usb_charging,
@@ -439,7 +431,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="startup_volume",
         translation_key="startup_volume",
-        icon="mdi:volume-source",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.startup_volume_enabled,
         async_set_fn=_async_set_startup_volume,
@@ -447,7 +438,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="per_input_startup_volume",
         translation_key="per_input_startup_volume",
-        icon="mdi:tune-variant",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.per_input_startup_volume_enabled,
         async_set_fn=_async_set_per_input_startup_volume,
@@ -455,7 +445,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="volume_limit",
         translation_key="volume_limit",
-        icon="mdi:volume-off",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.volume_limit_enabled,
         async_set_fn=_async_set_volume_limit,
@@ -463,7 +452,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="subwoofer_wake",
         translation_key="subwoofer_wake",
-        icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.subwoofer_wake_enabled,
         async_set_fn=_async_set_subwoofer_wake,
@@ -471,7 +459,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="kw1_wake",
         translation_key="kw1_wake",
-        icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.kw1_wake_enabled,
         async_set_fn=_async_set_kw1_wake,
@@ -479,7 +466,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="subwoofer",
         translation_key="subwoofer",
-        icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
             data.eq_profile.subwoofer_out if data.eq_profile else None
@@ -489,7 +475,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="kw1_adapter",
         translation_key="kw1_adapter",
-        icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_profile.is_kw1 if data.eq_profile else None,
         async_set_fn=_async_set_kw1_adapter,
@@ -497,7 +482,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="sub_enable_stereo",
         translation_key="sub_enable_stereo",
-        icon="mdi:speaker-multiple",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
             data.eq_profile.sub_enable_stereo if data.eq_profile else None
@@ -508,7 +492,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="remote_ir",
         translation_key="remote_ir",
-        icon="mdi:remote",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.remote_ir_enabled,
         async_set_fn=_async_set_remote_ir,
@@ -516,7 +499,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="analytics",
         translation_key="analytics",
-        icon="mdi:chart-line",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.analytics_enabled,
         async_set_fn=_async_set_analytics,
@@ -524,7 +506,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="app_analytics",
         translation_key="app_analytics",
-        icon="mdi:cellphone-cog",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.app_analytics_enabled,
         async_set_fn=_async_set_app_analytics,
@@ -532,7 +513,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="desk_mode",
         translation_key="desk_mode",
-        icon="mdi:desk",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_profile.desk_mode if data.eq_profile else None,
         async_set_fn=_async_set_desk_mode,
@@ -541,7 +521,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="wall_mode",
         translation_key="wall_mode",
-        icon="mdi:wall",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_profile.wall_mode if data.eq_profile else None,
         async_set_fn=_async_set_wall_mode,
@@ -550,7 +529,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="phase_correction",
         translation_key="phase_correction",
-        icon="mdi:waveform",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
             data.eq_profile.phase_correction if data.eq_profile else None
@@ -560,7 +538,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="high_pass_mode",
         translation_key="high_pass_mode",
-        icon="mdi:chart-bell-curve-cumulative",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
             data.eq_profile.high_pass_mode if data.eq_profile else None
@@ -570,7 +547,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="auto_detect_placement",
         translation_key="auto_detect_placement",
-        icon="mdi:crosshairs-gps",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.auto_detect_placement,
         async_set_fn=_async_set_auto_detect_placement,
@@ -579,7 +555,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="wall_mounted",
         translation_key="wall_mounted",
-        icon="mdi:wall",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
             data.eq_profile.wall_mounted if data.eq_profile else None
@@ -590,7 +565,6 @@ SWITCHES: tuple[KefSwitchDescription, ...] = (
     KefSwitchDescription(
         key="prefer_virtual_x",
         translation_key="prefer_virtual_x",
-        icon="mdi:surround-sound",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.prefer_virtual_x,
         async_set_fn=_async_set_prefer_virtual_x,

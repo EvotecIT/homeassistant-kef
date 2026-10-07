@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 from homeassistant.const import CONF_HOST
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.icon import async_get_icons
 from homeassistant.helpers.translation import async_get_translations
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -74,6 +75,21 @@ async def test_host_translations_preserve_labels_and_custom_names(
         expected = translations[key].format(**placeholders)
         assert child.original_name == expected
         assert expected
+
+    icons = (await async_get_icons(hass, "entity", {DOMAIN}))[DOMAIN]
+    assert icons["number"]["source_startup_volume"]["default"] == (
+        "mdi:volume-medium"
+    )
+    assert icons["text"]["ui_language"]["default"] == "mdi:translate"
+    if model == "XIO":
+        assert icons["button"]["start_calibration"]["default"] == (
+            "mdi:tune"
+        )
+    player = next(
+        item for item in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if item.domain == "media_player"
+    )
+    assert hass.states.get(player.entity_id).attributes["device_class"] == "speaker"
 
     current = registry.async_get(old.entity_id)
     assert current.unique_id == old.unique_id

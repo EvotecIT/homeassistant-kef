@@ -71,7 +71,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | entity-disabled-by-default | Partial | Diagnostic feature gating exists; audit noisy or rarely useful entities and user opt-in behaviour. |
 | entity-translations | Partial | Child entity translation keys and dynamic source placeholders resolve in minimum/current HA, including English fallback for French and preserved custom names/IDs on LSX II and XIO fixtures. English is the provided language; installed frontend qualification remains open. |
 | exception-translations | Review | Audit user-facing action exceptions and translation keys. |
-| icon-translations | Gap | Add applicable state-aware icon definitions and verify them against entity states. |
+| icon-translations | Partial | Custom icons use `icons.json` and existing entity translation keys; speaker and frequency entities use their device-class defaults. HA 2025.1 and 2026.9.4 host tests load the resources, and the wheel includes the resource unchanged. Rendered frontend appearance remains unverified. |
 | reconfiguration-flow | Partial | Reconfigure step exists; verify identity checks, address changes, and retained settings. |
 | repair-issues | Review | Identify failures requiring user intervention and implement applicable repairs without log-only dead ends. |
 | stale-devices | Review | Audit registry removal and applicability for the single-device entry model. |

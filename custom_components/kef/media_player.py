@@ -5,7 +5,10 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime
 
-from homeassistant.components.media_player import MediaPlayerEntity
+from homeassistant.components.media_player import (
+    MediaPlayerDeviceClass,
+    MediaPlayerEntity,
+)
 from homeassistant.components.media_player.const import (
     MediaPlayerEntityFeature,
     MediaPlayerState,
@@ -78,7 +81,7 @@ async def async_setup_entry(
 class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEntity):
     """Representation of a KEF speaker."""
 
-    _attr_icon = "mdi:speaker-wireless"
+    _attr_device_class = MediaPlayerDeviceClass.SPEAKER
     _base_supported_features = (
         MediaPlayerEntityFeature.TURN_ON
         | MediaPlayerEntityFeature.TURN_OFF

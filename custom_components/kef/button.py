@@ -42,8 +42,6 @@ class KefStartCalibrationButton(
 ):
     """Button to start room calibration (XIO only)."""
 
-    _attr_icon = "mdi:tune"
-
     def __init__(self, coordinator: KefCoordinator) -> None:
         """Initialize the button."""
         CoordinatorEntity.__init__(self, coordinator)

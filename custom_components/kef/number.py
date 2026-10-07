@@ -206,7 +206,6 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="default_volume_global",
         translation_key="default_volume_global",
-        icon="mdi:volume-medium",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
         native_max_value=100,
@@ -217,7 +216,6 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="maximum_volume",
         translation_key="maximum_volume",
-        icon="mdi:volume-high",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
         native_max_value=100,
@@ -228,7 +226,6 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="volume_step",
         translation_key="volume_step",
-        icon="mdi:stairs",
         entity_category=EntityCategory.CONFIG,
         native_min_value=1,
         native_max_value=10,
@@ -239,7 +236,6 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="fixed_volume_level",
         translation_key="fixed_volume_level",
-        icon="mdi:volume-equal",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
         native_max_value=100,
@@ -250,7 +246,6 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="balance",
         translation_key="balance",
-        icon="mdi:arrow-left-right",
         entity_category=EntityCategory.CONFIG,
         native_min_value=-30,
         native_max_value=30,
@@ -262,7 +257,6 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="treble_amount",
         translation_key="treble_amount",
-        icon="mdi:tune-vertical",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
         native_min_value=-3.0,
@@ -276,7 +270,6 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="subwoofer_gain",
         translation_key="subwoofer_gain",
-        icon="mdi:speaker-wireless",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
         native_min_value=-10,
@@ -290,7 +283,6 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="high_pass_frequency",
         translation_key="high_pass_frequency",
-        icon="mdi:sine-wave",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="Hz",
         native_min_value=50.0,
@@ -304,7 +296,6 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="sub_out_low_pass_frequency",
         translation_key="sub_out_low_pass_frequency",
-        icon="mdi:sine-wave",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="Hz",
         native_min_value=40.0,
@@ -318,7 +309,6 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="desk_mode_db",
         translation_key="desk_mode_db",
-        icon="mdi:desk",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
         native_min_value=-10.0,
@@ -333,7 +323,6 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="wall_mode_db",
         translation_key="wall_mode_db",
-        icon="mdi:wall",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
         native_min_value=-10.0,
@@ -424,7 +413,6 @@ class KefSourceVolumeNumber(KefEntity, CoordinatorEntity[KefCoordinator], Number
     _attr_native_min_value = 0
     _attr_native_max_value = 100
     _attr_native_step = 1
-    _attr_icon = "mdi:volume-medium"
 
     def __init__(
         self,

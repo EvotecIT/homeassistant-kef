@@ -53,7 +53,6 @@ TEXTS: tuple[KefTextDescription, ...] = (
     KefTextDescription(
         key="ui_language",
         translation_key="ui_language",
-        icon="mdi:translate",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.ui_language,
         async_set_fn=_async_set_ui_language,
@@ -61,7 +60,6 @@ TEXTS: tuple[KefTextDescription, ...] = (
     KefTextDescription(
         key="speaker_location",
         translation_key="speaker_location",
-        icon="mdi:map-marker",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.speaker_location,
         async_set_fn=_async_set_speaker_location,
