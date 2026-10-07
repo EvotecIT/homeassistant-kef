@@ -1,5 +1,6 @@
 """HA configuration actions preserve wire values, state and HTTP failures."""
 
+from dataclasses import replace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -55,6 +56,23 @@ pytestmark = pytest.mark.usefixtures("socket_enabled")
             "kefMasterChannelMode",
             "left",
         ),
+        (
+            "select", "remote_ir_code", "Set B",
+            "settings:/kef/host/remote/remoteIRCode",
+            "kefSpeakerIRCode", "ir_code_set_b",
+        ),
+        (
+            "select", "streaming_quality", "256 kbps",
+            "settings:/airable/bitrate", "airableStreamBitrate", "256",
+        ),
+        *[
+            ("switch", key, enabled, path, "bool_", not enabled)
+            for key, path in (
+                ("analytics", "settings:/kef/host/disableAnalytics"),
+                ("app_analytics", "settings:/kef/host/disableAppAnalytics"),
+            )
+            for enabled in (False, True)
+        ],
     ],
 )
 async def test_configuration_service_preserves_wire_value_and_state(
@@ -75,8 +93,12 @@ async def test_configuration_service_preserves_wire_value_and_state(
     )
     entry.add_to_hass(hass)
 
+    snapshot = TEST_SNAPSHOT
+    if domain == "switch":
+        snapshot = replace(snapshot, **{f"{key}_enabled": not value})
+
     async def refresh(coordinator):
-        coordinator.async_set_updated_data(TEST_SNAPSHOT)
+        coordinator.async_set_updated_data(snapshot)
 
     with patch.object(KefCoordinator, "async_config_entry_first_refresh", refresh):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -108,15 +130,13 @@ async def test_configuration_service_preserves_wire_value_and_state(
             )
             assert entity_id is not None
             before = hass.states.get(entity_id).state
-            action = hass.services.async_call(
-                domain,
-                "set_value" if domain == "text" else "select_option",
-                {
-                    "entity_id": entity_id,
-                    ("value" if domain == "text" else "option"): value,
-                },
-                blocking=True,
-            )
+            data = {"entity_id": entity_id}
+            if domain == "switch":
+                service = "turn_on" if value else "turn_off"
+            else:
+                service = "set_value" if domain == "text" else "select_option"
+                data["value" if domain == "text" else "option"] = value
+            action = hass.services.async_call(domain, service, data, blocking=True)
             if status == 200:
                 await action
                 refresh_after_write.assert_awaited_once_with()
@@ -135,7 +155,12 @@ async def test_configuration_service_preserves_wire_value_and_state(
                 }
             ]
             await hass.async_block_till_done()
-            expected_state = value if domain == "select" and status == 200 else before
+            expected_state = before
+            if status == 200:
+                if domain == "select":
+                    expected_state = value
+                elif domain == "switch":
+                    expected_state = "on" if value else "off"
             assert hass.states.get(entity_id).state == expected_state
             assert not session.closed
     finally:
