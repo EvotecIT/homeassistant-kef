@@ -6,15 +6,17 @@ import asyncio
 import ipaddress
 import logging
 import socket
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
     SOURCE_RECONFIGURE,
     SOURCE_ZEROCONF,
+    ConfigEntry,
     ConfigEntryState,
     ConfigFlow,
+    ConfigFlowResult,
     OptionsFlow,
 )
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
@@ -24,7 +26,6 @@ from homeassistant.helpers.selector import (
     NumberSelectorConfig,
     NumberSelectorMode,
 )
-from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .api import async_create_client
 from .const import (
@@ -57,13 +58,16 @@ from .models import KefBackend
 _LOGGER = logging.getLogger(__name__)
 
 
+if TYPE_CHECKING:
+    from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
+
 class KefConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a KEF config flow."""
 
     VERSION = 1
 
     @staticmethod
-    def async_get_options_flow(config_entry):
+    def async_get_options_flow(config_entry: ConfigEntry) -> KefOptionsFlow:
         """Return the options flow."""
         return KefOptionsFlow()
 
@@ -78,7 +82,9 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         self._discovery_id: str | None = None
         self._discovery_ipv4_host: str | None = None
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None):
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Handle manual setup."""
         self._errors = {}
 
@@ -107,7 +113,9 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=self._errors,
         )
 
-    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None):
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Handle reconfiguration."""
         self._errors = {}
         entry = self._get_reconfigure_entry()
@@ -142,7 +150,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=self._errors,
         )
 
-    async def async_step_reauth(self, entry_data: dict[str, Any]):
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
         """Handle a request to update KEF credentials."""
         entry = self._get_reauth_entry()
         self._host = entry.data[CONF_HOST]
@@ -156,7 +164,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self,
         user_input: dict[str, Any] | None = None,
-    ):
+    ) -> ConfigFlowResult:
         """Confirm updated KEF credentials."""
         self._errors = {}
         entry = self._get_reauth_entry()
@@ -183,7 +191,9 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             last_step=True,
         )
 
-    async def async_step_zeroconf(self, discovery_info: ZeroconfServiceInfo):
+    async def async_step_zeroconf(
+        self, discovery_info: ZeroconfServiceInfo,
+    ) -> ConfigFlowResult:
         """Handle zeroconf discovery."""
         if discovery_info.type != AIRPLAY_ZEROCONF_TYPE:
             return self.async_abort(reason="unsupported")
@@ -198,7 +208,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
 
         # Keep the advertised name so Home Assistant's mDNS resolver can try
         # both address families and follow address changes after setup.
-        self._host = discovery_info.hostname.rstrip(".") or discovery_info.host
+        self._host = discovery_info.hostname.rstrip(".") or str(discovery_info.host)
         self._title = discovery_info.name.removesuffix(f".{discovery_info.type}")
 
         legacy_host = self._legacy_ipv4_host(discovery_info)
@@ -217,7 +227,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 # Link an old legacy entry only before it has an AirPlay ID.
                 # An address may later be assigned to another speaker.
                 advertised_hosts = {
-                    host.rstrip(".").casefold()
+                    str(host).rstrip(".").casefold()
                     for host in (*discovery_info.ip_addresses, legacy_host, self._host)
                 }
                 matches = [
@@ -235,10 +245,11 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                     if legacy_host is None:
                         await self.async_set_unique_id(existing.unique_id)
                         self._abort_if_unique_id_configured()
-                    updates = {
-                        CONF_HOST: legacy_host,
-                        CONF_DISCOVERY_ID: discovery_unique_id,
-                    }
+                    else:
+                        updates = {
+                            CONF_HOST: legacy_host,
+                            CONF_DISCOVERY_ID: discovery_unique_id,
+                        }
                 if existing.state is ConfigEntryState.LOADED:
                     # The announcement means the speaker is reachable again;
                     # skip the rest of the offline retry wait.
@@ -312,11 +323,8 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
     def _legacy_ipv4_host(discovery_info: ZeroconfServiceInfo) -> str | None:
         """Pick an IPv4 address for the legacy client's IPv4-only socket."""
         for host in (*discovery_info.ip_addresses, discovery_info.host):
-            try:
-                if isinstance(ipaddress.ip_address(host), ipaddress.IPv4Address):
-                    return host
-            except ValueError:
-                continue
+            if isinstance(ipaddress.ip_address(host), ipaddress.IPv4Address):
+                return str(host)
         return None
 
     @staticmethod
@@ -331,7 +339,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
             except OSError:
                 return set()
-            return {result[4][0] for result in results}
+            return {str(result[4][0]) for result in results}
         return {str(address)} if isinstance(address, ipaddress.IPv4Address) else set()
 
     async def _async_legacy_host_configured(self) -> bool:
@@ -353,7 +361,9 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 return True
         return False
 
-    async def async_step_confirm(self, user_input: dict[str, Any] | None = None):
+    async def async_step_confirm(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Confirm a discovered speaker."""
         self._errors = {}
 
@@ -390,7 +400,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             device = await client.async_identify()
         except KefAuthenticationRequiredError:
             self._errors["base"] = "invalid_auth"
-            return None
+            return False
         except KefError as err:
             if self.source == SOURCE_ZEROCONF and self._discovery_ipv4_host:
                 try:
@@ -407,7 +417,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                         if isinstance(legacy_err, KefUnsupportedDeviceError)
                         else "cannot_connect"
                     )
-                    return None
+                    return False
                 self._host = self._discovery_ipv4_host
             else:
                 self._errors["base"] = (
@@ -415,7 +425,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                     if isinstance(err, KefUnsupportedDeviceError)
                     else "cannot_connect"
                 )
-                return None
+                return False
 
         entry_unique_id = device.unique_id
         stored_device_id = device.unique_id
@@ -468,7 +478,9 @@ def _seconds_slider(minimum: int, maximum: int, *, step: int) -> vol.All:
 class KefOptionsFlow(OptionsFlow):
     """Handle KEF options."""
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None):
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         """Manage the integration options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)

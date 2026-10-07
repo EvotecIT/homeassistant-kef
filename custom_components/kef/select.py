@@ -31,6 +31,9 @@ from .entity import KefEntity, apply_eq_profile_change
 from .kef_client.const import model_has_subwoofer_preset_values
 from .models import KefBackend, KefSnapshot
 
+# Ask HA to serialize action calls within this platform for each entry.
+PARALLEL_UPDATES = 1
+
 
 async def _async_set_standby_mode(
     coordinator: KefCoordinator,
@@ -221,8 +224,7 @@ class KefSelectDescription(SelectEntityDescription):
 SELECTS: tuple[KefSelectDescription, ...] = (
     KefSelectDescription(
         key="standby_mode",
-        name="HW: Standby mode",
-        icon="mdi:sleep",
+        translation_key="standby_mode",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.standby_mode,
         async_set_fn=_async_set_standby_mode,
@@ -230,8 +232,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="wake_source",
-        name="HW: Wake source",
-        icon="mdi:power-plug",
+        translation_key="wake_source",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.wake_source,
         async_set_fn=_async_set_wake_source,
@@ -239,8 +240,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="master_channel",
-        name="HW: Master channel",
-        icon="mdi:speaker",
+        translation_key="master_channel",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.master_channel,
         async_set_fn=_async_set_master_channel,
@@ -249,8 +249,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="cable_mode",
-        name="HW: Cable mode",
-        icon="mdi:cable-data",
+        translation_key="cable_mode",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.cable_mode,
         async_set_fn=_async_set_cable_mode,
@@ -259,8 +258,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="bass_extension",
-        name="DSP: Bass extension",
-        icon="mdi:waveform",
+        translation_key="bass_extension",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
             data.eq_profile.bass_extension if data.eq_profile else None
@@ -270,8 +268,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="remote_ir_code",
-        name="IR: Remote code",
-        icon="mdi:remote",
+        translation_key="remote_ir_code",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.remote_ir_code,
         async_set_fn=_async_set_remote_ir_code,
@@ -279,8 +276,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="streaming_quality",
-        name="HW: Streaming quality",
-        icon="mdi:music-circle",
+        translation_key="streaming_quality",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.streaming_quality,
         async_set_fn=_async_set_streaming_quality,
@@ -288,8 +284,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="favourite_button",
-        name="IR: Favourite button",
-        icon="mdi:star",
+        translation_key="favourite_button",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.favourite_button,
         async_set_fn=_async_set_favourite_button,
@@ -297,8 +292,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="eq_button_1",
-        name="IR: EQ 1",
-        icon="mdi:gesture-tap-button",
+        translation_key="eq_button_1",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_button_1,
         async_set_fn=_async_set_eq_button_1,
@@ -307,8 +301,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="eq_button_2",
-        name="IR: EQ 2",
-        icon="mdi:gesture-tap-button",
+        translation_key="eq_button_2",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.eq_button_2,
         async_set_fn=_async_set_eq_button_2,
@@ -317,8 +310,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="subwoofer_polarity",
-        name="SW: Polarity",
-        icon="mdi:sine-wave",
+        translation_key="subwoofer_polarity",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
             data.eq_profile.subwoofer_polarity if data.eq_profile else None
@@ -328,8 +320,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="audio_polarity",
-        name="DSP: Audio polarity",
-        icon="mdi:sine-wave",
+        translation_key="audio_polarity",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
             data.eq_profile.audio_polarity if data.eq_profile else None
@@ -339,8 +330,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="subwoofer_preset",
-        name="SW: Model preset",
-        icon="mdi:speaker",
+        translation_key="subwoofer_preset",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: (
             data.eq_profile.subwoofer_preset if data.eq_profile else None
@@ -351,8 +341,7 @@ SELECTS: tuple[KefSelectDescription, ...] = (
     ),
     KefSelectDescription(
         key="sound_profile",
-        name="DSP: Sound profile",
-        icon="mdi:surround-sound",
+        translation_key="sound_profile",
         value_fn=lambda data: (
             data.eq_profile.sound_profile if data.eq_profile else None
         ),
@@ -403,7 +392,6 @@ class KefSelect(KefEntity, CoordinatorEntity[KefCoordinator], SelectEntity):
             f"{coordinator.data.device.unique_id}_{description.key}"
         )
         self._attr_options = list(description.options_map.values())
-        self._attr_name = description.name
 
     @property
     def current_option(self) -> str | None:

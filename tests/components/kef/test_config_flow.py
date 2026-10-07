@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ipaddress import ip_address
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -9,7 +10,6 @@ from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
-from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef.const import (
@@ -30,6 +30,11 @@ from custom_components.kef.exceptions import (
 )
 from custom_components.kef.models import KefBackend, KefDeviceInfo
 from tests.conftest import TEST_DEVICE_INFO, TEST_HOST
+
+try:
+    from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
+except ImportError:  # HA 2025.1 stores discovery information in the component.
+    from homeassistant.components.zeroconf import ZeroconfServiceInfo
 
 
 @pytest.fixture(autouse=True)
@@ -826,7 +831,10 @@ async def test_zeroconf_skips_device_seen_for_an_entry_that_is_not_loaded(
     assert result["reason"] == "already_configured"
 
 
-async def test_zeroconf_legacy_entry_uses_ipv4_when_ipv6_is_preferred(hass) -> None:
+@pytest.mark.parametrize("address_type", [str, ip_address])
+async def test_zeroconf_legacy_entry_uses_ipv4_when_ipv6_is_preferred(
+    hass, address_type,
+) -> None:
     """Rediscovery must not save IPv6 for an IPv4-only legacy socket."""
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -843,8 +851,8 @@ async def test_zeroconf_legacy_entry_uses_ipv4_when_ipv6_is_preferred(hass) -> N
     entry.add_to_hass(hass)
 
     discovery_info = ZeroconfServiceInfo(
-        ip_address="fd42:241::228",
-        ip_addresses=["fd42:241::228", "192.0.2.11"],
+        ip_address=address_type("fd42:241::228"),
+        ip_addresses=[address_type("fd42:241::228"), address_type("192.0.2.11")],
         hostname="lsx.local.",
         type=AIRPLAY_ZEROCONF_TYPE,
         name="Living Room LSX._airplay._tcp.local.",
@@ -870,8 +878,8 @@ async def test_zeroconf_legacy_entry_uses_ipv4_when_ipv6_is_preferred(hass) -> N
     # A later address change matches the persisted AirPlay ID while keeping
     # the existing entity's address-derived identity stable.
     discovery_info = ZeroconfServiceInfo(
-        ip_address="fd42:241::229",
-        ip_addresses=["fd42:241::229", "192.0.2.12"],
+        ip_address=address_type("fd42:241::229"),
+        ip_addresses=[address_type("fd42:241::229"), address_type("192.0.2.12")],
         hostname="lsx.local.",
         type=AIRPLAY_ZEROCONF_TYPE,
         name="Living Room LSX._airplay._tcp.local.",

@@ -12,6 +12,9 @@ from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend
 
+# Ask HA to serialize action calls within this platform for each entry.
+PARALLEL_UPDATES = 1
+
 BUTTON_MODEL_FEATURES = {"start_calibration": "xio"}
 
 
@@ -39,16 +42,14 @@ class KefStartCalibrationButton(
 ):
     """Button to start room calibration (XIO only)."""
 
-    _attr_icon = "mdi:tune"
-
     def __init__(self, coordinator: KefCoordinator) -> None:
         """Initialize the button."""
         CoordinatorEntity.__init__(self, coordinator)
         KefEntity.__init__(self, coordinator)
         self._attr_unique_id = f"{coordinator.data.device.unique_id}_start_calibration"
-        self._attr_name = "DSP: Start calibration"
+        self._attr_translation_key = "start_calibration"
 
     async def async_press(self) -> None:
         """Start room calibration."""
-        await self.async_call_kef(self.coordinator.client.async_start_calibration)
+        await self.async_call_kef(self.client.async_start_calibration)
         await self.coordinator.async_request_refresh()

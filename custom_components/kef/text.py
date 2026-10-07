@@ -15,6 +15,9 @@ from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefBackend, KefSnapshot
 
+# Ask HA to serialize action calls within this platform for each entry.
+PARALLEL_UPDATES = 1
+
 
 async def _async_set_ui_language(
     coordinator: KefCoordinator,
@@ -49,16 +52,14 @@ class KefTextDescription(TextEntityDescription):
 TEXTS: tuple[KefTextDescription, ...] = (
     KefTextDescription(
         key="ui_language",
-        name="SYS: UI language",
-        icon="mdi:translate",
+        translation_key="ui_language",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.ui_language,
         async_set_fn=_async_set_ui_language,
     ),
     KefTextDescription(
         key="speaker_location",
-        name="SYS: Speaker location",
-        icon="mdi:map-marker",
+        translation_key="speaker_location",
         entity_category=EntityCategory.CONFIG,
         value_fn=lambda data: data.speaker_location,
         async_set_fn=_async_set_speaker_location,
@@ -101,7 +102,6 @@ class KefText(KefEntity, CoordinatorEntity[KefCoordinator], TextEntity):
         self._attr_unique_id = (
             f"{coordinator.data.device.unique_id}_{description.key}"
         )
-        self._attr_name = description.name
 
     @property
     def native_value(self) -> str | None:

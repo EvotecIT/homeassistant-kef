@@ -6,7 +6,16 @@
 
 Accept Home Assistant's discovered KEF device, or add **KEF** from **Settings →
 Devices & services** and enter the host/IP address. Keep the speaker reachable
-on your local network.
+on your local network. Modern speakers use their local HTTP API on TCP port 80;
+first-generation speakers use the IPv4 binary API on TCP port 50001. Discovery
+uses the speaker's AirPlay/Bonjour announcement. Across network segments, allow
+the required local traffic and make sure Home Assistant can resolve any `.local`
+hostname you enter.
+
+| Setup field | Required | Purpose |
+| --- | --- | --- |
+| Host | Yes for manual setup; supplied by discovery otherwise | Speaker IP address or resolvable hostname |
+| Speaker password | Only when the local API requires it | Password for the speaker's web interface; blank by default |
 
 If the speaker's web UI is password-protected, enter that password during setup.
 This is the speaker web-interface password, not a request to put your credentials
@@ -26,7 +35,8 @@ the same speaker; the legacy binary API does not provide a stable device ID.
 
 ## Options
 
-Open the integration's **Configure** dialog.
+Open the integration's **Configure** dialog. Saving options reloads the entry;
+its entities retain their identities. Use **Reconfigure** to change the host.
 
 | Option | Default and purpose |
 | --- | --- |
@@ -34,6 +44,22 @@ Open the integration's **Configure** dialog.
 | Polling interval | 10 seconds; accepts 5–120 seconds |
 | Offline retry interval | 60 seconds; accepts 30–600 seconds. How often an offline speaker is retried |
 | Diagnostics | Off by default; enables optional diagnostic entities |
+
+## Data updates
+
+The integration reads a speaker snapshot every 10 seconds by default. The
+polling option accepts whole seconds from 5 to 120. A snapshot can require
+several local API requests; the interval is not a per-request rate limit.
+
+Modern speakers also have an event-queue listener. An event requests a fresh
+snapshot between scheduled polls, so a change can appear before the next poll.
+Polling continues alongside the listener and remains available if the event
+queue fails. Legacy speakers use polling without this event listener.
+
+Shorter intervals increase requests to the speaker. Leave the default unless
+you need a different update cadence; no measured per-model request budget is
+currently published. Network latency, retries, and speaker response time affect
+when Home Assistant receives a fresh state.
 
 ### Offline speakers
 
@@ -45,10 +71,11 @@ retry interval instead of the polling interval. The live event queue pauses
 while the speaker is offline. Home Assistant logs one error when the speaker
 goes offline and one message when it comes back.
 
-A speaker announces itself on the network when it powers up. That announcement
-triggers an immediate retry, so a speaker usually comes back within seconds of
-being switched on, whatever the offline retry interval is set to. The interval
-only matters if the announcement is missed.
+When a discovery announcement matches an existing offline entry, the integration
+requests a refresh without waiting for the offline retry interval. If the
+announcement is missed or cannot be matched, recovery uses the next scheduled
+retry. During initial setup there is no previous state to retain: Home Assistant
+retries setup if the first connection fails.
 
 ## Daily controls and settings
 
@@ -108,3 +135,20 @@ do not run firmware installation as a routine unattended automation.
 For an issue, reproduce once and download integration diagnostics. Include the
 model, firmware, integration version, and the failed action. Review the file and
 any logs before sharing them; never post the speaker password.
+
+## Remove the integration
+
+1. Disable or update automations and dashboard cards that reference the speaker.
+2. Open **Settings → Devices & services → KEF**, open the menu for the speaker's
+   integration entry, and choose **Delete**. Repeat for any other speakers you
+   want to remove.
+3. To uninstall the custom integration, delete all KEF entries first, then
+   remove **KEF** in HACS. For a manual installation, remove
+   `config/custom_components/kef`. Restart Home Assistant.
+
+Entry deletion removes the HA connection configuration. KEF does not keep a
+separate on-disk speaker cache. Recorder history, exported diagnostics, and
+backups follow Home Assistant's retention or your own file-management settings;
+they are not erased by this integration. Deletion does not factory-reset the
+speaker, change its saved settings, or turn it off. It remains usable through
+the vendor app and its other inputs.

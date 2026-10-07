@@ -16,6 +16,9 @@ from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity, apply_eq_profile_change
 from .models import KefBackend, KefSnapshot
 
+# Ask HA to serialize action calls within this platform for each entry.
+PARALLEL_UPDATES = 1
+
 
 async def _async_set_default_volume_global(
     coordinator: KefCoordinator,
@@ -202,8 +205,7 @@ class KefNumberDescription(NumberEntityDescription):
 NUMBERS: tuple[KefNumberDescription, ...] = (
     KefNumberDescription(
         key="default_volume_global",
-        name="VOL: Startup volume",
-        icon="mdi:volume-medium",
+        translation_key="default_volume_global",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
         native_max_value=100,
@@ -213,8 +215,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="maximum_volume",
-        name="VOL: Maximum volume",
-        icon="mdi:volume-high",
+        translation_key="maximum_volume",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
         native_max_value=100,
@@ -224,8 +225,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="volume_step",
-        name="VOL: Step",
-        icon="mdi:stairs",
+        translation_key="volume_step",
         entity_category=EntityCategory.CONFIG,
         native_min_value=1,
         native_max_value=10,
@@ -235,8 +235,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="fixed_volume_level",
-        name="VOL: Fixed level",
-        icon="mdi:volume-equal",
+        translation_key="fixed_volume_level",
         entity_category=EntityCategory.CONFIG,
         native_min_value=0,
         native_max_value=100,
@@ -246,8 +245,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="balance",
-        name="DSP: Balance",
-        icon="mdi:arrow-left-right",
+        translation_key="balance",
         entity_category=EntityCategory.CONFIG,
         native_min_value=-30,
         native_max_value=30,
@@ -258,8 +256,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="treble_amount",
-        name="DSP: Treble amount",
-        icon="mdi:tune-vertical",
+        translation_key="treble_amount",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
         native_min_value=-3.0,
@@ -272,8 +269,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="subwoofer_gain",
-        name="SW: Gain",
-        icon="mdi:speaker-wireless",
+        translation_key="subwoofer_gain",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
         native_min_value=-10,
@@ -286,8 +282,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="high_pass_frequency",
-        name="SW: High-pass frequency",
-        icon="mdi:sine-wave",
+        translation_key="high_pass_frequency",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="Hz",
         native_min_value=50.0,
@@ -300,8 +295,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="sub_out_low_pass_frequency",
-        name="SW: Low-pass frequency",
-        icon="mdi:sine-wave",
+        translation_key="sub_out_low_pass_frequency",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="Hz",
         native_min_value=40.0,
@@ -314,8 +308,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="desk_mode_db",
-        name="DSP: Desk mode attenuation",
-        icon="mdi:desk",
+        translation_key="desk_mode_db",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
         native_min_value=-10.0,
@@ -329,8 +322,7 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
     ),
     KefNumberDescription(
         key="wall_mode_db",
-        name="DSP: Wall mode attenuation",
-        icon="mdi:wall",
+        translation_key="wall_mode_db",
         entity_category=EntityCategory.CONFIG,
         native_unit_of_measurement="dB",
         native_min_value=-10.0,
@@ -355,7 +347,7 @@ async def async_setup_entry(
     if coordinator.data.device.backend is not KefBackend.MODERN:
         return
 
-    entities: list[KefNumber] = [
+    entities: list[NumberEntity] = [
         KefNumber(coordinator, description)
         for description in NUMBERS
         if description.value_fn(coordinator.data) is not None
@@ -399,7 +391,6 @@ class KefNumber(KefEntity, CoordinatorEntity[KefCoordinator], NumberEntity):
         self._attr_unique_id = (
             f"{coordinator.data.device.unique_id}_{description.key}"
         )
-        self._attr_name = description.name
 
     @property
     def native_value(self) -> float | None:
@@ -422,7 +413,6 @@ class KefSourceVolumeNumber(KefEntity, CoordinatorEntity[KefCoordinator], Number
     _attr_native_min_value = 0
     _attr_native_max_value = 100
     _attr_native_step = 1
-    _attr_icon = "mdi:volume-medium"
 
     def __init__(
         self,
@@ -438,7 +428,8 @@ class KefSourceVolumeNumber(KefEntity, CoordinatorEntity[KefCoordinator], Number
         self._attr_unique_id = (
             f"{coordinator.data.device.unique_id}_default_volume_{source}"
         )
-        self._attr_name = f"VOL: {_friendly_source_name(source)} startup volume"
+        self._attr_translation_key = "source_startup_volume"
+        self._attr_translation_placeholders = {"source": _friendly_source_name(source)}
 
     @property
     def available(self) -> bool:

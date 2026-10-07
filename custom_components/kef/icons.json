@@ -1,0 +1,235 @@
+{
+  "entity": {
+    "button": {
+      "start_calibration": {
+        "default": "mdi:tune"
+      }
+    },
+    "number": {
+      "source_startup_volume": {
+        "default": "mdi:volume-medium"
+      },
+      "default_volume_global": {
+        "default": "mdi:volume-medium"
+      },
+      "maximum_volume": {
+        "default": "mdi:volume-high"
+      },
+      "volume_step": {
+        "default": "mdi:stairs"
+      },
+      "fixed_volume_level": {
+        "default": "mdi:volume-equal"
+      },
+      "balance": {
+        "default": "mdi:arrow-left-right"
+      },
+      "treble_amount": {
+        "default": "mdi:tune-vertical"
+      },
+      "subwoofer_gain": {
+        "default": "mdi:speaker-wireless"
+      },
+      "high_pass_frequency": {
+        "default": "mdi:sine-wave"
+      },
+      "sub_out_low_pass_frequency": {
+        "default": "mdi:sine-wave"
+      },
+      "desk_mode_db": {
+        "default": "mdi:desk"
+      },
+      "wall_mode_db": {
+        "default": "mdi:wall"
+      }
+    },
+    "select": {
+      "standby_mode": {
+        "default": "mdi:sleep"
+      },
+      "wake_source": {
+        "default": "mdi:power-plug"
+      },
+      "master_channel": {
+        "default": "mdi:speaker"
+      },
+      "cable_mode": {
+        "default": "mdi:cable-data"
+      },
+      "bass_extension": {
+        "default": "mdi:waveform"
+      },
+      "remote_ir_code": {
+        "default": "mdi:remote"
+      },
+      "streaming_quality": {
+        "default": "mdi:music-circle"
+      },
+      "favourite_button": {
+        "default": "mdi:star"
+      },
+      "eq_button_1": {
+        "default": "mdi:gesture-tap-button"
+      },
+      "eq_button_2": {
+        "default": "mdi:gesture-tap-button"
+      },
+      "subwoofer_polarity": {
+        "default": "mdi:sine-wave"
+      },
+      "audio_polarity": {
+        "default": "mdi:sine-wave"
+      },
+      "subwoofer_preset": {
+        "default": "mdi:speaker"
+      },
+      "sound_profile": {
+        "default": "mdi:surround-sound"
+      }
+    },
+    "sensor": {
+      "backend": {
+        "default": "mdi:api"
+      },
+      "speaker_status": {
+        "default": "mdi:power-standby"
+      },
+      "play_mode": {
+        "default": "mdi:play-circle-outline"
+      },
+      "service_id": {
+        "default": "mdi:cast-connected"
+      },
+      "wifi_ssid": {
+        "default": "mdi:wifi"
+      },
+      "wifi_bssid": {
+        "default": "mdi:router-wireless"
+      },
+      "network_stability": {
+        "default": "mdi:access-point-network"
+      },
+      "speed_test_status": {
+        "default": "mdi:speedometer"
+      },
+      "speed_test_packet_loss": {
+        "default": "mdi:package-variant-closed-remove"
+      },
+      "alert_alarm_count": {
+        "default": "mdi:alarm"
+      },
+      "alert_timer_count": {
+        "default": "mdi:timer-outline"
+      },
+      "audio_codec": {
+        "default": "mdi:waveform"
+      },
+      "audio_virtualizer": {
+        "default": "mdi:surround-sound"
+      },
+      "audio_codec_raw": {
+        "default": "mdi:information-outline"
+      },
+      "audio_source_channels": {
+        "default": "mdi:audio-input-stereo-minijack"
+      },
+      "audio_playback_channels": {
+        "default": "mdi:speaker-multiple"
+      },
+      "room_calibration": {
+        "default": "mdi:tune"
+      },
+      "calibration_adjustment": {
+        "default": "mdi:tune-variant"
+      }
+    },
+    "switch": {
+      "startup_tone": {
+        "default": "mdi:music-note"
+      },
+      "auto_switch_hdmi": {
+        "default": "mdi:video-switch"
+      },
+      "front_led": {
+        "default": "mdi:led-strip-variant"
+      },
+      "standby_led": {
+        "default": "mdi:led-outline"
+      },
+      "top_panel": {
+        "default": "mdi:gesture-tap-button"
+      },
+      "top_panel_led": {
+        "default": "mdi:led-on"
+      },
+      "top_panel_standby_led": {
+        "default": "mdi:led-outline"
+      },
+      "usb_charging": {
+        "default": "mdi:usb-port"
+      },
+      "startup_volume": {
+        "default": "mdi:volume-source"
+      },
+      "per_input_startup_volume": {
+        "default": "mdi:tune-variant"
+      },
+      "volume_limit": {
+        "default": "mdi:volume-off"
+      },
+      "subwoofer_wake": {
+        "default": "mdi:speaker-wireless"
+      },
+      "kw1_wake": {
+        "default": "mdi:speaker-wireless"
+      },
+      "subwoofer": {
+        "default": "mdi:speaker-wireless"
+      },
+      "kw1_adapter": {
+        "default": "mdi:speaker-wireless"
+      },
+      "sub_enable_stereo": {
+        "default": "mdi:speaker-multiple"
+      },
+      "remote_ir": {
+        "default": "mdi:remote"
+      },
+      "analytics": {
+        "default": "mdi:chart-line"
+      },
+      "app_analytics": {
+        "default": "mdi:cellphone-cog"
+      },
+      "desk_mode": {
+        "default": "mdi:desk"
+      },
+      "wall_mode": {
+        "default": "mdi:wall"
+      },
+      "phase_correction": {
+        "default": "mdi:waveform"
+      },
+      "high_pass_mode": {
+        "default": "mdi:chart-bell-curve-cumulative"
+      },
+      "auto_detect_placement": {
+        "default": "mdi:crosshairs-gps"
+      },
+      "wall_mounted": {
+        "default": "mdi:wall"
+      },
+      "prefer_virtual_x": {
+        "default": "mdi:surround-sound"
+      }
+    },
+    "text": {
+      "ui_language": {
+        "default": "mdi:translate"
+      },
+      "speaker_location": {
+        "default": "mdi:map-marker"
+      }
+    }
+  }
+}

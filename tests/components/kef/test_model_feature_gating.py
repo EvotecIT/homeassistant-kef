@@ -261,6 +261,10 @@ async def test_cleanup_removes_only_model_unsupported_registry_entries(hass) -> 
     unique_id_prefix = f"{snapshot.device.unique_id}_"
 
     entries = {
+        "obsolete_binary": registry.async_get_or_create(
+            Platform.BINARY_SENSOR, DOMAIN, f"{unique_id_prefix}legacy_eq_state",
+            config_entry=entry,
+        ),
         "front_led": registry.async_get_or_create(
             Platform.SWITCH,
             DOMAIN,
@@ -313,6 +317,7 @@ async def test_cleanup_removes_only_model_unsupported_registry_entries(hass) -> 
 
     await _async_cleanup_optional_entities(hass, entry, coordinator)
 
+    assert registry.async_get(entries["obsolete_binary"].entity_id) is None
     assert registry.async_get(entries["front_led"].entity_id) is None
     assert registry.async_get(entries["cable_mode"].entity_id) is None
     assert registry.async_get(entries["balance"].entity_id) is None

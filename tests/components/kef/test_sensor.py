@@ -9,6 +9,8 @@ import pytest
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import CONF_HOST
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.icon import async_get_icons
+from homeassistant.helpers.translation import async_get_translations
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef.audio import (
@@ -193,6 +195,7 @@ async def test_sensor_platform_registers_distinct_names_and_metadata(hass) -> No
         await hass.async_block_till_done()
 
     registry = er.async_get(hass)
+    translations = await async_get_translations(hass, "en", "entity", {DOMAIN})
     sensor_entries = {
         entity_entry.unique_id: entity_entry
         for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id)
@@ -204,13 +207,18 @@ async def test_sensor_platform_registers_distinct_names_and_metadata(hass) -> No
         {item.entity_id for item in sensor_entries.values()}
     ) == len(EXPECTED_SENSORS)
 
+    icons = (await async_get_icons(hass, "entity", {DOMAIN}))[DOMAIN]
     for description in EXPECTED_SENSORS:
         unique_id = f"{TEST_SNAPSHOT.device.unique_id}_{description.key}"
         entity_entry = sensor_entries[unique_id]
 
-        assert entity_entry.original_name == description.name
+        assert entity_entry.original_name == translations[
+            f"component.kef.entity.sensor.{description.translation_key}.name"
+        ]
         assert entity_entry.entity_id.startswith("sensor.lsx_ii_test_")
-        assert description.device_class is not None or description.icon is not None
+        assert description.device_class is not None or icons["sensor"].get(
+            description.translation_key, {}
+        ).get("default")
         if description.device_class is SensorDeviceClass.ENUM:
             assert description.value_fn(TEST_SNAPSHOT) in description.options
 
@@ -225,7 +233,7 @@ async def test_sensor_platform_registers_distinct_names_and_metadata(hass) -> No
         "sensor.lsx_ii_test_speed_test_packet_loss"
     )
     assert packet_loss_state is not None
-    assert packet_loss_state.attributes["icon"] == (
+    assert icons["sensor"]["speed_test_packet_loss"]["default"] == (
         "mdi:package-variant-closed-remove"
     )
     assert packet_loss_state.attributes["state_class"] == "measurement"

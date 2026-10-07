@@ -6,6 +6,7 @@ import logging
 import time
 import zlib
 from datetime import datetime
+from typing import Any
 
 import aiohttp
 from homeassistant.components.update import (
@@ -30,6 +31,9 @@ from .release_notes import (
     parse_release_notes,
     release_notes_url,
 )
+
+# Ask HA to serialize action calls within this platform for each entry.
+PARALLEL_UPDATES = 1
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -88,7 +92,9 @@ class KefFirmwareUpdateEntity(
     """Coordinator-backed KEF firmware update entity."""
 
     _attr_supported_features = (
-        UpdateEntityFeature.INSTALL | UpdateEntityFeature.RELEASE_NOTES
+        UpdateEntityFeature.INSTALL
+        | UpdateEntityFeature.RELEASE_NOTES
+        | UpdateEntityFeature.PROGRESS
     )
 
     def __init__(self, coordinator: KefCoordinator) -> None:
@@ -96,7 +102,7 @@ class KefFirmwareUpdateEntity(
         CoordinatorEntity.__init__(self, coordinator)
         KefEntity.__init__(self, coordinator)
         self._attr_unique_id = f"{coordinator.data.device.unique_id}_firmware"
-        self._attr_name = "Firmware"
+        self._attr_translation_key = "firmware"
         self._releases: dict[str, list[FirmwareRelease]] | None = None
         self._releases_fetched_at = 0.0
 
@@ -114,14 +120,20 @@ class KefFirmwareUpdateEntity(
         return update.available_version or self.installed_version
 
     @property
-    def in_progress(self) -> bool | int | None:
+    def in_progress(self) -> bool:
         """Return whether a firmware operation is currently active."""
         update = self.coordinator.data.firmware_update
         if update is None or update.state not in _IN_PROGRESS_STATES:
             return False
-        if update.download_progress is not None:
-            return update.download_progress
         return True
+
+    @property
+    def update_percentage(self) -> int | None:
+        """Return the percentage while a firmware operation is active."""
+        update = self.coordinator.data.firmware_update
+        if update is None or not self.in_progress:
+            return None
+        return update.download_progress
 
     @property
     def release_url(self) -> str | None:
@@ -184,7 +196,7 @@ class KefFirmwareUpdateEntity(
                 self.coordinator.config_entry.title,
             )
             try:
-                await self.coordinator.client.async_check_for_firmware_update()
+                await self.client.async_check_for_firmware_update()
             except KefAuthenticationRequiredError:
                 self.coordinator.config_entry.async_start_reauth(self.hass)
             except KefError as err:
@@ -239,10 +251,10 @@ class KefFirmwareUpdateEntity(
         self,
         version: str | None,
         backup: bool,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Install the available firmware update."""
         await self.async_call_kef(
-            self.coordinator.client.async_install_firmware_update
+            self.client.async_install_firmware_update
         )
         await self.coordinator.async_request_refresh()

@@ -27,6 +27,9 @@ from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefSnapshot
 
+# The coordinator owns all reads; these entities send no actions.
+PARALLEL_UPDATES = 0
+
 
 def _room_calibration_value(data: KefSnapshot) -> str | None:
     """Return the room calibration status as a date, or a plain status string."""
@@ -52,8 +55,7 @@ class KefSensorDescription(SensorEntityDescription):
 SENSORS: tuple[KefSensorDescription, ...] = (
     KefSensorDescription(
         key="backend",
-        name="Backend",
-        icon="mdi:api",
+        translation_key="backend",
         device_class=SensorDeviceClass.ENUM,
         options=["modern", "legacy"],
         value_fn=lambda data: data.device.backend.value,
@@ -62,8 +64,7 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="speaker_status",
-        name="Speaker status",
-        icon="mdi:power-standby",
+        translation_key="speaker_status",
         device_class=SensorDeviceClass.ENUM,
         options=["standby", "powerOn"],
         value_fn=lambda data: data.speaker_status,
@@ -72,16 +73,14 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="play_mode",
-        name="Play mode",
-        icon="mdi:play-circle-outline",
+        translation_key="play_mode",
         value_fn=lambda data: data.play_mode,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
     ),
     KefSensorDescription(
         key="service_id",
-        name="Service ID",
-        icon="mdi:cast-connected",
+        translation_key="service_id",
         value_fn=lambda data: data.playback.service_id if data.playback else None,
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -89,7 +88,7 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="wifi_signal_level",
-        name="Wi-Fi signal level",
+        translation_key="wifi_signal_level",
         device_class=SensorDeviceClass.SIGNAL_STRENGTH,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="dBm",
@@ -99,15 +98,14 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="wifi_ssid",
-        name="Wi-Fi SSID",
-        icon="mdi:wifi",
+        translation_key="wifi_ssid",
         value_fn=lambda data: data.wifi_info.ssid if data.wifi_info else None,
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     KefSensorDescription(
         key="wifi_frequency",
-        name="Wi-Fi frequency",
+        translation_key="wifi_frequency",
         device_class=SensorDeviceClass.FREQUENCY,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="MHz",
@@ -117,15 +115,14 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="wifi_bssid",
-        name="Wi-Fi BSSID",
-        icon="mdi:router-wireless",
+        translation_key="wifi_bssid",
         value_fn=lambda data: data.wifi_info.bssid if data.wifi_info else None,
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     KefSensorDescription(
         key="network_ping",
-        name="Network ping",
+        translation_key="network_ping",
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="ms",
@@ -135,23 +132,21 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="network_stability",
-        name="Network stability",
-        icon="mdi:access-point-network",
+        translation_key="network_stability",
         value_fn=lambda data: data.network_stability,
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     KefSensorDescription(
         key="speed_test_status",
-        name="Speed-test status",
-        icon="mdi:speedometer",
+        translation_key="speed_test_status",
         value_fn=lambda data: data.speed_test_status,
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     KefSensorDescription(
         key="speed_test_average_download",
-        name="Speed-test average download",
+        translation_key="speed_test_average_download",
         device_class=SensorDeviceClass.DATA_RATE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="Mbit/s",
@@ -161,7 +156,7 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="speed_test_current_download",
-        name="Speed-test current download",
+        translation_key="speed_test_current_download",
         device_class=SensorDeviceClass.DATA_RATE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="Mbit/s",
@@ -171,35 +166,32 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="speed_test_packet_loss",
-        name="Speed-test packet loss",
+        translation_key="speed_test_packet_loss",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="%",
-        icon="mdi:package-variant-closed-remove",
         value_fn=lambda data: data.speed_test_packet_loss,
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     KefSensorDescription(
         key="alert_alarm_count",
-        name="Alarm count",
+        translation_key="alert_alarm_count",
         state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:alarm",
         value_fn=lambda data: data.alert_alarm_count,
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     KefSensorDescription(
         key="alert_timer_count",
-        name="Timer count",
+        translation_key="alert_timer_count",
         state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:timer-outline",
         value_fn=lambda data: data.alert_timer_count,
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     KefSensorDescription(
         key="alert_snooze_time",
-        name="Alert snooze time",
+        translation_key="alert_snooze_time",
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="min",
@@ -209,25 +201,22 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="audio_codec",
-        name="Audio codec",
-        icon="mdi:waveform",
+        translation_key="audio_codec",
         value_fn=audio_codec_value,
         model_feature="xio",
     ),
     KefSensorDescription(
         key="audio_virtualizer",
-        name="Audio virtualizer",
-        icon="mdi:surround-sound",
+        translation_key="audio_virtualizer",
         value_fn=audio_virtualizer_value,
         model_feature="xio",
     ),
     KefSensorDescription(
         key="audio_sample_rate",
-        name="Audio sample rate",
+        translation_key="audio_sample_rate",
         device_class=SensorDeviceClass.FREQUENCY,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="Hz",
-        icon="mdi:sine-wave",
         value_fn=lambda data: (
             data.playback.sample_frequency if data.playback else None
         ),
@@ -235,8 +224,7 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="audio_codec_raw",
-        name="Audio codec (raw)",
-        icon="mdi:information-outline",
+        translation_key="audio_codec_raw",
         value_fn=lambda data: data.playback.codec if data.playback else None,
         diagnostics_only=True,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -244,8 +232,7 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="audio_source_channels",
-        name="Audio channels (source)",
-        icon="mdi:audio-input-stereo-minijack",
+        translation_key="audio_source_channels",
         value_fn=lambda data: (
             data.playback.stream_channels if data.playback else None
         ),
@@ -255,8 +242,7 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="audio_playback_channels",
-        name="Audio channels (playback)",
-        icon="mdi:speaker-multiple",
+        translation_key="audio_playback_channels",
         value_fn=lambda data: (
             data.playback.audio_channels if data.playback else None
         ),
@@ -266,15 +252,13 @@ SENSORS: tuple[KefSensorDescription, ...] = (
     ),
     KefSensorDescription(
         key="room_calibration",
-        name="DSP: Room calibration",
-        icon="mdi:tune",
+        translation_key="room_calibration",
         value_fn=_room_calibration_value,
         model_feature="xio",
     ),
     KefSensorDescription(
         key="calibration_adjustment",
-        name="DSP: Calibration adjustment",
-        icon="mdi:tune-variant",
+        translation_key="calibration_adjustment",
         native_unit_of_measurement="dB",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data.calibration_result,
@@ -324,7 +308,6 @@ class KefSensor(KefEntity, CoordinatorEntity[KefCoordinator], SensorEntity):
         self._attr_unique_id = (
             f"{coordinator.data.device.unique_id}_{description.key}"
         )
-        self._attr_name = description.name
 
     @property
     def native_value(self) -> Any:

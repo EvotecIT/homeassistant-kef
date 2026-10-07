@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import voluptuous as vol
 from homeassistant.const import ATTR_ENTITY_ID, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     AUTH_FAILURE_MESSAGE,
@@ -25,7 +28,6 @@ PLATFORMS = [
     Platform.SELECT,
     Platform.NUMBER,
     Platform.SENSOR,
-    Platform.BINARY_SENSOR,
     Platform.UPDATE,
     Platform.TEXT,
     Platform.BUTTON,
@@ -37,9 +39,14 @@ SERVICE_INSTALL_FIRMWARE_FILE = "install_firmware_file"
 _ACTIVE_BINARY_SENSOR_ENTITY_KEYS: set[str] = set()
 
 
-async def async_setup_entry(hass, entry: KefConfigEntry) -> bool:
-    """Set up KEF from a config entry."""
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register KEF actions independently of speaker availability."""
     _async_register_services(hass)
+    return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: KefConfigEntry) -> bool:
+    """Set up KEF from a config entry."""
     coordinator = KefCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
@@ -85,12 +92,18 @@ async def _async_handle_install_firmware_file(
         or entity_entry.platform != DOMAIN
         or entity_entry.config_entry_id is None
     ):
-        raise HomeAssistantError("Target must be a KEF firmware update entity")
+        raise ServiceValidationError(
+            "Target must be a KEF firmware update entity", translation_domain=DOMAIN,
+            translation_key="invalid_firmware_target",
+        )
 
     config_entry = hass.config_entries.async_get_entry(entity_entry.config_entry_id)
     coordinator = getattr(config_entry, "runtime_data", None)
     if config_entry is None or coordinator is None or coordinator.client is None:
-        raise HomeAssistantError("KEF config entry is not ready")
+        raise ServiceValidationError(
+            "KEF config entry is not ready", translation_domain=DOMAIN,
+            translation_key="entry_not_ready",
+        )
 
     try:
         await coordinator.client.async_upload_firmware_update(
@@ -99,24 +112,34 @@ async def _async_handle_install_firmware_file(
         await coordinator.async_request_refresh()
     except KefAuthenticationRequiredError as err:
         config_entry.async_start_reauth(hass)
-        raise HomeAssistantError(AUTH_FAILURE_MESSAGE) from err
+        raise HomeAssistantError(
+            AUTH_FAILURE_MESSAGE,
+            translation_domain=DOMAIN,
+            translation_key="authentication_required",
+        ) from err
     except KefError as err:
-        raise HomeAssistantError(str(err)) from err
+        raise HomeAssistantError(
+            str(err), translation_domain=DOMAIN,
+            translation_key="command_failed",
+            translation_placeholders={"error": str(err)},
+        ) from err
 
 
-async def async_unload_entry(hass, entry: KefConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: KefConfigEntry) -> bool:
     """Unload a config entry."""
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        return False
     await entry.runtime_data.async_stop_event_listener()
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    return True
 
 
-async def async_reload_entry(hass, entry: KefConfigEntry) -> None:
+async def async_reload_entry(hass: HomeAssistant, entry: KefConfigEntry) -> None:
     """Reload the config entry when options change."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def _async_cleanup_optional_entities(
-    hass,
+    hass: HomeAssistant,
     entry: KefConfigEntry,
     coordinator: KefCoordinator,
 ) -> None:
@@ -175,7 +198,7 @@ async def _async_cleanup_optional_entities(
             }
         )
     expected_binary_sensor_keys = set(_ACTIVE_BINARY_SENSOR_ENTITY_KEYS)
-    model_features_by_platform = {
+    model_features_by_platform: dict[str, Mapping[str, str | None]] = {
         "button": BUTTON_MODEL_FEATURES,
         "select": {
             description.key: description.model_feature for description in SELECTS

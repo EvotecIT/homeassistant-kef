@@ -7,9 +7,11 @@ from dataclasses import replace
 from typing import Any, TypeVar
 
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.device_registry import DeviceInfo
 from yarl import URL
 
-from .const import AUTH_FAILURE_MESSAGE
+from .api import BaseKefClient
+from .const import AUTH_FAILURE_MESSAGE, DOMAIN
 from .coordinator import KefCoordinator
 from .exceptions import KefAuthenticationRequiredError, KefError
 
@@ -25,18 +27,37 @@ class KefEntity:
         """Initialize the entity."""
         self.coordinator = coordinator
 
+    @property
+    def client(self) -> BaseKefClient:
+        """Return the initialized client for an entity action."""
+        client = self.coordinator.client
+        if client is None:
+            raise HomeAssistantError(
+                "KEF speaker is not initialized", translation_domain=DOMAIN,
+                translation_key="not_initialized",
+            )
+        return client
+
     async def async_call_kef(self, action: Callable[[], Awaitable[_T]]) -> _T:
         """Run a KEF client action and surface integration-friendly errors."""
         try:
             return await action()
         except KefAuthenticationRequiredError as err:
             self.coordinator.config_entry.async_start_reauth(self.coordinator.hass)
-            raise HomeAssistantError(AUTH_FAILURE_MESSAGE) from err
+            raise HomeAssistantError(
+                AUTH_FAILURE_MESSAGE,
+                translation_domain=DOMAIN,
+                translation_key="authentication_required",
+            ) from err
         except KefError as err:
-            raise HomeAssistantError(str(err)) from err
+            raise HomeAssistantError(
+                str(err), translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Return device information."""
         device = self.coordinator.data.device
         return {
@@ -50,7 +71,7 @@ class KefEntity:
             "serial_number": device.serial_number or device.mac_address,
             "configuration_url": str(
                 URL.build(scheme="http", host=device.host.strip("[]"), port=device.port)
-            ),
+            ) if device.host else None,
         }
 
 

@@ -245,6 +245,8 @@ async def test_volume_auth_failure_starts_reauth() -> None:
         await player.async_set_volume_level(0.5)
     except HomeAssistantError as err:
         assert "valid web UI password" in str(err)
+        assert err.translation_domain == "kef"
+        assert err.translation_key == "authentication_required"
     else:
         raise AssertionError("Expected HomeAssistantError")
 
@@ -416,6 +418,8 @@ async def test_step_auth_failure_at_limit_starts_reauth() -> None:
         await player.async_volume_up()
     except HomeAssistantError as err:
         assert "valid web UI password" in str(err)
+        assert err.translation_domain == "kef"
+        assert err.translation_key == "authentication_required"
     else:
         raise AssertionError("Expected HomeAssistantError")
 
