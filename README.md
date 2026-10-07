@@ -90,6 +90,11 @@ if its network address changes.
 
 ![KEF integration overview](assets/kef-overview.png)
 
+## Removal
+
+Follow the [removal instructions](docs/configuration.md#remove-the-integration)
+to delete speaker entries and uninstall the HACS or manual installation.
+
 ## Support
 
 [Report an issue](https://github.com/EvotecIT/homeassistant-kef/issues) with the

@@ -5,6 +5,19 @@
 Use standard Home Assistant media-player actions for KEF. Choose your own
 entity in the automation editor; `media_player.kef_speaker` below is a placeholder.
 
+## Triggers and conditions
+
+KEF does not register custom automation triggers or conditions. Use Home
+Assistant's standard time, state, numeric-state, or template options with the
+entities your speaker exposes. In the automation editor, add a trigger under
+**When** and any conditions under **And if**, then select your speaker entity.
+The example below uses a time trigger and a template condition.
+
+The modern speaker's internal event queue updates Home Assistant state; it is
+not a separate KEF automation trigger. For a playback-state automation, use a
+state trigger on the media-player entity and account for `unknown` and
+`unavailable` during startup or a connection loss.
+
 ## Test an action first
 
 In **Developer tools → Actions**, select **Media player: Set volume**, choose

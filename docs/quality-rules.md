@@ -1,7 +1,7 @@
 # Integration rule ledger
 
 This is KEF's self-assessment against the [Home Assistant rules](https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/),
-checked on 2026-10-06. It is an implementation checklist, not an official rating.
+checked on 2026-10-07. It is an implementation checklist, not an official rating.
 The current index contains 54 rules. `Source verified` means the applicable
 implementation contract has source and test evidence at this candidate. It does
 not certify a published release or replace the artifact and hardware gates below.
@@ -22,11 +22,11 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | config-flow | Partial | Manual and discovered setup exist; prove the installed artifact's UI flow. |
 | dependency-transparency | Source verified | [Dependency evidence](development.md#runtime-dependencies) records bundled ownership and the OSI licenses, public PyPI releases, corresponding tags, public build/publish workflows and PyPI publisher provenance for aiohttp 3.11.11/3.14.3 and cryptography 44.0.0/48.0.1 in the minimum/current environments. Reassess when supported dependencies change; installed-artifact qualification remains separate. |
 | docs-actions | Partial | `services.yaml` and automation guide exist; exercise each documented action example. |
-| docs-triggers | Review | Audit custom trigger support and document supported automation usage or applicability. |
-| docs-conditions | Review | Audit custom condition support and document supported automation usage or applicability. |
+| docs-triggers | Source verified | No custom triggers are registered. The [automation guide](automations.md#triggers-and-conditions) documents standard HA triggers and distinguishes them from the internal event queue. Source audit: manifest, integration setup and platform files. This is a documented interface, not a rule exemption. |
+| docs-conditions | Source verified | No custom conditions are registered. The [automation guide](automations.md#triggers-and-conditions) explains standard HA conditions and supplies a time-trigger/template-condition example. Source audit: manifest, integration setup and platform files. This is a documented interface, not a rule exemption. |
 | docs-high-level-description | Partial | README describes speaker control; reconcile it with verified model support. |
 | docs-installation-instructions | Partial | README installation path exists; install the actual HACS artifact. |
-| docs-removal-instructions | Review | Verify entry removal and HACS uninstall guidance, including retained data. |
+| docs-removal-instructions | Source verified | [Removal instructions](configuration.md#remove-the-integration) cover entry deletion, HACS/manual uninstall, retained history/exports/backups, and unchanged device settings. Source audit found no integration-owned persistent speaker store; [unload tests](../tests/components/kef/test_init.py) cover listener cleanup. Installed removal proof remains a separate lifecycle gate. |
 | entity-event-setup | Partial | Coordinator cancellation tests exist; audit every entity listener's registration and removal. |
 | entity-unique-id | Partial | Entity base supplies identity; verify uniqueness and persistence across migration/reconfiguration. |
 | has-entity-name | Partial | Entity base enables entity names; audit primary and child entity naming. |
@@ -41,14 +41,14 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | --- | --- | --- |
 | action-exceptions | Partial | Invalid firmware target regression exists; audit validation and transport errors across actions. |
 | config-entry-unloading | Partial | Failed unload preserves the event listener; successful unload stops it. Real HA tests verify two reloads preserve entity IDs, replace runtime owners, cancel old event tasks, and reset their queues. A forwarding failure enters HA setup-error state without starting the event listener; a later reload replaces the runtime owner and succeeds. A failure after the real sensor platform loads removes its registered coordinator listeners before recovery; reload uses a fresh owner. Installed-artifact qualification remains open. |
-| docs-configuration-parameters | Partial | Configuration guide exists; reconcile all options, defaults, ranges, and effects. |
-| docs-installation-parameters | Partial | Configuration guide exists; reconcile setup fields, credentials, and network prerequisites. |
+| docs-configuration-parameters | Source verified | [Options](configuration.md#options) documents all four fields, defaults, numeric ranges and entry reload behavior. Reconciled with KefOptionsFlow and const.py; [flow tests](../tests/components/kef/test_config_flow.py) cover persisted values. Installed dialog proof remains separate. |
+| docs-installation-parameters | Source verified | [Setup fields](configuration.md#connect-a-speaker) documents required host, conditional password, address families, local API ports, discovery and hostname prerequisites. Reconciled with config_flow.py and the canonical client defaults. Installed onboarding remains separate. |
 | entity-unavailable | Partial | Coordinator drives availability; verify offline startup, disconnect, recovery, and dependent entities. |
 | integration-owner | Partial | Manifest names maintainers and issue tracker; confirm support and security-reporting paths. |
 | log-when-unavailable | Review | Exercise one disconnect/reconnect cycle and inspect logs for useful, non-repeating messages. |
 | parallel-updates | Source verified | All eight platforms explicitly set limits: coordinator-only sensors use 0 and writable platforms use 1. [HA multi-entity action test](../tests/components/kef/test_parallel_actions.py) verifies serialized switch writes. These are per-platform limits; minimum HA bypasses them for separate single-entity calls. Physical request-budget measurements remain a separate qualification gate. |
 | reauthentication-flow | Partial | Reauth steps exist; prove credentials are replaced only after successful validation. |
-| test-coverage | Gap | Integration and bundled-client statement coverage is 85.5%, with 67.5% branch coverage. Several modules remain below the required threshold; tests and exclusions must reflect supported behaviour. |
+| test-coverage | Gap | The measured 36cd65b baseline including the bundled client has 85.6% statement and 68.4% branch coverage. Later 401-test runs did not remeasure coverage. Several modules remain below the required threshold; tests and exclusions must reflect supported behaviour. |
 
 ## Gold
 
@@ -58,7 +58,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | diagnostics | Partial | Privacy and nonmutation tests pass; inspect the downloaded artifact and all supported model payloads. |
 | discovery-update-info | Partial | Zeroconf update handling exists; verify address changes preserve identity and credentials. |
 | discovery | Partial | Manifest advertises AirPlay discovery; verify supported model matching and unrelated-device rejection. |
-| docs-data-update | Review | Describe polling, event updates, retry timing, and expected state delays. |
+| docs-data-update | Source verified | [Data updates](configuration.md#data-updates) describes polling defaults/ranges, modern event-triggered refresh, legacy polling, failure tolerance, setup retry and discovery recovery. Reconciled with coordinator.py and [coordinator tests](../tests/components/kef/test_coordinator.py). Per-model request budgets remain unmeasured. |
 | docs-examples | Partial | Automation guide exists; validate examples against current entities/actions. |
 | docs-known-limitations | Partial | Model notes exist; reconcile protocol and feature restrictions with evidence. |
 | docs-supported-devices | Partial | Device support guide exists; distinguish tested hardware from protocol-based expectations. |
@@ -86,7 +86,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 
 ## Qualification beyond the rule ledger
 
-- [x] 384 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
+- [x] 401 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
 - [ ] Install the published artifact and upgrade from the previous stable release.
 - [ ] Verify real model/firmware behaviour, resource use, reconnection, and supported actions.
 - [ ] Record release version, commit, artifact identity, environment, and evidence date.
