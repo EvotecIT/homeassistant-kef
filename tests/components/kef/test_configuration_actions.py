@@ -121,8 +121,11 @@ async def test_configuration_service_preserves_wire_value_and_state(
                 await action
                 refresh_after_write.assert_awaited_once_with()
             else:
-                with pytest.raises(HomeAssistantError):
+                with pytest.raises(HomeAssistantError) as error:
                     await action
+                assert error.value.translation_domain == DOMAIN
+                assert error.value.translation_key == "command_failed"
+                assert error.value.translation_placeholders["error"]
                 refresh_after_write.assert_not_awaited()
             assert captured == [
                 {

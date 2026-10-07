@@ -92,12 +92,18 @@ async def _async_handle_install_firmware_file(
         or entity_entry.platform != DOMAIN
         or entity_entry.config_entry_id is None
     ):
-        raise ServiceValidationError("Target must be a KEF firmware update entity")
+        raise ServiceValidationError(
+            "Target must be a KEF firmware update entity", translation_domain=DOMAIN,
+            translation_key="invalid_firmware_target",
+        )
 
     config_entry = hass.config_entries.async_get_entry(entity_entry.config_entry_id)
     coordinator = getattr(config_entry, "runtime_data", None)
     if config_entry is None or coordinator is None or coordinator.client is None:
-        raise ServiceValidationError("KEF config entry is not ready")
+        raise ServiceValidationError(
+            "KEF config entry is not ready", translation_domain=DOMAIN,
+            translation_key="entry_not_ready",
+        )
 
     try:
         await coordinator.client.async_upload_firmware_update(
@@ -106,9 +112,17 @@ async def _async_handle_install_firmware_file(
         await coordinator.async_request_refresh()
     except KefAuthenticationRequiredError as err:
         config_entry.async_start_reauth(hass)
-        raise HomeAssistantError(AUTH_FAILURE_MESSAGE) from err
+        raise HomeAssistantError(
+            AUTH_FAILURE_MESSAGE,
+            translation_domain=DOMAIN,
+            translation_key="authentication_required",
+        ) from err
     except KefError as err:
-        raise HomeAssistantError(str(err)) from err
+        raise HomeAssistantError(
+            str(err), translation_domain=DOMAIN,
+            translation_key="command_failed",
+            translation_placeholders={"error": str(err)},
+        ) from err
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: KefConfigEntry) -> bool:

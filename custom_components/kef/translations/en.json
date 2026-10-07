@@ -157,5 +157,25 @@
     "button": {
       "start_calibration": { "name": "DSP: Start calibration" }
     }
+  },
+  "exceptions": {
+    "authentication_required": {
+      "message": "KEF speaker requires a valid web UI password. Reconfigure the KEF integration and enter the password configured in the speaker web interface."
+    },
+    "command_failed": {
+      "message": "The KEF command failed: {error}"
+    },
+    "not_initialized": {
+      "message": "KEF speaker is not initialized"
+    },
+    "invalid_firmware_target": {
+      "message": "Target must be a KEF firmware update entity"
+    },
+    "entry_not_ready": {
+      "message": "KEF config entry is not ready"
+    },
+    "automatic_placement_enabled": {
+      "message": "Turn off auto-detect placement before changing wall mounted"
+    }
   }
 }

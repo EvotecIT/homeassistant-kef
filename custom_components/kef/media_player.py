@@ -20,7 +20,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .audio import audio_codec_value, audio_virtualizer_value
-from .const import AUTH_FAILURE_MESSAGE, model_supports_feature
+from .const import AUTH_FAILURE_MESSAGE, DOMAIN, model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .exceptions import KefAuthenticationRequiredError, KefError
@@ -420,7 +420,11 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
             live = await self.client.async_get_volume_raw()
         except KefAuthenticationRequiredError as err:
             self.coordinator.config_entry.async_start_reauth(self.coordinator.hass)
-            raise HomeAssistantError(AUTH_FAILURE_MESSAGE) from err
+            raise HomeAssistantError(
+                AUTH_FAILURE_MESSAGE,
+                translation_domain=DOMAIN,
+                translation_key="authentication_required",
+            ) from err
         except KefError:
             live = None
         if live is None:

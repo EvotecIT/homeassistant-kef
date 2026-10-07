@@ -13,7 +13,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import model_supports_feature
+from .const import DOMAIN, model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity, apply_eq_profile_change
 from .models import KefBackend, KefSnapshot
@@ -335,7 +335,8 @@ async def _async_set_wall_mounted(
     # manual setting), so manual changes are only allowed with auto-detect off.
     if coordinator.data.auto_detect_placement is not False:
         raise ServiceValidationError(
-            "Turn off auto-detect placement before changing wall mounted"
+            "Turn off auto-detect placement before changing wall mounted",
+            translation_domain=DOMAIN, translation_key="automatic_placement_enabled",
         )
     client = coordinator.client
     if client is None:

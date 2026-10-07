@@ -9,6 +9,7 @@ import pytest
 from homeassistant.const import ATTR_ENTITY_ID, Platform
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.translation import async_get_translations
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -26,7 +27,7 @@ async def test_action_registered_without_config_entries(hass) -> None:
     assert await async_setup_component(hass, DOMAIN, {})
     assert hass.services.has_service(DOMAIN, SERVICE_INSTALL_FIRMWARE_FILE)
 
-    with pytest.raises(ServiceValidationError, match="Target must be a KEF"):
+    with pytest.raises(ServiceValidationError, match="Target must be a KEF") as error:
         await hass.services.async_call(
             DOMAIN,
             SERVICE_INSTALL_FIRMWARE_FILE,
@@ -36,6 +37,12 @@ async def test_action_registered_without_config_entries(hass) -> None:
             },
             blocking=True,
         )
+    assert error.value.translation_domain == DOMAIN
+    assert error.value.translation_key == "invalid_firmware_target"
+    translations = await async_get_translations(hass, "en", "exceptions", {DOMAIN})
+    assert translations[
+        "component.kef.exceptions.invalid_firmware_target.message"
+    ] == str(error.value)
 
 
 async def test_install_firmware_file_service_uploads_to_update_entity(hass) -> None:
@@ -105,7 +112,7 @@ async def test_install_firmware_file_auth_failure_starts_reauth(hass) -> None:
 
     _async_register_services(hass)
 
-    with pytest.raises(HomeAssistantError, match="valid web UI password"):
+    with pytest.raises(HomeAssistantError, match="valid web UI password") as error:
         await hass.services.async_call(
             DOMAIN,
             SERVICE_INSTALL_FIRMWARE_FILE,
@@ -118,6 +125,8 @@ async def test_install_firmware_file_auth_failure_starts_reauth(hass) -> None:
 
     config_entry.async_start_reauth.assert_called_once_with(hass)
     coordinator.async_request_refresh.assert_not_awaited()
+    assert error.value.translation_domain == DOMAIN
+    assert error.value.translation_key == "authentication_required"
 
 
 async def test_firmware_action_rejects_entry_without_runtime(hass):
@@ -128,9 +137,11 @@ async def test_firmware_action_rejects_entry_without_runtime(hass):
         Platform.UPDATE, DOMAIN, "unavailable_firmware", config_entry=entry,
     )
     _async_register_services(hass)
-    with pytest.raises(ServiceValidationError, match="not ready"):
+    with pytest.raises(ServiceValidationError, match="not ready") as error:
         await hass.services.async_call(
             DOMAIN, SERVICE_INSTALL_FIRMWARE_FILE,
             {ATTR_ENTITY_ID: entity.entity_id, ATTR_FIRMWARE_FILE_PATH: "/unused.swu"},
             blocking=True,
         )
+    assert error.value.translation_domain == DOMAIN
+    assert error.value.translation_key == "entry_not_ready"
