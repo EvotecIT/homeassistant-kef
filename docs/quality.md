@@ -20,9 +20,9 @@ pytest --cov=custom_components.kef --cov-branch --cov-report=term-missing
 ```
 
 Coverage includes the bundled reusable client. Do not exclude it to improve the
-reported percentage. The current suite passes all 413 tests on HA 2026.9.4.
-The preceding 401-test baseline also passes on HA 2025.1.0; the latest config-flow
-change passes all 23 component flow tests on that minimum version. Ruff and
+reported percentage. The current suite passes all 413 tests on HA 2026.7.2 and HA 2026.9.4 with
+Python 3.14. The historical 401-test baseline passed on HA 2025.1.0; its final
+config-flow change passed all 23 component flow tests on that retired host. Ruff and
 strict typing pass on the current lane.
 
 The measured production baseline at `4b75b57` contains 401 tests and covers
@@ -82,7 +82,7 @@ corresponding HA rules or physical speaker behavior.
 - [x] Verify cleanup after a real sensor platform loads and the remaining setup fails, including recovery with a fresh owner.
 - [x] Verify authentication failure starts HA reauthentication without publishing entities or runtime data.
 - [ ] Verify installed-artifact lifecycle behavior.
-- [x] Run all 401 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
+- [x] Run all 413 tests on HA 2026.7.2 and HA 2026.9.4 with Python 3.14.
 - [ ] Install the published HACS artifact and upgrade from the previous stable
   version while retaining user names, entity IDs, and automation bindings.
 - [ ] Record model/firmware-specific offline startup, reconnection, authentication,
