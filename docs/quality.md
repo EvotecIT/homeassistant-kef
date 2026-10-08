@@ -97,10 +97,11 @@ runtime proof are separate evidence boundaries.
 ## Compatibility environments
 
 CI pins HA 2026.7.2 and 2026.9.4 with matching fixture releases on Python 3.14.
+HA 2026.9.4 is the fixed comparison target; newer releases need separate qualification.
 Reproduce the supported minimum with
 `python -m pip install -r requirements-test-minimum.txt` in a separate virtual
 environment. Home Assistant supplies the compatible patched DNS and zeroconf
 packages; legacy compatibility overrides are unnecessary.
 
-Strict typing runs against current stable HA. Beta HA versions are outside these
+Strict typing runs against the fixed HA 2026.9.4 comparison target. Beta HA versions are outside these
 stable qualification lanes and require separate compatibility work.
