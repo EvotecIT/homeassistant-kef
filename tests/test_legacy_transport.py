@@ -164,11 +164,13 @@ async def test_missing_reply_is_bounded_by_response_size(operation):
 
 
 @pytest.mark.parametrize(
-    ("wire_volume", "split"), [(42, 1), (42, 2), (42, 3), (82, 4), (170, 4)]
+    ("wire_volume", "split", "trailer"),
+    [(42, 1, 255), (42, 2, 255), (42, 3, 255), (82, 4, 255),
+     (170, 4, 255), (42, 4, 128)],
 )
-async def test_get_volume_waits_for_a_complete_packet(wire_volume, split):
+async def test_get_volume_waits_for_a_complete_packet(wire_volume, split, trailer):
     async def handler(reader, writer):
-        reply = bytes([82, 37, wire_volume, 255])
+        reply = bytes([82, 37, wire_volume, trailer])
         writer.write(reply[:split])
         await writer.drain()
         if split < len(reply):
@@ -189,7 +191,9 @@ async def test_get_volume_waits_for_a_complete_packet(wire_volume, split):
         assert received == [bytes([71, 37, 128])]
 
 
-@pytest.mark.parametrize("reply", [b"", b"R", b"R%", b"R%*", b"R0*\xff"])
+@pytest.mark.parametrize(
+    "reply", [b"", b"R", b"R%", b"R%*", b"R0*\xff", b"R0R%R\xff*\xff"]
+)
 async def test_get_volume_rejects_incomplete_or_unrelated_packets(reply):
     async def handler(reader, writer):
         writer.write(reply)
@@ -205,10 +209,15 @@ async def test_get_volume_rejects_incomplete_or_unrelated_packets(reply):
         assert received == [bytes([71, 37, 128])]
 
 
-async def test_get_volume_selects_matching_packet_from_combined_reply():
+@pytest.mark.parametrize(
+    ("reply", "volume"),
+    [(bytes([82, 48, 82, 255, 82, 37, 82, 255]), 82),
+     (bytes([82, 48, 82, 37, 82, 37, 42, 255]), 42)],
+)
+async def test_get_volume_selects_matching_packet_from_combined_reply(reply, volume):
     async def handler(reader, writer):
         # The other query's value and the requested volume can both equal 'R'.
-        writer.write(bytes([82, 48, 82, 255, 82, 37, 82, 255]))
+        writer.write(reply)
         await writer.drain()
         assert await reader.read() == b""
 
@@ -216,6 +225,6 @@ async def test_get_volume_selects_matching_packet_from_combined_reply():
         port, received, disconnected
     ):
         client = LegacyBinaryClient("127.0.0.1", port=port)
-        assert await client.async_get_volume_raw() == 82
+        assert await client.async_get_volume_raw() == volume
         await asyncio.wait_for(disconnected.wait(), 1)
         assert received == [bytes([71, 37, 128])]

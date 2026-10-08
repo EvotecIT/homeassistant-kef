@@ -3039,10 +3039,12 @@ class LegacyBinaryClient(BaseKefClient):
         if message[0] == _LEGACY_GET_START:
             # GET packets contain a header, query type, value and trailing byte.
             # The value can itself equal 'R', so it is not a packet delimiter.
+            # Keep the existing acceptance of the trailing byte's value.
             header = bytes([ord("R"), message[1]])
-            offset = reply.find(header)
-            if offset >= 0 and len(reply) >= offset + 4:
-                return reply[offset:offset + 4]
+            for offset in range(0, len(reply) - 3, 4):
+                packet = reply[offset:offset + 4]
+                if packet[:2] == header:
+                    return packet
             raise KefResponseError("Legacy KEF query type did not match the response")
         if message[0] == _LEGACY_SET_START:
             responses = [b"R" + chunk for chunk in reply.split(b"R") if chunk]
