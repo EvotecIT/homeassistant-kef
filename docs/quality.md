@@ -13,16 +13,16 @@ artifact and device qualification remain separate.
 Run the existing test environment on Linux, including WSL:
 
 ```bash
-python -m pip install -e '.[test]'
+python -m pip install -e '.[test]' homeassistant==2026.9.4 pytest-homeassistant-custom-component==0.13.367
 ruff check .
 python -m mypy --strict custom_components/kef
 pytest --cov=custom_components.kef --cov-branch --cov-report=term-missing
 ```
 
 Coverage includes the bundled reusable client. Do not exclude it to improve the
-reported percentage. The current suite passes all 413 tests on HA 2026.9.4.
-The preceding 401-test baseline also passes on HA 2025.1.0; the latest config-flow
-change passes all 23 component flow tests on that minimum version. Ruff and
+reported percentage. The current suite passes all 413 tests on HA 2026.7.2 and HA 2026.9.4 with
+Python 3.14. The historical 401-test baseline passed on HA 2025.1.0; its final
+config-flow change passed all 23 component flow tests on that retired host. Ruff and
 strict typing pass on the current lane.
 
 The measured production baseline at `4b75b57` contains 401 tests and covers
@@ -82,7 +82,7 @@ corresponding HA rules or physical speaker behavior.
 - [x] Verify cleanup after a real sensor platform loads and the remaining setup fails, including recovery with a fresh owner.
 - [x] Verify authentication failure starts HA reauthentication without publishing entities or runtime data.
 - [ ] Verify installed-artifact lifecycle behavior.
-- [x] Run all 401 tests on HA 2025.1.0/Python 3.13 and HA 2026.9.4/Python 3.14.
+- [x] Run all 413 tests on HA 2026.7.2 and HA 2026.9.4 with Python 3.14.
 - [ ] Install the published HACS artifact and upgrade from the previous stable
   version while retaining user names, entity IDs, and automation bindings.
 - [ ] Record model/firmware-specific offline startup, reconnection, authentication,
@@ -96,12 +96,12 @@ runtime proof are separate evidence boundaries.
 
 ## Compatibility environments
 
-CI pins HA 2025.1.0 and 2026.9.4 with matching fixture releases. Reproduce the
-minimum lane with `python -m pip install -r requirements-test-minimum.txt` in a
-Python 3.13 environment. The older fixture needs its compatible josepy and pycares
-versions; zeroconf is installed for the legacy discovery test type.
+CI pins HA 2026.7.2 and 2026.9.4 with matching fixture releases on Python 3.14.
+HA 2026.9.4 is the fixed comparison target; newer releases need separate qualification.
+Reproduce the supported minimum with
+`python -m pip install -r requirements-test-minimum.txt` in a separate virtual
+environment. Home Assistant supplies the compatible patched DNS and zeroconf
+packages; legacy compatibility overrides are unnecessary.
 
-Strict typing runs against current stable HA. The minimum lane exercises runtime
-compatibility; its old discovery type lives in a different HA module. Production
-imports that type only for static annotations. Beta HA versions are outside these
+Strict typing runs against the fixed HA 2026.9.4 comparison target. Beta HA versions are outside these
 stable qualification lanes and require separate compatibility work.
