@@ -6,6 +6,9 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/EvotecIT/homeassistant-kef/validate.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/EvotecIT/homeassistant-kef/actions/workflows/validate.yml)
 [![License](https://img.shields.io/github/license/EvotecIT/homeassistant-kef?style=for-the-badge)](LICENSE)
 
+Requires Home Assistant 2026.7.2 or later. Upgrade the Home Assistant host before
+installing this integration; the host owns its zeroconf and DNS dependencies.
+
 ## Overview
 
 Control KEF speakers over your local network from Home Assistant. The

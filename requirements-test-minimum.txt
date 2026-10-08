@@ -1,8 +1,4 @@
-# Exact declared minimum and its matching HA fixture release.
+# Patched supported minimum and its matching Home Assistant fixtures.
 -e .[test]
-homeassistant==2026.2.3
-pytest-homeassistant-custom-component==0.13.316
-# Compatibility constraints for the legacy HA test environment.
-josepy<3
-pycares==5.0.1
-zeroconf==0.151.5
+homeassistant==2026.7.2
+pytest-homeassistant-custom-component==0.13.346
