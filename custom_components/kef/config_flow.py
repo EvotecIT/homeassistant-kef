@@ -12,6 +12,7 @@ import voluptuous as vol
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
     SOURCE_RECONFIGURE,
+    SOURCE_USER,
     SOURCE_ZEROCONF,
     ConfigEntry,
     ConfigEntryState,
@@ -457,8 +458,15 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         if self.source in {SOURCE_REAUTH, SOURCE_RECONFIGURE}:
             self._abort_if_unique_id_mismatch()
         else:
+            existing = self.hass.config_entries.async_entry_for_domain_unique_id(
+                DOMAIN, entry_unique_id
+            )
             self._abort_if_unique_id_configured(
-                updates={CONF_HOST: self._host}, reload_on_update=False
+                updates={CONF_HOST: self._host},
+                reload_on_update=(
+                    self.source == SOURCE_USER
+                    and (existing is None or not existing.update_listeners)
+                ),
             )
 
         self._entry_data = {

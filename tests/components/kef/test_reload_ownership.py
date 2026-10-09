@@ -4,10 +4,13 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from homeassistant import config_entries
+from homeassistant.components import websocket_api
+from homeassistant.components.config.config_entries import config_entry_update
 from homeassistant.config_entries import ConfigEntryState, DiscoveryKey
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
+from homeassistant.helpers.translation import async_get_translations
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef import async_setup_entry
@@ -143,10 +146,18 @@ async def test_rediscovery_reloads_once(hass, monkeypatch, changed, state):
         reload.assert_not_awaited()
 
 
-async def test_manual_rediscovery_reloads_once(hass, monkeypatch):
-    """Adding an already configured speaker at its new host updates it once."""
+@pytest.mark.parametrize(
+    "state",
+    [
+        ConfigEntryState.LOADED,
+        ConfigEntryState.NOT_LOADED,
+        ConfigEntryState.SETUP_RETRY,
+    ],
+)
+async def test_manual_rediscovery_preserves_reload_policy(hass, monkeypatch, state):
+    """A host change wakes active/retrying speakers and preserves dormant state."""
     entry = await _entry(
-        hass, monkeypatch, ConfigEntryState.LOADED, host="old-speaker.local"
+        hass, monkeypatch, state, host="old-speaker.local"
     )
     client = Mock(async_identify=AsyncMock(return_value=TEST_DEVICE_INFO))
     monkeypatch.setattr(
@@ -166,7 +177,10 @@ async def test_manual_rediscovery_reloads_once(hass, monkeypatch):
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
     assert entry.data[CONF_HOST] == TEST_HOST
-    reload.assert_awaited_once_with(entry.entry_id)
+    if state is ConfigEntryState.NOT_LOADED:
+        reload.assert_not_awaited()
+    else:
+        reload.assert_awaited_once_with(entry.entry_id)
 
 
 @pytest.mark.parametrize("field", ["data", "options", "title", "unique_id"])
@@ -186,3 +200,34 @@ async def test_registered_listener_preserves_setting_reload(hass, monkeypatch, f
     await hass.async_block_till_done()
 
     reload.assert_awaited_once_with(entry.entry_id)
+
+
+async def test_system_polling_options_reload_once(hass, hass_ws_client, monkeypatch):
+    """The real HA system-options handler owns disabling and restoring polling."""
+    entry = await _entry(hass, monkeypatch, ConfigEntryState.LOADED)
+    reload = AsyncMock(return_value=True)
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload)
+    websocket_api.async_register_command(hass, config_entry_update)
+    client = await hass_ws_client(hass)
+    for message_id, disabled in enumerate((True, False), start=1):
+        await client.send_json(
+            {
+                "id": message_id,
+                "type": "config_entries/update",
+                "entry_id": entry.entry_id,
+                "pref_disable_polling": disabled,
+            }
+        )
+        result = await client.receive_json()
+        await hass.async_block_till_done()
+        assert result["success"]
+        assert entry.pref_disable_polling is disabled
+        assert reload.await_count == message_id
+    await client.close()
+
+
+async def test_connection_success_messages_are_translated(hass):
+    """The runtime translation catalog resolves both successful repair reasons."""
+    translations = await async_get_translations(hass, "en", "config", {DOMAIN})
+    for reason in ("reauth_successful", "reconfigure_successful"):
+        assert translations[f"component.{DOMAIN}.config.abort.{reason}"]

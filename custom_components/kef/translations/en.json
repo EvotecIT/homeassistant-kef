@@ -38,6 +38,7 @@
     "abort": {
       "already_configured": "This KEF speaker is already configured",
       "reauth_successful": "The KEF password was updated",
+      "reconfigure_successful": "The KEF connection was updated",
       "unsupported": "This discovered device is not a supported KEF speaker"
     }
   },
