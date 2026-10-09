@@ -17,7 +17,8 @@ The integration and reusable `kef_client` are implemented. See
 
 ## Two protocol families
 
-The legacy backend uses `aiokef` over TCP port `50001` for first-generation
+The legacy backend uses the bundled asynchronous TCP client, with port `50001`
+as its default, for first-generation
 speakers. Modern speakers refuse that transport and instead expose the HTTP API
 used by their built-in web interface. Keep the two backends distinct; do not
 assume settings or playback commands behave identically across them.

@@ -3009,19 +3009,18 @@ class LegacyBinaryClient(BaseKefClient):
             async with asyncio.timeout(self._request_timeout):
                 await writer.drain()
                 raw_reply = await reader.read(100)
-                if payload[0] == _LEGACY_SET_START:
-                    # TCP may deliver the acknowledgement over several reads.
-                    # Keep one deadline and the existing 100-byte response bound;
-                    # never resend a command merely because its reply is split.
-                    while raw_reply and len(raw_reply) < 100:
-                        try:
-                            self._parse_response(payload, raw_reply)
+                # TCP may deliver GET replies and SET acknowledgements over
+                # several reads. Keep one deadline and the existing 100-byte
+                # response bound without resending a command.
+                while raw_reply and len(raw_reply) < 100:
+                    try:
+                        self._parse_response(payload, raw_reply)
+                        break
+                    except KefResponseError:
+                        chunk = await reader.read(100 - len(raw_reply))
+                        if not chunk:
                             break
-                        except KefResponseError:
-                            chunk = await reader.read(100 - len(raw_reply))
-                            if not chunk:
-                                break
-                            raw_reply += chunk
+                        raw_reply += chunk
         except (OSError, TimeoutError) as err:
             raise KefConnectionError(str(err)) from err
         finally:
@@ -3037,14 +3036,18 @@ class LegacyBinaryClient(BaseKefClient):
     @staticmethod
     def _parse_response(message: bytes, reply: bytes) -> bytes:
         """Extract the matching response packet."""
-        responses = [b"R" + chunk for chunk in reply.split(b"R") if chunk]
         if message[0] == _LEGACY_GET_START:
-            query_type = message[1]
-            for response in responses:
-                if len(response) > 1 and response[1] == query_type:
-                    return response
+            # GET packets contain a header, query type, value and trailing byte.
+            # The value can itself equal 'R', so it is not a packet delimiter.
+            # Keep the existing acceptance of the trailing byte's value.
+            header = bytes([ord("R"), message[1]])
+            for offset in range(0, len(reply) - 3, 4):
+                packet = reply[offset:offset + 4]
+                if packet[:2] == header:
+                    return packet
             raise KefResponseError("Legacy KEF query type did not match the response")
         if message[0] == _LEGACY_SET_START:
+            responses = [b"R" + chunk for chunk in reply.split(b"R") if chunk]
             ok = bytes([82, 17, 255])
             if ok in responses:
                 return ok

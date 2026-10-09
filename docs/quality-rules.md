@@ -18,7 +18,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | appropriate-polling | Partial | Coordinator and scan/retry options exist; document and measure normal/offline request budgets. |
 | brands | Partial | Local `brand/` assets exist; verify rendered HACS/HA assets and applicable custom-integration requirements. |
 | common-modules | Partial | `entity.py`, `coordinator.py`, and `kef_client/` own shared behaviour; inspect remaining adapter duplication. |
-| config-flow-test-coverage | Source verified | The current 413-test suite covers all 216 config-flow statements and 78 branches (100%). Real HA flows cover authentication/connection failures, identity mismatch, sparse discovery, IPv6-only discovery and DNS aliases. All 23 component flow tests also pass on HA 2025.1.0. Discovery addresses are parsed by HA before this integration receives them. |
+| config-flow-test-coverage | Source verified | The current 430-test suite covers all 216 executable config-flow statements and 78 branches (100%) on HA 2026.9.4. Real HA flows cover authentication/connection failures, identity mismatch, sparse discovery, IPv6-only discovery and DNS aliases. All 430 tests also pass on HA 2025.1.0. That lane's older coverage tool counts the annotation-only discovery import separately; no runtime flow is missing from this measurement. Discovery addresses are parsed by HA before this integration receives them. |
 | config-flow | Partial | Manual and discovered setup exist; prove the installed artifact's UI flow. |
 | dependency-transparency | Source verified | [Dependency evidence](development.md#runtime-dependencies) records bundled ownership and the OSI licenses, public PyPI releases, corresponding tags, public build/publish workflows and PyPI publisher provenance for aiohttp 3.11.11/3.14.3 and cryptography 44.0.0/48.0.1 in the minimum/current environments. Reassess when supported dependencies change; installed-artifact qualification remains separate. |
 | docs-actions | Partial | `services.yaml` and automation guide exist; exercise each documented action example. |
@@ -48,7 +48,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | log-when-unavailable | Review | Exercise one disconnect/reconnect cycle and inspect logs for useful, non-repeating messages. |
 | parallel-updates | Source verified | All eight platforms explicitly set limits: coordinator-only sensors use 0 and writable platforms use 1. [HA multi-entity action test](../tests/components/kef/test_parallel_actions.py) verifies serialized switch writes. These are per-platform limits; minimum HA bypasses them for separate single-entity calls. Physical request-budget measurements remain a separate qualification gate. |
 | reauthentication-flow | Partial | Reauth steps exist; prove credentials are replaced only after successful validation. |
-| test-coverage | Gap | The measured 4b75b57 production baseline including the bundled client has 86.6% statement coverage (2637/3046) and 69.2% branch coverage (501/724) across 401 passing tests. Several modules remain below the required threshold; tests and exclusions must reflect supported behaviour. |
+| test-coverage | Gap | The measured 03e03c8 production baseline including the bundled client has 86.99% statement coverage (2647/3043) and 70.08% branch coverage (506/722) across 430 passing tests on HA 2026.9.4. Several modules remain below the required threshold; tests and exclusions must reflect supported behaviour. |
 
 ## Gold
 
@@ -86,7 +86,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 
 ## Qualification beyond the rule ledger
 
-- [x] 401 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
+- [x] 430 tests pass on HA 2025.1.0 and HA 2026.9.4 with the same source.
 - [ ] Install the published artifact and upgrade from the previous stable release.
 - [ ] Verify real model/firmware behaviour, resource use, reconnection, and supported actions.
 - [ ] Record release version, commit, artifact identity, environment, and evidence date.

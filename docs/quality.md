@@ -20,14 +20,13 @@ pytest --cov=custom_components.kef --cov-branch --cov-report=term-missing
 ```
 
 Coverage includes the bundled reusable client. Do not exclude it to improve the
-reported percentage. The current suite passes all 413 tests on HA 2026.7.2 and HA 2026.9.4 with
-Python 3.14. The historical 401-test baseline passed on HA 2025.1.0; its final
-config-flow change passed all 23 component flow tests on that retired host. Ruff and
-strict typing pass on the current lane.
+reported percentage. The supported host matrix uses HA 2026.7.2 and HA 2026.9.4
+with Python 3.14. Ruff and strict typing run on the current lane.
 
-The measured production baseline at `4b75b57` contains 401 tests and covers
-86.6% of statements (2637/3046) and 69.2% of branches (501/724). This remains a
-historical integration-wide measurement, not a measurement of the latest source.
+The measured production baseline at `03e03c8` contains 430 tests and covers
+86.99% of statements (2647/3043) and 70.08% of branches (506/722) on HA 2026.9.4.
+This is a historical integration-wide measurement taken before the subsequent
+setup and reload changes, rather than a measurement of the latest source.
 The current full-suite config-flow measurement covers all 216 statements and
 78 branches (100%). Both supported HA discovery producers supply parsed IP
 addresses; the unreachable invalid-address exception handler has been removed.
@@ -39,12 +38,14 @@ returning data to entities.
 
 ## Verified contracts
 
-- Legacy commands accept the documented acknowledgement across TCP reads,
-  without resending a command. The response remains limited to 100 bytes and
-  one request deadline. Loopback tests cover truncated/rejected replies,
-  deadline expiry, cancellation, and connection closure.
-  Evidence: `tests/test_legacy_transport.py`. Legacy GET framing and physical
-  firmware behavior still need separate qualification.
+- Legacy GET replies and SET acknowledgements can arrive across TCP reads
+  without resending the command. GET replies wait for a complete four-byte
+  packet at a packet boundary and match the requested query; a value equal to the packet marker
+  remains data. The response remains limited to 100 bytes and one request
+  deadline. Loopback tests cover incomplete/unrelated replies, combined packets,
+  the mute bit, deadline expiry, cancellation, and connection closure.
+  Evidence: `tests/test_legacy_transport.py`. Actual legacy model and firmware
+  packet behavior still needs separate qualification.
 
 - Actions are registered during integration setup before a speaker entry is
   ready. Invalid firmware targets raise an error without uploading a file.
@@ -82,7 +83,7 @@ corresponding HA rules or physical speaker behavior.
 - [x] Verify cleanup after a real sensor platform loads and the remaining setup fails, including recovery with a fresh owner.
 - [x] Verify authentication failure starts HA reauthentication without publishing entities or runtime data.
 - [ ] Verify installed-artifact lifecycle behavior.
-- [x] Run all 413 tests on HA 2026.7.2 and HA 2026.9.4 with Python 3.14.
+- [x] Run the complete suite on HA 2026.7.2 and HA 2026.9.4 with Python 3.14.
 - [ ] Install the published HACS artifact and upgrade from the previous stable
   version while retaining user names, entity IDs, and automation bindings.
 - [ ] Record model/firmware-specific offline startup, reconnection, authentication,
