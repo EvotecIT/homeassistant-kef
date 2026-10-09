@@ -127,11 +127,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 entry.options.get(CONF_PASSWORD, entry.data.get(CONF_PASSWORD, "")),
             )
             if await self._async_validate_host():
-                return self.async_update_reload_and_abort(
-                    entry,
-                    data_updates=self._entry_data,
-                    options={**entry.options, CONF_PASSWORD: self._password},
-                )
+                return self._async_update_connection_and_abort(entry)
 
         return self.async_show_form(
             step_id="reconfigure",
@@ -173,11 +169,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             self._host = entry.data[CONF_HOST]
             self._password = user_input.get(CONF_PASSWORD, "")
             if await self._async_validate_host():
-                return self.async_update_reload_and_abort(
-                    entry,
-                    data_updates=self._entry_data,
-                    options={**entry.options, CONF_PASSWORD: self._password},
-                )
+                return self._async_update_connection_and_abort(entry)
 
         return self.async_show_form(
             step_id="reauth_confirm",
@@ -190,6 +182,26 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"title": self._title},
             last_step=True,
         )
+
+    def _async_update_connection_and_abort(
+        self, entry: ConfigEntry,
+    ) -> ConfigFlowResult:
+        """Persist a validated connection and reload through one owner."""
+        changed = self.hass.config_entries.async_update_entry(
+            entry,
+            data={**entry.data, **self._entry_data},
+            options={**entry.options, CONF_PASSWORD: self._password},
+        )
+        # A loaded entry's update listener owns changed-data reloads. Repairs
+        # with unchanged data, or no registered listener, still need one reload.
+        if not changed or not entry.update_listeners:
+            self.hass.config_entries.async_schedule_reload(entry.entry_id)
+        reason = (
+            "reconfigure_successful"
+            if self.source == SOURCE_RECONFIGURE
+            else "reauth_successful"
+        )
+        return self.async_abort(reason=reason)
 
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo,
@@ -255,7 +267,9 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                     # skip the rest of the offline retry wait.
                     existing.runtime_data.async_device_seen()
                 await self.async_set_unique_id(existing.unique_id)
-                self._abort_if_unique_id_configured(updates=updates)
+                self._abort_if_unique_id_configured(
+                    updates=updates, reload_on_update=False
+                )
             await self.async_set_unique_id(discovery_unique_id)
 
         # AirPlay TXT records don't reliably carry a per-device name, so resolve
@@ -443,7 +457,9 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         if self.source in {SOURCE_REAUTH, SOURCE_RECONFIGURE}:
             self._abort_if_unique_id_mismatch()
         else:
-            self._abort_if_unique_id_configured(updates={CONF_HOST: self._host})
+            self._abort_if_unique_id_configured(
+                updates={CONF_HOST: self._host}, reload_on_update=False
+            )
 
         self._entry_data = {
             CONF_HOST: self._host,
