@@ -47,10 +47,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: KefConfigEntry) -> bool:
     """Set up KEF from a config entry."""
-    coordinator = KefCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
-    entry.runtime_data = coordinator
-    await _async_cleanup_optional_entities(hass, entry, coordinator)
+    # Subscribe before network awaits so a new connection cannot be lost.
     reload_settings = (entry.data, entry.options, entry.title, entry.unique_id)
 
     async def async_reload_changed_settings(
@@ -67,6 +64,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: KefConfigEntry) -> bool:
         await async_reload_entry(hass, updated_entry)
 
     entry.async_on_unload(entry.add_update_listener(async_reload_changed_settings))
+    coordinator = KefCoordinator(hass, entry)
+    await coordinator.async_config_entry_first_refresh()
+    entry.runtime_data = coordinator
+    await _async_cleanup_optional_entities(hass, entry, coordinator)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await coordinator.async_start_event_listener()
     return True

@@ -1,5 +1,6 @@
 """Config-entry changes must schedule one reload through Home Assistant."""
 
+import asyncio
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -9,6 +10,7 @@ from homeassistant.components.config.config_entries import config_entry_update
 from homeassistant.config_entries import ConfigEntryState, DiscoveryKey
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.helpers.translation import async_get_translations
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -231,3 +233,81 @@ async def test_connection_success_messages_are_translated(hass):
     translations = await async_get_translations(hass, "en", "config", {DOMAIN})
     for reason in ("reauth_successful", "reconfigure_successful"):
         assert translations[f"component.{DOMAIN}.config.abort.{reason}"]
+
+
+@pytest.mark.parametrize("first_refresh_fails", [False, True])
+async def test_rediscovery_during_setup_uses_new_host(
+    hass, monkeypatch, first_refresh_fails
+):
+    """A discovery update survives the active setup lock and failed first refresh."""
+    entry = await _entry(
+        hass, monkeypatch, ConfigEntryState.NOT_LOADED, host="old-speaker.local"
+    )
+    entered, release = asyncio.Event(), asyncio.Event()
+    setup_hosts = []
+
+    async def first_refresh():
+        entered.set()
+        await release.wait()
+        if first_refresh_fails:
+            raise ConfigEntryNotReady("Old speaker address is unavailable")
+
+    def coordinator_factory(_hass, setup_entry):
+        setup_hosts.append(setup_entry.data[CONF_HOST])
+        return Mock(
+            data=TEST_SNAPSHOT,
+            async_config_entry_first_refresh=AsyncMock(
+                side_effect=first_refresh if len(setup_hosts) == 1 else None
+            ),
+            async_start_event_listener=AsyncMock(),
+            async_stop_event_listener=AsyncMock(),
+        )
+
+    monkeypatch.setattr("custom_components.kef.KefCoordinator", coordinator_factory)
+    monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", AsyncMock())
+    monkeypatch.setattr(
+        hass.config_entries, "async_unload_platforms", AsyncMock(return_value=True)
+    )
+    reload = AsyncMock(wraps=hass.config_entries.async_reload)
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload)
+    unload_states = []
+    original_unload = hass.config_entries.async_unload
+
+    async def unload(*args, **kwargs):
+        unload_states.append(entry.state)
+        return await original_unload(*args, **kwargs)
+
+    monkeypatch.setattr(hass.config_entries, "async_unload", unload)
+    task = hass.async_create_task(hass.config_entries.async_setup(entry.entry_id))
+    await asyncio.wait_for(entered.wait(), timeout=10)
+    discovery = ZeroconfServiceInfo(
+        ip_address="192.0.2.11", ip_addresses=["192.0.2.11"],
+        hostname="lsxii.local.", type=AIRPLAY_ZEROCONF_TYPE,
+        name="Living Room LSX II._airplay._tcp.local.", port=7000,
+        properties={"manufacturer": "KEF", "model": "LSX II",
+                    "deviceid": "02:00:00:00:00:01"},
+    )
+    try:
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_ZEROCONF,
+                "discovery_key": DiscoveryKey(
+                    domain="zeroconf", key=(discovery.type, discovery.name), version=1
+                ),
+            },
+            data=discovery,
+        )
+        assert result["reason"] == "already_configured"
+        assert entry.state is ConfigEntryState.SETUP_IN_PROGRESS
+    finally:
+        release.set()
+    await task
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    assert setup_hosts == ["old-speaker.local", "lsxii.local"]
+    assert unload_states == [
+        ConfigEntryState.SETUP_RETRY if first_refresh_fails else ConfigEntryState.LOADED
+    ]
+    reload.assert_awaited_once_with(entry.entry_id)
+    assert len(entry.update_listeners) == 1
