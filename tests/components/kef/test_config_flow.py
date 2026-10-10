@@ -383,9 +383,13 @@ async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) ->
     assert result["data"][CONF_HOST] == "lsxii.local"
 
 
+@pytest.mark.parametrize(
+    "http_failure", [KefUnsupportedDeviceError, KefAuthenticationRequiredError]
+)
 async def test_zeroconf_preserves_title_for_generic_legacy_identity(
     monkeypatch,
     hass,
+    http_failure,
 ) -> None:
     """A generic legacy API identity should not replace the AirPlay name."""
     legacy_device = KefDeviceInfo(
@@ -407,7 +411,7 @@ async def test_zeroconf_preserves_title_for_generic_legacy_identity(
         tcp_port=None,
     ):
         if host == "lsx.local":
-            raise KefUnsupportedDeviceError("legacy socket cannot resolve mDNS")
+            raise http_failure("no modern API on this legacy speaker")
         assert host == "192.0.2.11"
         assert password == ""
         return _FakeClient(legacy_device)
@@ -440,6 +444,7 @@ async def test_zeroconf_preserves_title_for_generic_legacy_identity(
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "confirm"
     assert result["description_placeholders"] == {"title": "Living Room LSX"}
+    assert CONF_PASSWORD not in result["data_schema"].schema
 
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -448,9 +453,13 @@ async def test_zeroconf_preserves_title_for_generic_legacy_identity(
     assert result["data"][CONF_DISCOVERY_ID] == "AA-BB-CC"
 
 
+@pytest.mark.parametrize(
+    "http_failure", [KefUnsupportedDeviceError, KefAuthenticationRequiredError]
+)
 async def test_zeroconf_confirm_retries_ipv4_after_legacy_speaker_wakes(
     monkeypatch,
     hass,
+    http_failure,
 ) -> None:
     """Confirmation can recover when the legacy socket was offline at discovery."""
     legacy_device = KefDeviceInfo(
@@ -465,7 +474,7 @@ async def test_zeroconf_confirm_retries_ipv4_after_legacy_speaker_wakes(
 
     async def fake_create_client(host, session, *, backend=None, **kwargs):
         if host == "lsx.local":
-            raise KefUnsupportedDeviceError("legacy socket cannot resolve mDNS")
+            raise http_failure("no modern API on this legacy speaker")
         assert host == "192.0.2.11"
         assert backend is KefBackend.LEGACY
         if not online:
@@ -515,6 +524,9 @@ async def test_zeroconf_confirm_accepts_web_password(monkeypatch, hass) -> None:
         password=None,
         tcp_port=None,
     ):
+        if backend is KefBackend.LEGACY:
+            assert host == "192.0.2.11"
+            raise KefConnectionError("no legacy endpoint on modern speaker")
         assert host == "lsxii.local"
         passwords.append(password)
         if password == "":
@@ -546,6 +558,7 @@ async def test_zeroconf_confirm_accepts_web_password(monkeypatch, hass) -> None:
         context={"source": config_entries.SOURCE_ZEROCONF},
         data=discovery_info,
     )
+    assert CONF_PASSWORD in result["data_schema"].schema
 
     assert result["type"] is FlowResultType.FORM
     assert result["description_placeholders"] == {"title": "Living Room LSX II"}

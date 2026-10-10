@@ -361,13 +361,13 @@ async def test_modern_refresh_parses_snapshot(monkeypatch, hass) -> None:
 
 
 async def test_autodetect_preserves_modern_auth_failures(monkeypatch, hass) -> None:
-    """Backend autodetection should not hide modern authentication failures."""
+    """An unsuccessful legacy probe must retain modern authentication failures."""
 
     async def fake_modern_identify(self):
         raise KefAuthenticationRequiredError("password required")
 
     async def fake_legacy_identify(self):
-        raise AssertionError("legacy probing should not run after auth failure")
+        raise KefConnectionError("no legacy endpoint")
 
     monkeypatch.setattr(ModernKefClient, "async_identify", fake_modern_identify)
     monkeypatch.setattr(LegacyBinaryClient, "async_identify", fake_legacy_identify)

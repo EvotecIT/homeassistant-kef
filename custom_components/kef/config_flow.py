@@ -82,6 +82,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         self._entry_title = "KEF"
         self._discovery_id: str | None = None
         self._discovery_ipv4_host: str | None = None
+        self._discovered_backend: KefBackend | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None,
@@ -283,13 +284,6 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 password=self._password,
             )
             device = await client.async_identify()
-        except KefAuthenticationRequiredError as err:
-            _LOGGER.debug(
-                "Could not resolve speaker identity for %s: %s",
-                self._host,
-                err,
-            )
-            device = None
         except KefError as err:
             _LOGGER.debug("Could not probe %s: %s", self._host, err)
             device = None
@@ -310,6 +304,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                     )
 
         if device is not None:
+            self._discovered_backend = device.backend
             if device.backend is KefBackend.LEGACY:
                 if legacy_host is None:
                     return self.async_abort(reason="unsupported")
@@ -393,7 +388,9 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="confirm",
             data_schema=vol.Schema(
-                {
+                {}
+                if self._discovered_backend is KefBackend.LEGACY
+                else {
                     vol.Optional(CONF_PASSWORD, default=self._password): str,
                 }
             ),
@@ -413,9 +410,6 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 password=self._password,
             )
             device = await client.async_identify()
-        except KefAuthenticationRequiredError:
-            self._errors["base"] = "invalid_auth"
-            return False
         except KefError as err:
             if self.source == SOURCE_ZEROCONF and self._discovery_ipv4_host:
                 try:
@@ -428,7 +422,9 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                     device = await client.async_identify()
                 except KefError as legacy_err:
                     self._errors["base"] = (
-                        "unsupported"
+                        "invalid_auth"
+                        if isinstance(err, KefAuthenticationRequiredError)
+                        else "unsupported"
                         if isinstance(legacy_err, KefUnsupportedDeviceError)
                         else "cannot_connect"
                     )
@@ -436,7 +432,9 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._host = self._discovery_ipv4_host
             else:
                 self._errors["base"] = (
-                    "unsupported"
+                    "invalid_auth"
+                    if isinstance(err, KefAuthenticationRequiredError)
+                    else "unsupported"
                     if isinstance(err, KefUnsupportedDeviceError)
                     else "cannot_connect"
                 )

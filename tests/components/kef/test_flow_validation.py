@@ -271,6 +271,7 @@ async def test_ipv6_only_rediscovery_preserves_legacy_ipv4_host(hass, monkeypatc
 @pytest.mark.parametrize(
     ("failure", "error"),
     [
+        (KefAuthenticationRequiredError, "invalid_auth"),
         (KefConnectionError, "cannot_connect"),
         (KefUnsupportedDeviceError, "unsupported"),
     ],
