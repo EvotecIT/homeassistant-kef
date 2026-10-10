@@ -3092,10 +3092,13 @@ async def async_create_client(
         password=password,
         async_add_executor_job=async_add_executor_job,
     )
+    modern_auth_error: KefAuthenticationRequiredError | None = None
     try:
         await modern_client.async_identify()
-    except KefAuthenticationRequiredError:
-        raise
+    except KefAuthenticationRequiredError as err:
+        # An older speaker's HTTP error page can look like a login page.
+        # Accept legacy only after a valid binary-protocol response.
+        modern_auth_error = err
     except KefError:
         pass
     else:
@@ -3105,6 +3108,8 @@ async def async_create_client(
     try:
         await legacy_client.async_identify()
     except KefError as err:
+        if modern_auth_error is not None:
+            raise modern_auth_error from err
         raise KefUnsupportedDeviceError(
             f"Unable to detect a supported KEF API on {host}"
         ) from err

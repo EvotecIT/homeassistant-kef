@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Add KEF speaker",
-        "description": "Enter the host or IP address of your KEF speaker.",
+        "description": "Enter the host or IP address of your KEF speaker. Leave the password blank for first-generation LSX and LS50 Wireless speakers. For newer speakers, enter the speaker's web interface password only if one is configured.",
         "data": {
           "host": "Host or IP address",
           "password": "Web UI password"
@@ -12,7 +12,10 @@
       },
       "confirm": {
         "title": "Set up {title}",
-        "description": "Do you want to set up {title}?"
+        "description": "Do you want to set up {title}? If a password field is shown, leave it blank unless the speaker has a web interface password configured.",
+        "data": {
+          "password": "Web UI password"
+        }
       },
       "reconfigure": {
         "title": "Reconfigure KEF",
