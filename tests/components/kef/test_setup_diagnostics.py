@@ -113,4 +113,3 @@ def test_recent_events_are_safe_bounded_and_coalesced() -> None:
         events.record("connection_recovered")
     assert len(events.as_list()) == 32
     assert "private" not in json.dumps(events.as_list())
-
