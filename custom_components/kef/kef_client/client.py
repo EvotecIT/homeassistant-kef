@@ -2988,13 +2988,15 @@ class LegacyBinaryClient(BaseKefClient):
         )
         channel = 1 if orientation == "R/L" else 0
         source_code = _INPUT_SOURCES[source][standby][channel]
-        if off and standby == 20:
+        if off and (current_standby == 20 or standby == 20):
             # Original speakers can crash their control server when powered
             # off with 20-minute standby. Switch to 60 while on, then turn off.
-            source_code = _INPUT_SOURCES[source][60][channel]
+            safe_source_code = _INPUT_SOURCES[source][60][channel]
             await self._send_command(
-                bytes([_LEGACY_SET_START, ord("0"), _LEGACY_SET_MID, source_code])
+                bytes([_LEGACY_SET_START, ord("0"), _LEGACY_SET_MID, safe_source_code])
             )
+            if standby == 20:
+                source_code = safe_source_code
         if off:
             source_code += 128
         await self._send_command(

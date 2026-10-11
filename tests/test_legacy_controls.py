@@ -38,7 +38,10 @@ async def test_mute_preserves_volume_and_uses_the_mute_bit(volume, muted, expect
      (98, "off", [226], {}), (66, "off", [82, 210], {}), (194, "off", [], {}),
      (98, "source", [75], {"standby_time": 20}),
      (98, "source", [91], {"standby_time": 60}),
-     (82, "source", [107], {"standby_time": None})],
+     (82, "source", [107], {"standby_time": None}),
+     (66, "off", [82, 210], {"standby_time": 60}),
+     (66, "off", [82, 226], {"standby_time": None}),
+     (98, "off", [82, 210], {"standby_time": 20})],
 )
 async def test_source_and_power_preserve_settings(
     current, action, expected_codes, options,
