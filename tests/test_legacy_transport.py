@@ -22,7 +22,12 @@ async def legacy_server(handler, *, command_length=4):
 
     async def connection(reader, writer):
         try:
-            received.append(await reader.readexactly(command_length))
+            if command_length is None:
+                start = await reader.readexactly(1)
+                command = start + await reader.readexactly(2 if start == b"G" else 3)
+            else:
+                command = await reader.readexactly(command_length)
+            received.append(command)
             await handler(reader, writer)
         finally:
             writer.close()

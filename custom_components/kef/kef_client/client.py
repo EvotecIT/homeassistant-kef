@@ -15,7 +15,7 @@ import socket
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Mapping
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlencode
 
 import aiohttp
@@ -2461,14 +2461,13 @@ class LegacyBinaryClient(BaseKefClient):
         *,
         port: int = DEFAULT_LEGACY_PORT,
         request_timeout: float = 2.0,
-        standby_time: int | None = 20,
+        standby_time: int | None | Literal["preserve"] = "preserve",
     ) -> None:
         """Initialize the legacy client."""
         super().__init__(host)
         self._port = port
         self._request_timeout = request_timeout
         self._standby_time = standby_time
-        self._last_active_source: str | None = None
 
     async def async_identify(self) -> KefDeviceInfo:
         """Probe the legacy speaker."""
@@ -2498,8 +2497,6 @@ class LegacyBinaryClient(BaseKefClient):
         is_on = source_response <= 128
         source_code = source_response % 128
         source = _INPUT_SOURCES_RESPONSE.get(source_code, ("Unknown", None, "L/R"))[0]
-        if source not in (None, "Unknown", STATE_OFF):
-            self._last_active_source = source
         is_muted = volume_response >= 128
         volume_raw = volume_response % 128
 
@@ -2573,20 +2570,11 @@ class LegacyBinaryClient(BaseKefClient):
 
     async def async_turn_on(self) -> None:
         """Turn on the speaker."""
-        snapshot = await self.async_refresh()
-        target_source = self._last_active_source
-        if target_source in (None, STATE_OFF, "Unknown"):
-            current_source = snapshot.source
-            target_source = (
-                current_source if current_source not in (None, "Unknown") else "Wifi"
-            )
-        await self.async_select_source(target_source)
+        await self._set_source(None)
 
     async def async_turn_off(self) -> None:
         """Turn off the speaker."""
-        snapshot = await self.async_refresh()
-        state = snapshot.source or "Wifi"
-        await self._set_source(state, off=True)
+        await self._set_source(None, off=True)
 
     async def async_set_volume_raw(self, volume: int) -> None:
         """Set the raw volume level."""
@@ -2613,15 +2601,15 @@ class LegacyBinaryClient(BaseKefClient):
 
     async def async_set_muted(self, muted: bool) -> None:
         """Set the muted state."""
-        snapshot = await self.async_refresh()
-        if muted:
-            await self.async_set_volume_raw(0)
-            return
-
-        target_volume = snapshot.volume_raw or 15
-        if target_volume == 0:
-            target_volume = 15
-        await self.async_set_volume_raw(target_volume)
+        volume = await self._send_command(
+            bytes([_LEGACY_GET_START, ord("%"), _LEGACY_GET_END])
+        )
+        if volume % 128 > 100:
+            raise KefResponseError(f"Invalid legacy volume: {volume}")
+        volume = volume % 128 + (128 if muted else 0)
+        await self._send_command(
+            bytes([_LEGACY_SET_START, ord("%"), _LEGACY_SET_MID, volume])
+        )
 
     async def async_next_track(self) -> None:
         """Skip to the next track."""
@@ -2637,8 +2625,6 @@ class LegacyBinaryClient(BaseKefClient):
 
     async def async_select_source(self, source: str) -> None:
         """Select the active source."""
-        if source not in (None, STATE_OFF):
-            self._last_active_source = source
         await self._set_source(source)
 
     async def async_set_standby_mode(self, mode: str) -> None:
@@ -2983,11 +2969,34 @@ class LegacyBinaryClient(BaseKefClient):
             "Firmware updates are not supported for legacy KEF"
         )
 
-    async def _set_source(self, source: str, *, off: bool = False) -> None:
-        """Set the current source."""
-        if source not in _INPUT_SOURCES:
+    async def _set_source(self, source: str | None, *, off: bool = False) -> None:
+        """Set source/power without overwriting channel or standby settings."""
+        if source is not None and source not in _INPUT_SOURCES:
             raise KefUnsupportedDeviceError(f"Unsupported legacy source: {source}")
-        source_code = _INPUT_SOURCES[source][self._standby_time][0] % 128
+        current = await self._send_command(
+            bytes([_LEGACY_GET_START, ord("0"), _LEGACY_GET_END])
+        )
+        settings = _INPUT_SOURCES_RESPONSE.get(current % 128)
+        if settings is None:
+            raise KefResponseError(f"Unknown legacy source settings: {current}")
+        if off and current >= 128:
+            return
+        current_source, current_standby, orientation = settings
+        source = source or current_source
+        standby = (
+            current_standby if self._standby_time == "preserve" else self._standby_time
+        )
+        channel = 1 if orientation == "R/L" else 0
+        source_code = _INPUT_SOURCES[source][standby][channel]
+        if off and (current_standby == 20 or standby == 20):
+            # Original speakers can crash their control server when powered
+            # off with 20-minute standby. Switch to 60 while on, then turn off.
+            safe_source_code = _INPUT_SOURCES[source][60][channel]
+            await self._send_command(
+                bytes([_LEGACY_SET_START, ord("0"), _LEGACY_SET_MID, safe_source_code])
+            )
+            if standby == 20:
+                source_code = safe_source_code
         if off:
             source_code += 128
         await self._send_command(
