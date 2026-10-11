@@ -2996,19 +2996,23 @@ class LegacyBinaryClient(BaseKefClient):
 
     async def _send_command(self, payload: bytes) -> int:
         """Send a command over the legacy binary socket."""
+        _LOGGER.debug("Legacy KEF connecting to %s:%s", self._host, self._port)
         try:
             reader, writer = await asyncio.wait_for(
                 asyncio.open_connection(self._host, self._port, family=socket.AF_INET),
                 timeout=self._request_timeout,
             )
         except OSError as err:
+            _LOGGER.debug("Legacy KEF connection failed: %s", err)
             raise KefConnectionError(str(err)) from err
 
         try:
+            _LOGGER.debug("Legacy KEF sending %s", payload.hex())
             writer.write(payload)
             async with asyncio.timeout(self._request_timeout):
                 await writer.drain()
                 raw_reply = await reader.read(100)
+                _LOGGER.debug("Legacy KEF received %s", raw_reply.hex())
                 # TCP may deliver GET replies and SET acknowledgements over
                 # several reads. Keep one deadline and the existing 100-byte
                 # response bound without resending a command.
@@ -3018,10 +3022,12 @@ class LegacyBinaryClient(BaseKefClient):
                         break
                     except KefResponseError:
                         chunk = await reader.read(100 - len(raw_reply))
+                        _LOGGER.debug("Legacy KEF received %s", chunk.hex())
                         if not chunk:
                             break
                         raw_reply += chunk
         except (OSError, TimeoutError) as err:
+            _LOGGER.debug("Legacy KEF command failed: %s", err)
             raise KefConnectionError(str(err)) from err
         finally:
             writer.close()
@@ -3036,23 +3042,38 @@ class LegacyBinaryClient(BaseKefClient):
     @staticmethod
     def _parse_response(message: bytes, reply: bytes) -> bytes:
         """Extract the matching response packet."""
-        if message[0] == _LEGACY_GET_START:
-            # GET packets contain a header, query type, value and trailing byte.
-            # The value can itself equal 'R', so it is not a packet delimiter.
-            # Keep the existing acceptance of the trailing byte's value.
-            header = bytes([ord("R"), message[1]])
-            for offset in range(0, len(reply) - 3, 4):
-                packet = reply[offset:offset + 4]
-                if packet[:2] == header:
+        if message[0] not in (_LEGACY_GET_START, _LEGACY_SET_START):
+            raise KefResponseError("Legacy KEF returned an unknown response")
+
+        # Original LSX/LS50W replies are R, query, 0x81, value, trailer.
+        # SET acknowledgements are R, 0x11, 0xff. Walk packet boundaries:
+        # values and trailers can themselves equal 'R' or a query byte.
+        offset = 0
+        while offset < len(reply):
+            remaining = reply[offset:]
+            if len(remaining) < 2 or remaining[0] != ord("R"):
+                raise KefResponseError("Legacy KEF returned an incomplete response")
+            is_ack = remaining[1] == _LEGACY_RESPONSE_OK
+            size = 3 if is_ack else 5
+            if len(remaining) < size:
+                raise KefResponseError("Legacy KEF returned an incomplete response")
+            packet = remaining[:size]
+            if is_ack:
+                if packet != bytes([82, _LEGACY_RESPONSE_OK, 255]):
+                    raise KefResponseError(
+                        "Legacy KEF returned an invalid acknowledgement"
+                    )
+                if message[0] == _LEGACY_SET_START:
                     return packet
-            raise KefResponseError("Legacy KEF query type did not match the response")
-        if message[0] == _LEGACY_SET_START:
-            responses = [b"R" + chunk for chunk in reply.split(b"R") if chunk]
-            ok = bytes([82, 17, 255])
-            if ok in responses:
-                return ok
-            raise KefResponseError("Legacy KEF did not acknowledge the command")
-        raise KefResponseError("Legacy KEF returned an unknown response")
+            else:
+                if packet[2] != _LEGACY_SET_MID:
+                    raise KefResponseError(
+                        "Legacy KEF returned an invalid response marker"
+                    )
+                if message[0] == _LEGACY_GET_START and packet[1] == message[1]:
+                    return packet
+            offset += size
+        raise KefResponseError("Legacy KEF did not return the requested response")
 
 
 async def async_create_client(

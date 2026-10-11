@@ -165,12 +165,12 @@ async def test_missing_reply_is_bounded_by_response_size(operation):
 
 @pytest.mark.parametrize(
     ("wire_volume", "split", "trailer"),
-    [(42, 1, 255), (42, 2, 255), (42, 3, 255), (82, 4, 255),
-     (170, 4, 255), (42, 4, 128)],
+    [(42, 1, 255), (42, 2, 255), (42, 3, 255), (42, 4, 255),
+     (82, 5, 255), (170, 5, 255), (42, 5, 128)],
 )
 async def test_get_volume_waits_for_a_complete_packet(wire_volume, split, trailer):
     async def handler(reader, writer):
-        reply = bytes([82, 37, wire_volume, trailer])
+        reply = bytes([82, 37, 129, wire_volume, trailer])
         writer.write(reply[:split])
         await writer.drain()
         if split < len(reply):
@@ -192,7 +192,42 @@ async def test_get_volume_waits_for_a_complete_packet(wire_volume, split, traile
 
 
 @pytest.mark.parametrize(
-    "reply", [b"", b"R", b"R%", b"R%*", b"R0*\xff", b"R0R%R\xff*\xff"]
+    ("source", "volume", "status", "source_name", "muted"),
+    [(34, 60, "powerOn", "Wifi", False), (218, 60, "standby", "Aux", False),
+     (218, 170, "standby", "Aux", True)],
+)
+async def test_refresh_reads_original_speaker_reply_layout(
+    source, volume, status, source_name, muted,
+):
+    """Read source, mute, and playback from five-byte legacy replies."""
+    # aiokef issue #15 records R0 81 da 9a and R% 81 3c 44 on an LSX.
+    replies = {
+        ord("0"): bytes([82, 48, 129, source, 154]),
+        ord("%"): bytes([82, 37, 129, volume, 68]),
+        ord("1"): bytes([82, 49, 129, 129, 255]),
+    }
+
+    async def handler(reader, writer):
+        query = received[-1][1]
+        writer.write(replies[query])
+        await writer.drain()
+        assert await reader.read() == b""
+
+    async with legacy_server(handler, command_length=3) as (
+        port, received, disconnected
+    ):
+        snapshot = await LegacyBinaryClient("127.0.0.1", port=port).async_refresh()
+        assert snapshot.speaker_status == status
+        assert snapshot.source == source_name
+        assert snapshot.volume_raw == volume % 128
+        assert snapshot.is_muted is muted
+        assert snapshot.playback.state == "playing"
+        assert received == [b"G0\x80", b"G0\x80", b"G%\x80", b"G1\x80"]
+
+
+@pytest.mark.parametrize(
+    "reply", [b"", b"R", b"R%", b"R%\x81", b"R%\x81*", b"R0\x81*\xff",
+              b"R%\x80*\xff", b"R0\x81R%R\xff*\xff"]
 )
 async def test_get_volume_rejects_incomplete_or_unrelated_packets(reply):
     async def handler(reader, writer):
@@ -211,8 +246,10 @@ async def test_get_volume_rejects_incomplete_or_unrelated_packets(reply):
 
 @pytest.mark.parametrize(
     ("reply", "volume"),
-    [(bytes([82, 48, 82, 255, 82, 37, 82, 255]), 82),
-     (bytes([82, 48, 82, 37, 82, 37, 42, 255]), 42)],
+    [(bytes([82, 48, 129, 82, 255, 82, 37, 129, 82, 255]), 82),
+     (bytes([82, 48, 129, 82, 37, 82, 37, 129, 42, 255]), 42),
+     (bytes([82, 17, 255, 82, 48, 129, 82, 255,
+             82, 37, 129, 42, 255]), 42)],
 )
 async def test_get_volume_selects_matching_packet_from_combined_reply(reply, volume):
     async def handler(reader, writer):

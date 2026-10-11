@@ -140,6 +140,25 @@ For an issue, reproduce once and download integration diagnostics. Include the
 model, firmware, integration version, and the failed action. Review the file and
 any logs before sharing them; never post the speaker password.
 
+If setup fails before an integration entry exists, enable debug logging in
+`configuration.yaml`. Add this logger to an existing `logger.logs` mapping if
+you already have one:
+
+```yaml
+logger:
+  logs:
+    custom_components.kef: debug
+```
+
+Restart Home Assistant, retry setup once, then open **Settings → System → Logs**
+and download the full log. Share the KEF messages around the failed attempt
+after removing personal information. Legacy messages include the TCP endpoint
+and binary command/reply bytes, which help distinguish an unreachable port
+from a response parsing failure. Remove the debug setting after collecting the
+log. If an entry already exists, its menu under **Settings → Devices & services
+→ KEF** offers **Enable debug logging**; disabling it after reproduction prompts
+you to download the log.
+
 ## Remove the integration
 
 1. Disable or update automations and dashboard cards that reference the speaker.
