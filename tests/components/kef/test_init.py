@@ -10,6 +10,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef import PLATFORMS, async_unload_entry
 from custom_components.kef.const import DOMAIN
+from custom_components.kef.diagnostics import async_get_config_entry_diagnostics
 
 
 @pytest.mark.parametrize("unload_succeeds", [True, False])
@@ -205,7 +206,10 @@ async def test_failed_startup_has_no_entities_and_recovers(
                 and flow["context"].get("entry_id") == entry.entry_id
                 for flow in hass.config_entries.flow.async_progress()
             )
-        assert not hasattr(entry, "runtime_data")
+        assert entry.runtime_data.data is None
+        report = await async_get_config_entry_diagnostics(hass, entry)
+        assert report["health"]["last_update_success"] is False
+        assert report["recent_events"][0]["errors"][0]["type"] == type(failure).__name__
         assert not er.async_entries_for_config_entry(
             er.async_get(hass), entry.entry_id
         )

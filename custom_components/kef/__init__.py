@@ -65,8 +65,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: KefConfigEntry) -> bool:
 
     entry.async_on_unload(entry.add_update_listener(async_reload_changed_settings))
     coordinator = KefCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+    await coordinator.async_config_entry_first_refresh()
     await _async_cleanup_optional_entities(hass, entry, coordinator)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await coordinator.async_start_event_listener()

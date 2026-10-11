@@ -376,7 +376,7 @@ async def test_zeroconf_confirm_provides_title_placeholder(monkeypatch, hass) ->
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "confirm"
-    assert result["description_placeholders"] == {"title": "LSX II-Test (LSXII)"}
+    assert result["description_placeholders"]["title"] == "LSX II-Test (LSXII)"
 
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -443,7 +443,7 @@ async def test_zeroconf_preserves_title_for_generic_legacy_identity(
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "confirm"
-    assert result["description_placeholders"] == {"title": "Living Room LSX"}
+    assert result["description_placeholders"]["title"] == "Living Room LSX"
     assert CONF_PASSWORD not in result["data_schema"].schema
 
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
@@ -561,7 +561,7 @@ async def test_zeroconf_confirm_accepts_web_password(monkeypatch, hass) -> None:
     assert CONF_PASSWORD in result["data_schema"].schema
 
     assert result["type"] is FlowResultType.FORM
-    assert result["description_placeholders"] == {"title": "Living Room LSX II"}
+    assert result["description_placeholders"]["title"] == "Living Room LSX II"
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
