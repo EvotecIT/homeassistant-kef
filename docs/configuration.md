@@ -136,28 +136,31 @@ do not run firmware installation as a routine unattended automation.
   modern speaker with that hostname. The integration retries without requiring
   the speaker to be removed.
 
-For an issue, reproduce once and download integration diagnostics. Include the
-model, firmware, integration version, and the failed action. Review the file and
-any logs before sharing them; never post the speaker password.
+Reproduce the problem once, then collect diagnostics before reloading or
+restarting Home Assistant:
 
-If setup fails before an integration entry exists, enable debug logging in
-`configuration.yaml`. Add this logger to an existing `logger.logs` mapping if
-you already have one:
+1. If setup fails, choose **Download setup diagnostics** on the failed setup
+   form. The download works before a speaker entry exists. The link expires
+   after 15 minutes; retry setup to get a new one.
+2. For an existing speaker, open **Settings → Devices & services → KEF**, open
+   the integration entry's menu, and choose **Download diagnostics**.
+3. Attach the JSON file to your issue with the speaker model, firmware, and the
+   action that failed.
 
-```yaml
-logger:
-  logs:
-    custom_components.kef: debug
-```
+Diagnostics collect recent failure types and recovery events automatically.
+They include version and connection-health details without passwords, speaker
+addresses, private media details, or raw response bodies. Repeated failures are
+combined with a count and timestamps, and history is limited to the latest 32
+events. History is kept in memory and resets when the entry reloads or Home
+Assistant restarts. Setup reports expire after 15 minutes and only the latest
+20 reports are retained. Review any file before sharing it.
 
-Restart Home Assistant, retry setup once, then open **Settings → System → Logs**
-and download the full log. Share the KEF messages around the failed attempt
-after removing personal information. Legacy messages include the TCP endpoint
-and binary command/reply bytes, which help distinguish an unreachable port
-from a response parsing failure. Remove the debug setting after collecting the
-log. If an entry already exists, its menu under **Settings → Devices & services
-→ KEF** offers **Enable debug logging**; disabling it after reproduction prompts
-you to download the log.
+For detailed logs on an existing entry, use **Enable debug logging** in that
+same menu, reproduce the problem once, then choose **Disable debug logging**.
+Home Assistant offers the log download. This does not require YAML edits or a
+restart. Debug logs can include addresses and protocol data; remove personal
+information before sharing them. The **Expose diagnostic sensors** option
+controls extra entities and is not required for either download.
 
 ## Remove the integration
 

@@ -1,13 +1,13 @@
 """Privacy and useful-state contracts for downloadable KEF diagnostics."""
 
 from dataclasses import replace
-from types import SimpleNamespace
 
 import pytest
 from homeassistant.components.diagnostics import REDACTED
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef.const import DOMAIN
+from custom_components.kef.coordinator import KefCoordinator
 from custom_components.kef.diagnostics import async_get_config_entry_diagnostics
 from tests.conftest import TEST_SNAPSHOT
 
@@ -43,7 +43,8 @@ async def test_diagnostics_hide_identity_and_preserve_operating_state(
         wifi_info=TEST_SNAPSHOT.wifi_info if with_optional_state else None,
         speaker_location="Private address",
     )
-    entry.runtime_data = SimpleNamespace(data=snapshot)
+    entry.runtime_data = KefCoordinator(hass, entry)
+    entry.runtime_data.data = snapshot
 
     result = await async_get_config_entry_diagnostics(hass, entry)
 
@@ -68,3 +69,15 @@ async def test_diagnostics_hide_identity_and_preserve_operating_state(
         assert result["eq_profile"] is None
     assert entry.data["password"] == "private-password"
     assert snapshot.device.unique_id == "kef-private-id"
+
+
+async def test_diagnostics_for_unloaded_entry(hass):
+    """An unloaded entry still provides a useful report without a snapshot."""
+    entry = MockConfigEntry(domain=DOMAIN, data={"host": "192.0.2.42"})
+    entry.add_to_hass(hass)
+    result = await async_get_config_entry_diagnostics(hass, entry)
+    assert result["entry"]["host"] == REDACTED
+    assert result["entry_state"] == entry.state.value
+    assert "device" not in result
+    assert result["health"]["last_update_success"] is None
+    assert result["recent_events"] == []

@@ -6,6 +6,7 @@ import asyncio
 import ipaddress
 import logging
 import socket
+import time
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
@@ -55,6 +56,7 @@ from .exceptions import (
     KefUnsupportedDeviceError,
 )
 from .models import KefBackend
+from .setup_diagnostics import async_create_setup_report
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,6 +85,16 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
         self._discovery_id: str | None = None
         self._discovery_ipv4_host: str | None = None
         self._discovered_backend: KefBackend | None = None
+        self._diagnostics_url = ""
+
+    def _diagnostic_placeholders(self) -> dict[str, str]:
+        """Offer a download only after a failed validation attempt."""
+        text = (
+            f"\n\n[Download setup diagnostics]({self._diagnostics_url}) "
+            "to include with a support request. The link expires after 15 minutes."
+            if self._diagnostics_url else ""
+        )
+        return {"diagnostics": text}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None,
@@ -113,6 +125,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=self._errors,
+            description_placeholders=self._diagnostic_placeholders(),
         )
 
     async def async_step_reconfigure(
@@ -146,6 +159,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=self._errors,
+            description_placeholders=self._diagnostic_placeholders(),
         )
 
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
@@ -181,7 +195,9 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=self._errors,
-            description_placeholders={"title": self._title},
+            description_placeholders={
+                "title": self._title, **self._diagnostic_placeholders(),
+            },
             last_step=True,
         )
 
@@ -395,13 +411,18 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=self._errors,
-            description_placeholders={"title": self._title},
+            description_placeholders={
+                "title": self._title, **self._diagnostic_placeholders(),
+            },
             last_step=True,
         )
 
     async def _async_validate_host(self) -> bool:
         """Validate a host and create entry data."""
         session = async_get_clientsession(self.hass)
+
+        started = time.monotonic()
+        self._diagnostics_url = ""
 
         try:
             client = await async_create_client(
@@ -434,6 +455,10 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                         if isinstance(legacy_err, KefUnsupportedDeviceError)
                         else "cannot_connect"
                     )
+                    self._diagnostics_url = await async_create_setup_report(
+                        self.hass, source=self.source, errors=[err, legacy_err],
+                        elapsed=time.monotonic() - started,
+                    )
                     return False
                 self._host = self._discovery_ipv4_host
             else:
@@ -443,6 +468,10 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                     else "unsupported"
                     if isinstance(err, KefUnsupportedDeviceError)
                     else "cannot_connect"
+                )
+                self._diagnostics_url = await async_create_setup_report(
+                    self.hass, source=self.source, errors=[err],
+                    elapsed=time.monotonic() - started,
                 )
                 return False
 

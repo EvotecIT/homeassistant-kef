@@ -441,6 +441,10 @@ async def test_recovery_restores_the_normal_polling_interval(hass) -> None:
     await coordinator._async_update_data()
 
     assert not coordinator.is_offline
+    events = coordinator.diagnostic_events.as_list()
+    assert events[0]["operation"] == "refresh"
+    assert events[0]["count"] == 3
+    assert events[-1]["operation"] == "connection_recovered"
     assert coordinator.update_interval == timedelta(
         seconds=DEFAULT_SCAN_INTERVAL_SECONDS
     )

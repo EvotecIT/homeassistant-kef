@@ -8,7 +8,8 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from .coordinator import KefConfigEntry
+from .coordinator import KefConfigEntry, KefCoordinator
+from .diagnostic_events import describe_error
 
 TO_REDACT = {
     "album",
@@ -41,10 +42,29 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: KefConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    snapshot = entry.runtime_data.data
+    coordinator: KefCoordinator | None = getattr(entry, "runtime_data", None)
+    snapshot = coordinator.data if coordinator is not None else None
+    last_error = coordinator.last_exception if coordinator else None
+    last_update = coordinator.last_device_update_at if coordinator else None
+    interval = coordinator.update_interval if coordinator else None
     data = {
         "entry": dict(entry.data),
         "options": dict(entry.options),
+        "entry_state": entry.state.value,
+        "health": {
+            "last_update_success": coordinator.last_update_success
+            if coordinator else None,
+            "last_error": describe_error(last_error) if last_error is not None else [],
+            "offline": coordinator.is_offline if coordinator else None,
+            "last_device_update": last_update.isoformat() if last_update else None,
+            "poll_interval_seconds": interval.total_seconds() if interval else None,
+        },
+        "recent_events": coordinator.diagnostic_events.as_list()
+        if coordinator else [],
+    }
+    if snapshot is None:
+        return async_redact_data(data, TO_REDACT)
+    data.update({
         "device": asdict(snapshot.device),
         "speaker_status": snapshot.speaker_status,
         "source": snapshot.source,
@@ -98,5 +118,5 @@ async def async_get_config_entry_diagnostics(
         "alert_timer_count": snapshot.alert_timer_count,
         "alert_snooze_minutes": snapshot.alert_snooze_minutes,
         "player_notification_active": snapshot.player_notification_active,
-    }
+    })
     return async_redact_data(data, TO_REDACT)

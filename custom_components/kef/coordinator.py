@@ -27,6 +27,7 @@ from .const import (
     DEFAULT_OFFLINE_RETRY_INTERVAL_SECONDS,
     DEFAULT_SCAN_INTERVAL_SECONDS,
 )
+from .diagnostic_events import DiagnosticEvents
 from .exceptions import KefAuthenticationRequiredError, KefError
 from .models import KefBackend, KefSnapshot
 
@@ -63,6 +64,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
             )
         )
         self._consecutive_failures = 0
+        self.diagnostic_events = DiagnosticEvents()
         self._online = asyncio.Event()
         self._online.set()
         super().__init__(
@@ -97,8 +99,10 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
             started_at = time.monotonic()
             snapshot = await self.client.async_refresh()
         except KefAuthenticationRequiredError as err:
+            self.diagnostic_events.record("refresh", err)
             raise ConfigEntryAuthFailed(str(err)) from err
         except KefError as err:
+            self.diagnostic_events.record("refresh", err)
             return self._handle_refresh_failure(err)
         self._handle_refresh_success()
         if snapshot.device.backend is KefBackend.LEGACY:
@@ -138,6 +142,8 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
 
     def _handle_refresh_success(self) -> None:
         """Return to normal polling once the speaker answers again."""
+        if self._consecutive_failures:
+            self.diagnostic_events.record("connection_recovered")
         self._consecutive_failures = 0
         if not self._online.is_set():
             self._online.set()
@@ -248,6 +254,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
             except asyncio.CancelledError:
                 raise
             except KefError as err:
+                self.diagnostic_events.record("event_listener", err)
                 _LOGGER.debug(
                     "KEF event queue unavailable, falling back to polling: %s",
                     err,

@@ -43,6 +43,7 @@ class KefEntity:
         try:
             return await action()
         except KefAuthenticationRequiredError as err:
+            self.coordinator.diagnostic_events.record("command", err)
             self.coordinator.config_entry.async_start_reauth(self.coordinator.hass)
             raise HomeAssistantError(
                 AUTH_FAILURE_MESSAGE,
@@ -50,6 +51,7 @@ class KefEntity:
                 translation_key="authentication_required",
             ) from err
         except KefError as err:
+            self.coordinator.diagnostic_events.record("command", err)
             raise HomeAssistantError(
                 str(err), translation_domain=DOMAIN,
                 translation_key="command_failed",
