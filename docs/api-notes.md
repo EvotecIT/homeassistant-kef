@@ -38,6 +38,15 @@ and [kefctl](https://github.com/kraih/kefctl). The
 includes captured five-byte source and volume replies. These are protocol
 references; they do not replace testing each speaker and firmware combination.
 
+Legacy mute sets the high bit of the current volume; unmute clears it without
+changing that volume, including when it is zero. Source and power commands read
+the current source settings first and preserve the channel orientation and
+standby setting. Before powering off a speaker using 20-minute standby, the
+client selects 60-minute standby while the speaker is on, then powers it off.
+This follows the original `kefctl` workaround for a legacy control-server crash.
+A speaker already in standby is left there without being woken for that
+sequence. The workaround's effect on each firmware still needs device testing.
+
 ## Discovery
 
 Modern speakers advertise `_airplay._tcp`, `_raop._tcp`, `_http._tcp`, and
