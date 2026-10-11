@@ -1,7 +1,7 @@
 {
   "domain": "kef",
   "name": "KEF",
-  "after_dependencies": ["zeroconf"],
+  "after_dependencies": ["http", "zeroconf"],
   "codeowners": ["@EvotecIT", "@PrzemyslawKlys"],
   "config_flow": true,
   "documentation": "https://github.com/EvotecIT/homeassistant-kef",
