@@ -21,6 +21,12 @@ First-generation LSX and LS50 Wireless speakers use the passwordless legacy
 protocol. Leave the password blank when adding one manually. When discovery
 identifies a legacy speaker, its confirmation form has no password field.
 
+Legacy mute preserves the volume level. Source and power controls preserve the
+speaker's channel orientation and standby setting. Power-off follows the
+original legacy client's workaround: an active speaker using 20-minute standby
+is switched to 60 minutes before being turned off. An already-off speaker is
+left off.
+
 If the speaker's web UI is password-protected, enter that password during setup.
 This is the speaker web-interface password, not a request to put your credentials
 into YAML. Firmware updates that enable authentication can trigger a Home

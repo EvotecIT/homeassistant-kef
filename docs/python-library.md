@@ -101,6 +101,12 @@ For modern devices, `async_refresh()` includes source, power state, volume, mute
 
 - Use `ModernKefClient` when you know the device is from the newer HTTP-based family.
 - Use `LegacyBinaryClient` for first-generation speakers that still expose the older binary port.
+  It preserves the speaker's channel orientation and standby setting when
+  changing source or power. Standalone callers can pass `standby_time=20`,
+  `standby_time=60`, or `standby_time=None` to choose a standby setting explicitly;
+  the default `standby_time="preserve"` keeps the current setting. Power-off
+  changes 20-minute standby to 60 minutes before turning the speaker off to
+  avoid a control-server failure described by the original legacy client.
 - Use `async_create_client(...)` when you want the library to probe and choose for you.
 
 ## Error Handling
