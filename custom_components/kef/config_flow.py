@@ -7,6 +7,7 @@ import ipaddress
 import logging
 import socket
 import time
+from html import escape
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
@@ -90,7 +91,9 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
     def _diagnostic_placeholders(self) -> dict[str, str]:
         """Offer a download only after a failed validation attempt."""
         text = (
-            f"\n\n[Download setup diagnostics]({self._diagnostics_url}) "
+            '\n\n<a target="_blank" '
+            f'href="{escape(self._diagnostics_url, quote=True)}">'
+            "Download setup diagnostics</a> "
             "to include with a support request. The link expires after 15 minutes."
             if self._diagnostics_url else ""
         )

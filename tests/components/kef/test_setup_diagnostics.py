@@ -1,6 +1,7 @@
 """Downloads must help failed setup without exposing private connection data."""
 
 import json
+from html.parser import HTMLParser
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.setup import async_setup_component
@@ -9,6 +10,16 @@ from pytest_homeassistant_custom_component.plugins import aiohttp_client  # noqa
 from custom_components.kef.diagnostic_events import DiagnosticEvents
 from custom_components.kef.exceptions import KefConnectionError
 from custom_components.kef.setup_diagnostics import async_create_setup_report
+
+
+class _Links(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.anchors = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            self.anchors.append(dict(attrs))
 
 
 async def test_failed_setup_download(hass, hass_client, hass_client_no_auth) -> None:
@@ -36,7 +47,12 @@ async def test_failed_setup_download(hass, hass_client, hass_client_no_auth) -> 
     form = await response.json()
     assert form["errors"] == {"base": "cannot_connect"}
     description = form["description_placeholders"]["diagnostics"]
-    link = description.split("](", 1)[1].split(")", 1)[0]
+    links = _Links()
+    links.feed(description)
+    assert len(links.anchors) == 1
+    # HA routes same-window links as frontend pages instead of HTTP downloads.
+    assert links.anchors[0]["target"] == "_blank"
+    link = links.anchors[0]["href"]
     # A normal browser download has no bearer header; the signed URL must work.
     browser = await hass_client_no_auth()
     download = await browser.get(link)
