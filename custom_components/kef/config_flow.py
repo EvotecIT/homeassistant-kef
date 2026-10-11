@@ -411,6 +411,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             device = await client.async_identify()
         except KefError as err:
+            _LOGGER.debug("KEF setup validation failed for %s: %s", self._host, err)
             if self.source == SOURCE_ZEROCONF and self._discovery_ipv4_host:
                 try:
                     client = await async_create_client(
@@ -421,6 +422,11 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
                     )
                     device = await client.async_identify()
                 except KefError as legacy_err:
+                    _LOGGER.debug(
+                        "Legacy KEF setup validation failed for %s: %s",
+                        self._discovery_ipv4_host,
+                        legacy_err,
+                    )
                     self._errors["base"] = (
                         "invalid_auth"
                         if isinstance(err, KefAuthenticationRequiredError)

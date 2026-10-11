@@ -23,6 +23,21 @@ speakers. Modern speakers refuse that transport and instead expose the HTTP API
 used by their built-in web interface. Keep the two backends distinct; do not
 assume settings or playback commands behave identically across them.
 
+Legacy GET commands contain three bytes: `G`, the query byte, and `0x80`.
+Replies contain five bytes: `R`, the query byte, `0x81`, the value, and a
+trailing byte. SET acknowledgements contain three bytes: `R`, `0x11`, `0xff`.
+The parser walks those packet lengths and waits for a complete reply, including
+when TCP splits a packet or combines several replies. A value of `0x52` (`R`)
+is data, so splitting the stream at every `R` corrupts valid values such as
+volume 82.
+
+This layout agrees with the original
+[aiokef client](https://github.com/basnijholt/aiokef/blob/ca32b95d5214f40a88833e4da9e4ef2932cd63c7/aiokef/aiokef.py)
+and [kefctl](https://github.com/kraih/kefctl). The
+[original LSX connection report](https://github.com/basnijholt/aiokef/issues/15)
+includes captured five-byte source and volume replies. These are protocol
+references; they do not replace testing each speaker and firmware combination.
+
 ## Discovery
 
 Modern speakers advertise `_airplay._tcp`, `_raop._tcp`, `_http._tcp`, and

@@ -18,7 +18,7 @@ async def test_http_error_page_does_not_hide_working_legacy_speaker(status):
         return web.Response(status=status, text="<html>Not found</html>")
 
     async def tcp(reader, writer):
-        writer.write(b"R0\x01\x80")
+        writer.write(b"R0\x81\x22\x9a")
         await writer.drain()
         assert await reader.read() == b""
 
