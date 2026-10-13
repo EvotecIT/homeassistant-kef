@@ -13,7 +13,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.kef.const import CONF_BACKEND, DOMAIN
 from custom_components.kef.coordinator import KefCoordinator
 from custom_components.kef.kef_client.client import ModernKefClient
-from tests.conftest import TEST_HOST, TEST_SNAPSHOT
+from custom_components.kef.models import KefEqProfile
+from tests.conftest import EQ_PROFILE_V2_VALUE, TEST_HOST, TEST_SNAPSHOT
 from tests.test_http_session import local_server
 
 pytestmark = pytest.mark.usefixtures("socket_enabled")
@@ -65,6 +66,24 @@ pytestmark = pytest.mark.usefixtures("socket_enabled")
             "select", "streaming_quality", "256 kbps",
             "settings:/airable/bitrate", "airableStreamBitrate", "256",
         ),
+        (
+            "number", "default_volume_global", 37,
+            "settings:/kef/host/defaultVolumeGlobal", "i32_", 37,
+        ),
+        (
+            "number", "maximum_volume", 80,
+            "settings:/kef/host/maximumVolume", "i32_", 80,
+        ),
+        (
+            "number", "volume_step", 4,
+            "settings:/kef/host/volumeStep", "i16_", 4,
+        ),
+        ("switch", "startup_tone", False,
+         "settings:/kef/host/startupTone", "bool_", False),
+        ("switch", "front_led", True,
+         "settings:/kef/host/disableFrontLED", "bool_", False),
+        ("switch", "standby_led", False,
+         "settings:/kef/host/disableFrontStandbyLED", "bool_", True),
         *[
             ("switch", key, enabled, path, "bool_", not enabled)
             for key, path in (
@@ -94,6 +113,12 @@ async def test_configuration_service_preserves_wire_value_and_state(
     entry.add_to_hass(hass)
 
     snapshot = TEST_SNAPSHOT
+    if key == "front_led":
+        snapshot = replace(
+            snapshot,
+            device=replace(snapshot.device, model="LS50W2", model_code="LS50W2"),
+            eq_profile=KefEqProfile.from_modern_value(EQ_PROFILE_V2_VALUE),
+        )
     if domain == "switch":
         snapshot = replace(snapshot, **{f"{key}_enabled": not value})
 
@@ -134,8 +159,8 @@ async def test_configuration_service_preserves_wire_value_and_state(
             if domain == "switch":
                 service = "turn_on" if value else "turn_off"
             else:
-                service = "set_value" if domain == "text" else "select_option"
-                data["value" if domain == "text" else "option"] = value
+                service = "select_option" if domain == "select" else "set_value"
+                data["option" if domain == "select" else "value"] = value
             action = hass.services.async_call(domain, service, data, blocking=True)
             if status == 200:
                 await action
@@ -161,7 +186,10 @@ async def test_configuration_service_preserves_wire_value_and_state(
                     expected_state = value
                 elif domain == "switch":
                     expected_state = "on" if value else "off"
-            assert hass.states.get(entity_id).state == expected_state
+            if domain == "number" and status == 200:
+                assert float(hass.states.get(entity_id).state) == normalized
+            else:
+                assert hass.states.get(entity_id).state == expected_state
             assert not session.closed
     finally:
         assert await hass.config_entries.async_unload(entry.entry_id)
