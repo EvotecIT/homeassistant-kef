@@ -20,6 +20,7 @@ from .const import (
     model_supports_feature,
 )
 from .coordinator import KefConfigEntry, KefCoordinator
+from .diagnostic_events import remove_entry_history
 from .exceptions import KefAuthenticationRequiredError, KefError
 
 PLATFORMS = [
@@ -152,6 +153,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: KefConfigEntry) -> bool
 async def async_reload_entry(hass: HomeAssistant, entry: KefConfigEntry) -> None:
     """Reload the config entry when options change."""
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: KefConfigEntry) -> None:
+    """Discard session diagnostics when the entry is deleted."""
+    remove_entry_history(hass, entry.entry_id)
 
 
 async def _async_cleanup_optional_entities(

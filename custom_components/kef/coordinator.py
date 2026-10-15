@@ -27,7 +27,7 @@ from .const import (
     DEFAULT_OFFLINE_RETRY_INTERVAL_SECONDS,
     DEFAULT_SCAN_INTERVAL_SECONDS,
 )
-from .diagnostic_events import DiagnosticEvents
+from .diagnostic_events import entry_history
 from .exceptions import KefAuthenticationRequiredError, KefError
 from .models import KefBackend, KefSnapshot
 
@@ -64,7 +64,8 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
             )
         )
         self._consecutive_failures = 0
-        self.diagnostic_events = DiagnosticEvents()
+        self.diagnostic_events = entry_history(hass, entry.entry_id)
+        self.diagnostic_events.setup_started()
         self._online = asyncio.Event()
         self._online.set()
         super().__init__(
@@ -82,6 +83,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
 
     async def _async_update_data(self) -> KefSnapshot:
         """Fetch data from the device."""
+        transition = self.diagnostic_events.refresh_started(time.monotonic())
         try:
             if self.client is None:
                 self.client = await async_create_client(
@@ -99,11 +101,20 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
             started_at = time.monotonic()
             snapshot = await self.client.async_refresh()
         except KefAuthenticationRequiredError as err:
+            self.diagnostic_events.refresh_result(transition, error=err)
             self.diagnostic_events.record("refresh", err)
             raise ConfigEntryAuthFailed(str(err)) from err
         except KefError as err:
+            self.diagnostic_events.refresh_result(transition, error=err)
             self.diagnostic_events.record("refresh", err)
             return self._handle_refresh_failure(err)
+        except asyncio.CancelledError:
+            if transition is not None:
+                self.diagnostic_events.record(
+                    "source_refresh_cancelled", transition=transition,
+                )
+            raise
+        self.diagnostic_events.refresh_result(transition, source=snapshot.source)
         self._handle_refresh_success()
         if snapshot.device.backend is KefBackend.LEGACY:
             stored_id = self.config_entry.data.get(CONF_DEVICE_ID)
@@ -142,8 +153,6 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
 
     def _handle_refresh_success(self) -> None:
         """Return to normal polling once the speaker answers again."""
-        if self._consecutive_failures:
-            self.diagnostic_events.record("connection_recovered")
         self._consecutive_failures = 0
         if not self._online.is_set():
             self._online.set()

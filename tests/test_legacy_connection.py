@@ -80,6 +80,10 @@ async def test_permanent_refusal_is_bounded_and_keeps_socket_error():
     assert raised.value.backend == "legacy"
     assert raised.value.port == 50001
     assert raised.value.operation == "connect"
+    assert raised.value.command == "read_source"
+    assert raised.value.phase == "connecting"
+    assert raised.value.connection_attempts == 1
+    assert raised.value.elapsed_seconds >= 0
 
 
 async def test_connection_timeout_is_reported_as_a_connection_error():

@@ -78,8 +78,11 @@ async def test_eof_without_acknowledgement_is_a_response_error(reply):
 
     async with legacy_server(handler) as (port, received, disconnected):
         client = LegacyBinaryClient("127.0.0.1", port=port)
-        with pytest.raises(KefResponseError):
+        with pytest.raises(KefResponseError) as raised:
             await client.async_set_volume_raw(42)
+        assert raised.value.command == "write_volume"
+        assert raised.value.phase == "waiting_for_acknowledgement"
+        assert raised.value.connection_attempts == 1
         await asyncio.wait_for(disconnected.wait(), 1)
         assert len(received) == 1
 
@@ -103,12 +106,18 @@ async def test_partial_data_does_not_restart_reply_deadline(operation):
         handler, command_length=3 if operation == "read" else 4
     ) as (port, received, disconnected):
         client = LegacyBinaryClient("127.0.0.1", port=port, request_timeout=1)
-        with pytest.raises(KefConnectionError):
+        with pytest.raises(KefConnectionError) as raised:
             action = (
                 client.async_get_volume_raw()
                 if operation == "read" else client.async_set_volume_raw(42)
             )
             await asyncio.wait_for(action, 3)
+        assert raised.value.command == f"{operation}_volume"
+        assert raised.value.phase == (
+            "reading_response" if operation == "read"
+            else "waiting_for_acknowledgement"
+        )
+        assert raised.value.connection_attempts == 1
         await asyncio.wait_for(disconnected.wait(), 1)
         assert len(received) == 1
         assert len(chunks_sent) >= 2

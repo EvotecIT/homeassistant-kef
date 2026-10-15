@@ -164,15 +164,40 @@ restarting Home Assistant:
 
 Diagnostics collect recent failure types and recovery events automatically.
 Connection failures identify the backend, port, and operation when available.
+Legacy failures also identify the source, volume, or playback command, whether
+the failure happened while connecting or waiting for a reply, the number of
+connection attempts, and elapsed time. Source changes record the previous and
+requested input, write acknowledgement, and the next device refresh outcome.
+If another source write supersedes a pending refresh, the history records that
+explicitly rather than claiming an intermediate input was observed.
+An acknowledgement alone does not establish that the input changed successfully.
+The health section distinguishes the actual last device refresh from Home
+Assistant's cached-state health, which can stay successful during brief failures.
+History is limited to 32 recent events, with repeated failures coalesced. Counts
+and timestamps survive initialization retries and entry reloads in the current
+Home Assistant session; restarting Home Assistant or removing the entry clears
+them.
 If automatic detection fails, the report retains both the modern HTTP and
 legacy TCP probe failures so a closed control port can be distinguished from
 an HTTP authentication or response problem.
-They include version and connection-health details without passwords, speaker
-addresses, private media details, or raw response bodies. Repeated failures are
-combined with a count and timestamps, and history is limited to the latest 32
-events. History is kept in memory and resets when the entry reloads or Home
-Assistant restarts. Setup reports expire after 15 minutes and only the latest
-20 reports are retained. Review any file before sharing it.
+Reports include version and connection-health details without passwords, speaker
+addresses, private media details, or raw response bodies. Setup reports expire
+after 15 minutes and only the latest 20 reports are retained. Review any file
+before sharing it.
+
+To capture a connection lost when switching an original LSX from Wi-Fi to Optical:
+
+1. Select **Wi-Fi** using KEF Control or the remote and let the integration
+   connect. Close KEF Control after that.
+2. In the KEF entry's menu, choose **Enable debug logging**, then download a
+   baseline diagnostics file.
+3. Select **Opt** from Home Assistant. While the connection is failing, download
+   diagnostics again, before reloading the entry or restarting Home Assistant.
+4. Restore Wi-Fi using the remote, wait for the integration to recover, then
+   choose **Disable debug logging** to download the log covering the transition
+   and recovery. Download a final diagnostics file if recovery is incomplete.
+5. Include whether selecting Optical with the physical remote causes the same
+   loss of connection. Review logs for private details before sharing them.
 
 For detailed logs on an existing entry, use **Enable debug logging** in that
 same menu, reproduce the problem once, then choose **Disable debug logging**.
