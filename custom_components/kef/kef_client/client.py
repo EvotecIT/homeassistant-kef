@@ -63,6 +63,13 @@ from .models import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Older aiohttp versions use a shared timeout type for connect and read.
+# Only classify a timeout as connect when the distinct public type exists.
+_HTTP_CONNECT_ERRORS = (
+    aiohttp.ClientConnectorError,
+    getattr(aiohttp, "ConnectionTimeoutError", aiohttp.ClientConnectorError),
+)
+
 _LEGACY_RESPONSE_OK = 17
 _LEGACY_GET_START = ord("G")
 _LEGACY_SET_START = ord("S")
@@ -2107,9 +2114,8 @@ class ModernKefClient(BaseKefClient):
         except aiohttp.ClientError as err:
             raise KefConnectionError(
                 str(err), backend="modern", port=self._port,
-                operation="connect" if isinstance(
-                    err, aiohttp.ClientConnectorError
-                ) else "request",
+                operation="connect" if isinstance(err, _HTTP_CONNECT_ERRORS)
+                else "request",
             ) from err
         except TimeoutError as err:
             raise KefConnectionError(

@@ -1,18 +1,39 @@
 """Legacy speakers can refuse new connections briefly between commands."""
 
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
+import aiohttp
 import pytest
 
 from custom_components.kef.kef_client.client import (
     LegacyBinaryClient,
+    ModernKefClient,
     async_create_client,
 )
 from custom_components.kef.kef_client.exceptions import KefConnectionError
 from tests.test_legacy_transport import legacy_server
 
 pytestmark = pytest.mark.usefixtures("socket_enabled")
+
+
+@pytest.mark.parametrize(
+    ("failure", "operation"),
+    [(aiohttp.ConnectionTimeoutError, "connect"),
+     (aiohttp.SocketTimeoutError, "request")],
+    ids=["connect-timeout", "read-timeout"],
+)
+async def test_modern_timeout_diagnostics_distinguish_connect_and_read(
+    failure, operation,
+):
+    """The download context must not imply a connection for a connect timeout."""
+    session = Mock()
+    session.request.side_effect = failure("private host or URL")
+    with pytest.raises(KefConnectionError) as raised:
+        await ModernKefClient("192.0.2.42", session).async_identify()
+    assert raised.value.operation == operation
+    assert raised.value.backend == "modern"
+    assert raised.value.port == 80
 
 
 async def test_setup_recovers_when_reidentification_connection_is_refused(hass):
