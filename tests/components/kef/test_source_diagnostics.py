@@ -3,14 +3,19 @@
 import json
 import time
 from dataclasses import replace
+from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.setup import async_setup_component
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 
 from custom_components.kef import async_remove_entry
 from custom_components.kef.coordinator import KefCoordinator
@@ -79,6 +84,55 @@ async def test_failed_source_write_does_not_claim_acknowledgement(hass):
         await KefMediaPlayer(coordinator).async_select_source("Opt")
     operations = [e["operation"] for e in coordinator.diagnostic_events.as_list()]
     assert operations == ["source_change_requested", "command", "source_change_failed"]
+
+
+async def test_debounced_source_writes_record_superseded_transition(hass):
+    """Two supported actions during HA's cooldown cannot lose their outcome."""
+    entry = MockConfigEntry(domain="kef", data={})
+    coordinator = KefCoordinator(hass, entry)
+    coordinator.data = replace(TEST_SNAPSHOT, source="Wifi")
+    coordinator.client = SimpleNamespace(
+        async_select_source=AsyncMock(),
+        async_refresh=AsyncMock(return_value=coordinator.data),
+    )
+    # Start the real coordinator debouncer's default ten-second cooldown.
+    await coordinator.async_request_refresh()
+    player = KefMediaPlayer(coordinator)
+    await player.async_select_source("Opt")
+    await player.async_select_source("Aux")
+    assert coordinator.client.async_refresh.await_count == 1
+    events = coordinator.diagnostic_events.as_list()
+    superseded = [e for e in events if e["operation"] == "source_refresh_superseded"]
+    assert [e["context"]["transition"] for e in superseded] == [1]
+    coordinator.client.async_refresh.return_value = replace(TEST_SNAPSHOT, source="Aux")
+    future = dt_util.utcnow() + timedelta(seconds=11)
+    with patch("time.monotonic", return_value=time.monotonic() + 11):
+        async_fire_time_changed(hass, future)
+        await hass.async_block_till_done()
+    outcomes = [
+        e
+        for e in coordinator.diagnostic_events.as_list()
+        if e["operation"] == "source_refresh_succeeded"
+    ]
+    assert [e["context"]["transition"] for e in outcomes] == [2]
+    assert outcomes[0]["context"]["observed_source"] == "Aux"
+    await coordinator.async_shutdown()
+
+
+async def test_reload_recovery_to_same_source_remains_in_history(hass):
+    entry = MockConfigEntry(domain="kef", data={})
+    first = KefCoordinator(hass, entry)
+    first.data = replace(TEST_SNAPSHOT, source="Wifi")
+    first.client = SimpleNamespace(async_refresh=AsyncMock(return_value=first.data))
+    await first._async_update_data()
+    first.client.async_refresh.side_effect = KefConnectionError("offline")
+    await first._async_update_data()
+    second = KefCoordinator(hass, entry)
+    second.client = SimpleNamespace(async_refresh=AsyncMock(return_value=first.data))
+    await second._async_update_data()
+    recovered = second.diagnostic_events.as_list()[-1]
+    assert recovered["operation"] == "connection_recovered"
+    assert recovered["context"]["observed_source"] == "Wifi"
 
 
 async def test_initialization_retries_keep_history_until_entry_removal(hass):

@@ -109,7 +109,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
             self.diagnostic_events.record("refresh", err)
             return self._handle_refresh_failure(err)
         self.diagnostic_events.refresh_result(refresh_started, source=snapshot.source)
-        self._handle_refresh_success(snapshot.source)
+        self._handle_refresh_success()
         if snapshot.device.backend is KefBackend.LEGACY:
             stored_id = self.config_entry.data.get(CONF_DEVICE_ID)
             if stored_id and snapshot.device.unique_id != stored_id:
@@ -145,12 +145,8 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
             )
         raise UpdateFailed(str(err)) from err
 
-    def _handle_refresh_success(self, source: str | None = None) -> None:
+    def _handle_refresh_success(self) -> None:
         """Return to normal polling once the speaker answers again."""
-        if self._consecutive_failures:
-            self.diagnostic_events.record(
-                "connection_recovered", observed_source=source,
-            )
         self._consecutive_failures = 0
         if not self._online.is_set():
             self._online.set()

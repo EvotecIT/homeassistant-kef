@@ -191,6 +191,8 @@ class DiagnosticEvents:
 
     def source_acknowledged(self, transition: int) -> None:
         """Observe the next poll that starts after this acknowledged write."""
+        if self._pending is not None:
+            self.record("source_refresh_superseded", transition=self._pending[0])
         self.record("source_write_acknowledged", transition=transition)
         self._pending = (transition, time.monotonic())
 
@@ -202,6 +204,7 @@ class DiagnosticEvents:
         error: BaseException | None = None,
     ) -> None:
         """Record actual device I/O, including failures hidden by cached state."""
+        recovered = error is None and self.last_refresh_success is False
         self.last_refresh_success = error is None
         self.last_refresh_at = dt_util.utcnow().isoformat()
         if error is None:
@@ -222,6 +225,8 @@ class DiagnosticEvents:
                 transition=transition,
             )
             self._pending = None
+        if recovered:
+            self.record("connection_recovered", observed_source=source)
 
     def summary(self) -> dict[str, Any]:
         """Return lifetime counters for this entry's current HA session."""

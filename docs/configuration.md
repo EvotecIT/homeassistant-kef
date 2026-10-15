@@ -168,6 +168,8 @@ Legacy failures also identify the source, volume, or playback command, whether
 the failure happened while connecting or waiting for a reply, the number of
 connection attempts, and elapsed time. Source changes record the previous and
 requested input, write acknowledgement, and the next device refresh outcome.
+If another source write supersedes a pending refresh, the history records that
+explicitly rather than claiming an intermediate input was observed.
 An acknowledgement alone does not establish that the input changed successfully.
 The health section distinguishes the actual last device refresh from Home
 Assistant's cached-state health, which can stay successful during brief failures.
