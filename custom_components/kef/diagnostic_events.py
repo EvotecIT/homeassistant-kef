@@ -7,17 +7,34 @@ from typing import Any
 
 from homeassistant.util import dt as dt_util
 
+from .exceptions import KefError
 
-def describe_error(error: BaseException) -> list[dict[str, Any]]:
+
+def describe_error(
+    error: BaseException, *, _seen: set[int] | None = None,
+) -> list[dict[str, Any]]:
     """Describe exception types and OS error numbers, never messages or URLs."""
     chain: list[dict[str, Any]] = []
-    seen: set[int] = set()
+    seen = _seen if _seen is not None else set()
     current: BaseException | None = error
     while current is not None and id(current) not in seen and len(chain) < 6:
         seen.add(id(current))
         item: dict[str, Any] = {"type": type(current).__name__}
         if isinstance(current, OSError) and isinstance(current.errno, int):
             item["errno"] = current.errno
+        if isinstance(current, KefError):
+            if current.backend in {"modern", "legacy"}:
+                item["backend"] = current.backend
+            if isinstance(current.port, int) and 0 < current.port <= 65535:
+                item["port"] = current.port
+            if current.operation in {"identify", "connect", "request"}:
+                item["operation"] = current.operation
+            if current.probe_errors:
+                item["probes"] = [
+                    describe_error(probe, _seen=seen.copy())
+                    for probe in current.probe_errors[:2]
+                    if id(probe) not in seen
+                ]
         chain.append(item)
         current = current.__cause__ or current.__context__
     return chain

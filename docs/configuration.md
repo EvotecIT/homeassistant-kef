@@ -133,6 +133,15 @@ do not run firmware installation as a routine unattended automation.
 
 - **Speaker not found:** check its current IP and local connectivity. Manual
   setup does not depend on discovery succeeding.
+- **Original LSX or LS50 Wireless fails to connect:** these speakers use the
+  passwordless control service on TCP port 50001. A working speaker webpage or
+  discovery announcement does not prove that this service is reachable from
+  Home Assistant. Close other KEF clients, including KEF Control and any older
+  integration, and retry setup with the current IPv4 address and a blank
+  password. The integration briefly retries refused connections while the
+  speaker releases a previous connection. If the control service stays
+  unavailable, check network access from Home Assistant to port 50001 and try
+  one speaker power-cycle while no firmware update is running.
 - **Read works but control fails:** check whether firmware enabled a web UI
   password, then reauthenticate or reconfigure.
 - **Playback action unavailable:** check the selected source and whether that
@@ -154,6 +163,10 @@ restarting Home Assistant:
    action that failed.
 
 Diagnostics collect recent failure types and recovery events automatically.
+Connection failures identify the backend, port, and operation when available.
+If automatic detection fails, the report retains both the modern HTTP and
+legacy TCP probe failures so a closed control port can be distinguished from
+an HTTP authentication or response problem.
 They include version and connection-health details without passwords, speaker
 addresses, private media details, or raw response bodies. Repeated failures are
 combined with a count and timestamps, and history is limited to the latest 32

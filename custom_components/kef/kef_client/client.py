@@ -11,7 +11,6 @@ import ipaddress
 import json
 import logging
 import os
-import socket
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Mapping
@@ -21,6 +20,7 @@ from urllib.parse import urlencode
 import aiohttp
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+from .connection import async_open_legacy_connection, async_probe
 from .const import (
     API_ROOT,
     AUTH_MODE_ALL,
@@ -62,6 +62,13 @@ from .models import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# Older aiohttp versions use a shared timeout type for connect and read.
+# Only classify a timeout as connect when the distinct public type exists.
+_HTTP_CONNECT_ERRORS = (
+    aiohttp.ClientConnectorError,
+    getattr(aiohttp, "ConnectionTimeoutError", aiohttp.ClientConnectorError),
+)
 
 _LEGACY_RESPONSE_OK = 17
 _LEGACY_GET_START = ord("G")
@@ -2105,9 +2112,16 @@ class ModernKefClient(BaseKefClient):
             ) as response:
                 text = await response.text()
         except aiohttp.ClientError as err:
-            raise KefConnectionError(str(err)) from err
+            raise KefConnectionError(
+                str(err), backend="modern", port=self._port,
+                operation="connect" if isinstance(err, _HTTP_CONNECT_ERRORS)
+                else "request",
+            ) from err
         except TimeoutError as err:
-            raise KefConnectionError("Request to KEF speaker timed out") from err
+            raise KefConnectionError(
+                "Request to KEF speaker timed out", backend="modern",
+                port=self._port, operation="request",
+            ) from err
 
         location = response.headers.get("Location", "")
         if response.status in {301, 302, 303, 307, 308}:
@@ -2468,6 +2482,7 @@ class LegacyBinaryClient(BaseKefClient):
         self._port = port
         self._request_timeout = request_timeout
         self._standby_time = standby_time
+        self._command_lock = asyncio.Lock()
 
     async def async_identify(self) -> KefDeviceInfo:
         """Probe the legacy speaker."""
@@ -3005,15 +3020,21 @@ class LegacyBinaryClient(BaseKefClient):
 
     async def _send_command(self, payload: bytes) -> int:
         """Send a command over the legacy binary socket."""
+        async with self._command_lock:
+            return await self._async_exchange(payload)
+
+    async def _async_exchange(self, payload: bytes) -> int:
+        """Send once after connecting; never replay an unacknowledged command."""
         _LOGGER.debug("Legacy KEF connecting to %s:%s", self._host, self._port)
         try:
-            reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(self._host, self._port, family=socket.AF_INET),
-                timeout=self._request_timeout,
+            reader, writer = await async_open_legacy_connection(
+                self._host, self._port, self._request_timeout,
             )
-        except OSError as err:
+        except (OSError, TimeoutError) as err:
             _LOGGER.debug("Legacy KEF connection failed: %s", err)
-            raise KefConnectionError(str(err)) from err
+            raise KefConnectionError(
+                str(err), backend="legacy", port=self._port, operation="connect",
+            ) from err
 
         try:
             _LOGGER.debug("Legacy KEF sending %s", payload.hex())
@@ -3037,7 +3058,9 @@ class LegacyBinaryClient(BaseKefClient):
                         raw_reply += chunk
         except (OSError, TimeoutError) as err:
             _LOGGER.debug("Legacy KEF command failed: %s", err)
-            raise KefConnectionError(str(err)) from err
+            raise KefConnectionError(
+                str(err), backend="legacy", port=self._port, operation="request",
+            ) from err
         finally:
             writer.close()
             await writer.wait_closed()
@@ -3107,12 +3130,12 @@ async def async_create_client(
             password=password,
             async_add_executor_job=async_add_executor_job,
         )
-        await client.async_identify()
+        await async_probe(client, port or DEFAULT_PORT)
         return client
 
     if normalized_backend is KefBackend.LEGACY:
         client = LegacyBinaryClient(host, port=tcp_port or DEFAULT_LEGACY_PORT)
-        await client.async_identify()
+        await async_probe(client, tcp_port or DEFAULT_LEGACY_PORT)
         return client
 
     modern_client = ModernKefClient(
@@ -3122,25 +3145,31 @@ async def async_create_client(
         password=password,
         async_add_executor_job=async_add_executor_job,
     )
-    modern_auth_error: KefAuthenticationRequiredError | None = None
+    modern_error: KefError
     try:
-        await modern_client.async_identify()
-    except KefAuthenticationRequiredError as err:
-        # An older speaker's HTTP error page can look like a login page.
-        # Accept legacy only after a valid binary-protocol response.
-        modern_auth_error = err
-    except KefError:
-        pass
+        await async_probe(modern_client, port or DEFAULT_PORT)
+    except KefError as err:
+        modern_error = err
     else:
         return modern_client
 
     legacy_client = LegacyBinaryClient(host, port=tcp_port or DEFAULT_LEGACY_PORT)
     try:
-        await legacy_client.async_identify()
+        await async_probe(legacy_client, tcp_port or DEFAULT_LEGACY_PORT)
     except KefError as err:
-        if modern_auth_error is not None:
-            raise modern_auth_error from err
+        if isinstance(modern_error, KefAuthenticationRequiredError):
+            # An older speaker's HTTP error can resemble authentication.
+            # Preserve the modern auth failure unless legacy really responds.
+            raise modern_error from err
+        if isinstance(modern_error, KefConnectionError) and isinstance(
+            err, KefConnectionError
+        ):
+            raise KefConnectionError(
+                f"Unable to connect to a KEF API on {host}",
+                probe_errors=(modern_error, err),
+            ) from err
         raise KefUnsupportedDeviceError(
-            f"Unable to detect a supported KEF API on {host}"
+            f"Unable to detect a supported KEF API on {host}",
+            probe_errors=(modern_error, err),
         ) from err
     return legacy_client
