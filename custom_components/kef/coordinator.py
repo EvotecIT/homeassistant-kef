@@ -83,7 +83,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
 
     async def _async_update_data(self) -> KefSnapshot:
         """Fetch data from the device."""
-        refresh_started = time.monotonic()
+        transition = self.diagnostic_events.refresh_started(time.monotonic())
         try:
             if self.client is None:
                 self.client = await async_create_client(
@@ -101,14 +101,20 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
             started_at = time.monotonic()
             snapshot = await self.client.async_refresh()
         except KefAuthenticationRequiredError as err:
-            self.diagnostic_events.refresh_result(refresh_started, error=err)
+            self.diagnostic_events.refresh_result(transition, error=err)
             self.diagnostic_events.record("refresh", err)
             raise ConfigEntryAuthFailed(str(err)) from err
         except KefError as err:
-            self.diagnostic_events.refresh_result(refresh_started, error=err)
+            self.diagnostic_events.refresh_result(transition, error=err)
             self.diagnostic_events.record("refresh", err)
             return self._handle_refresh_failure(err)
-        self.diagnostic_events.refresh_result(refresh_started, source=snapshot.source)
+        except asyncio.CancelledError:
+            if transition is not None:
+                self.diagnostic_events.record(
+                    "source_refresh_cancelled", transition=transition,
+                )
+            raise
+        self.diagnostic_events.refresh_result(transition, source=snapshot.source)
         self._handle_refresh_success()
         if snapshot.device.backend is KefBackend.LEGACY:
             stored_id = self.config_entry.data.get(CONF_DEVICE_ID)

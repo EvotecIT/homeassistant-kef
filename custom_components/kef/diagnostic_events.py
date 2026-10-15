@@ -32,6 +32,7 @@ def remove_entry_history(hass: HomeAssistant, entry_id: str) -> None:
 
 
 def _safe_source(source: str | None) -> str | None:
+    """Exclude arbitrary device or action strings from shareable reports."""
     return source if source in _SOURCES else None
 
 
@@ -148,6 +149,7 @@ class DiagnosticEvents:
             # Timing varies across identical failures; preserve the latest timing
             # while coalescing the same failure and source context.
             def signature(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+                """Compare failure identity independently of variable timings."""
                 result = []
                 for item in errors:
                     stable = {k: v for k, v in item.items() if k != "elapsed_seconds"}
@@ -196,9 +198,17 @@ class DiagnosticEvents:
         self.record("source_write_acknowledged", transition=transition)
         self._pending = (transition, time.monotonic())
 
+    def refresh_started(self, started: float) -> int | None:
+        """Bind an eligible acknowledgement to this poll before network awaits."""
+        if self._pending is None or started < self._pending[1]:
+            return None
+        transition, _ = self._pending
+        self._pending = None
+        return transition
+
     def refresh_result(
         self,
-        started: float,
+        transition: int | None,
         *,
         source: str | None = None,
         error: BaseException | None = None,
@@ -216,15 +226,13 @@ class DiagnosticEvents:
                 self._last_source = safe
         else:
             self.refresh_failures += 1
-        if self._pending is not None and started >= self._pending[1]:
-            transition, _ = self._pending
+        if transition is not None:
             self.record(
                 "source_refresh_failed" if error else "source_refresh_succeeded",
                 error,
                 observed_source=source,
                 transition=transition,
             )
-            self._pending = None
         if recovered:
             self.record("connection_recovered", observed_source=source)
 
