@@ -1,8 +1,28 @@
 """Exceptions for the KEF integration."""
 
+from __future__ import annotations
+
+from typing import Literal
+
 
 class KefError(Exception):
     """Base KEF integration error."""
+
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        backend: Literal["modern", "legacy"] | None = None,
+        port: int | None = None,
+        operation: Literal["identify", "connect", "request"] | None = None,
+        probe_errors: tuple[KefError, ...] = (),
+    ) -> None:
+        """Keep optional safe connection context separate from private messages."""
+        super().__init__(message)
+        self.backend = backend
+        self.port = port
+        self.operation = operation
+        self.probe_errors = probe_errors
 
 
 class KefConnectionError(KefError):
