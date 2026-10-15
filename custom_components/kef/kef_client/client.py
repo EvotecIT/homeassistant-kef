@@ -20,7 +20,7 @@ from urllib.parse import urlencode
 import aiohttp
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from .connection import async_open_legacy_connection, async_probe
+from .connection import ConnectionAttempts, async_open_legacy_connection, async_probe
 from .const import (
     API_ROOT,
     AUTH_MODE_ALL,
@@ -3021,14 +3021,36 @@ class LegacyBinaryClient(BaseKefClient):
     async def _send_command(self, payload: bytes) -> int:
         """Send a command over the legacy binary socket."""
         async with self._command_lock:
-            return await self._async_exchange(payload)
+            started = time.monotonic()
+            attempts = ConnectionAttempts()
+            try:
+                return await self._async_exchange(payload, attempts)
+            except KefError as error:
+                query = {ord("0"): "source", ord("%"): "volume",
+                         ord("1"): "playback"}.get(payload[1])
+                action = "read" if payload[0] == _LEGACY_GET_START else "write"
+                error.command = f"{action}_{query}" if query else "other"
+                error.backend = "legacy"
+                error.port = self._port
+                error.operation = error.operation or "request"
+                error.phase = (
+                    "connecting" if error.operation == "connect" else
+                    "reading_response" if action == "read" else
+                    "waiting_for_acknowledgement"
+                )
+                error.connection_attempts = attempts.count
+                error.elapsed_seconds = time.monotonic() - started
+                raise
 
-    async def _async_exchange(self, payload: bytes) -> int:
+    async def _async_exchange(
+        self, payload: bytes, attempts: ConnectionAttempts,
+    ) -> int:
         """Send once after connecting; never replay an unacknowledged command."""
         _LOGGER.debug("Legacy KEF connecting to %s:%s", self._host, self._port)
         try:
             reader, writer = await async_open_legacy_connection(
                 self._host, self._port, self._request_timeout,
+                attempts=attempts,
             )
         except (OSError, TimeoutError) as err:
             _LOGGER.debug("Legacy KEF connection failed: %s", err)

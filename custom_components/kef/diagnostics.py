@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import platform
 from dataclasses import asdict
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.core import HomeAssistant
+from homeassistant.loader import async_get_integration
 
+from .const import DOMAIN
 from .coordinator import KefConfigEntry, KefCoordinator
-from .diagnostic_events import describe_error
+from .diagnostic_events import describe_error, entry_history
 
 TO_REDACT = {
     "album",
@@ -47,11 +51,19 @@ async def async_get_config_entry_diagnostics(
     last_error = coordinator.last_exception if coordinator else None
     last_update = coordinator.last_device_update_at if coordinator else None
     interval = coordinator.update_interval if coordinator else None
+    history = entry_history(hass, entry.entry_id)
+    integration = await async_get_integration(hass, DOMAIN)
     data = {
+        "home_assistant_version": HA_VERSION,
+        "integration_version": integration.version,
+        "python_version": platform.python_version(),
+        "os": platform.system(),
+        "architecture": platform.machine(),
         "entry": dict(entry.data),
         "options": dict(entry.options),
         "entry_state": entry.state.value,
         "health": {
+            **history.summary(),
             "last_update_success": coordinator.last_update_success
             if coordinator else None,
             "last_error": describe_error(last_error) if last_error is not None else [],
@@ -59,8 +71,7 @@ async def async_get_config_entry_diagnostics(
             "last_device_update": last_update.isoformat() if last_update else None,
             "poll_interval_seconds": interval.total_seconds() if interval else None,
         },
-        "recent_events": coordinator.diagnostic_events.as_list()
-        if coordinator else [],
+        "recent_events": history.as_list(),
     }
     if snapshot is None:
         return async_redact_data(data, TO_REDACT)

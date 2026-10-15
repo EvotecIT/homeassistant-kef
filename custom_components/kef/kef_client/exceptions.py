@@ -23,6 +23,10 @@ class KefError(Exception):
         self.port = port
         self.operation = operation
         self.probe_errors = probe_errors
+        self.command: str | None = None
+        self.phase: str | None = None
+        self.connection_attempts: int | None = None
+        self.elapsed_seconds: float | None = None
 
 
 class KefConnectionError(KefError):

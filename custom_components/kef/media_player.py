@@ -460,9 +460,16 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
 
     async def async_select_source(self, source: str) -> None:
         """Select the input source."""
-        await self.async_call_kef(
-            lambda: self.client.async_select_source(source)
-        )
+        history = self.coordinator.diagnostic_events
+        transition = history.begin_source_change(self.coordinator.data.source, source)
+        try:
+            await self.async_call_kef(
+                lambda: self.client.async_select_source(source)
+            )
+        except HomeAssistantError:
+            history.record("source_change_failed", transition=transition)
+            raise
+        history.source_acknowledged(transition)
         await self.coordinator.async_request_refresh()
 
     async def async_media_play(self) -> None:
