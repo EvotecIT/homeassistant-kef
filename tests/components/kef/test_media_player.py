@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
+import pytest
 from homeassistant.components.media_player import MediaPlayerEntityFeature
 from homeassistant.exceptions import HomeAssistantError
 
@@ -215,9 +216,11 @@ def test_modern_supported_features_expose_transport_controls_when_available() ->
     assert player.supported_features & MediaPlayerEntityFeature.PREVIOUS_TRACK
 
 
-def test_legacy_supported_features_keep_transport_controls() -> None:
-    """Legacy speakers should continue to expose the classic transport controls."""
+@pytest.mark.parametrize("source", ["Wifi", "Bluetooth"])
+def test_legacy_supported_features_keep_transport_controls(source) -> None:
+    """Legacy streaming inputs keep their classic transport controls."""
     snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.source = source
     snapshot.device.backend = snapshot.device.backend.LEGACY
     assert snapshot.playback is not None
     snapshot.playback.controls = {}
@@ -228,6 +231,26 @@ def test_legacy_supported_features_keep_transport_controls() -> None:
     assert player.supported_features & MediaPlayerEntityFeature.PAUSE
     assert player.supported_features & MediaPlayerEntityFeature.NEXT_TRACK
     assert player.supported_features & MediaPlayerEntityFeature.PREVIOUS_TRACK
+
+
+@pytest.mark.parametrize("source", ["Opt", "Aux", "Usb", "Unknown"])
+def test_legacy_physical_inputs_keep_volume_and_source_controls(source) -> None:
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    snapshot.device.backend = snapshot.device.backend.LEGACY
+    snapshot.source = source
+    player = _build_player(snapshot)
+    features = player.supported_features
+    for feature in (
+        MediaPlayerEntityFeature.TURN_ON, MediaPlayerEntityFeature.TURN_OFF,
+        MediaPlayerEntityFeature.VOLUME_SET, MediaPlayerEntityFeature.VOLUME_MUTE,
+        MediaPlayerEntityFeature.SELECT_SOURCE,
+    ):
+        assert features & feature
+    for feature in (
+        MediaPlayerEntityFeature.PLAY, MediaPlayerEntityFeature.PAUSE,
+        MediaPlayerEntityFeature.NEXT_TRACK, MediaPlayerEntityFeature.PREVIOUS_TRACK,
+    ):
+        assert not features & feature
 
 
 async def test_volume_auth_failure_starts_reauth() -> None:

@@ -34,6 +34,7 @@ from .const import (
     EVENT_POLL_QUEUE_ENDPOINT,
     EVENT_SUBSCRIPTIONS,
     GET_DATA_ENDPOINT,
+    LEGACY_PLAYBACK_SOURCES,
     LEGACY_SOURCE_LIST,
     MODERN_MODEL_SOURCE_MAP,
     PROBE_PATHS,
@@ -43,6 +44,7 @@ from .const import (
 )
 from .exceptions import (
     KefAuthenticationRequiredError,
+    KefCommandRejectedError,
     KefConnectionError,
     KefError,
     KefResponseError,
@@ -2505,13 +2507,19 @@ class LegacyBinaryClient(BaseKefClient):
         volume_response = await self._send_command(
             bytes([_LEGACY_GET_START, ord("%"), _LEGACY_GET_END])
         )
-        play_pause_response = await self._send_command(
-            bytes([_LEGACY_GET_START, ord("1"), _LEGACY_GET_END])
-        )
-
         is_on = source_response <= 128
         source_code = source_response % 128
         source = _INPUT_SOURCES_RESPONSE.get(source_code, ("Unknown", None, "L/R"))[0]
+        play_pause_response = None
+        if source in LEGACY_PLAYBACK_SOURCES:
+            try:
+                play_pause_response = await self._send_command(
+                    bytes([_LEGACY_GET_START, ord("1"), _LEGACY_GET_END])
+                )
+            except KefCommandRejectedError:
+                # The input can change between the source and playback reads.
+                # A rejected optional query does not invalidate source/volume.
+                _LOGGER.debug("Legacy playback status unavailable for %s", source)
         is_muted = volume_response >= 128
         volume_raw = volume_response % 128
 
@@ -3072,6 +3080,8 @@ class LegacyBinaryClient(BaseKefClient):
                     try:
                         self._parse_response(payload, raw_reply)
                         break
+                    except KefCommandRejectedError:
+                        raise
                     except KefResponseError:
                         chunk = await reader.read(100 - len(raw_reply))
                         _LOGGER.debug("Legacy KEF received %s", chunk.hex())
@@ -3107,6 +3117,12 @@ class LegacyBinaryClient(BaseKefClient):
             remaining = reply[offset:]
             if len(remaining) < 2 or remaining[0] != ord("R"):
                 raise KefResponseError("Legacy KEF returned an incomplete response")
+            if remaining[1] == 0x12:
+                if len(remaining) < 3:
+                    raise KefResponseError("Legacy KEF returned an incomplete response")
+                if remaining[2] != 0xFF:
+                    raise KefResponseError("Legacy KEF returned an invalid rejection")
+                raise KefCommandRejectedError("Legacy KEF rejected the command")
             is_ack = remaining[1] == _LEGACY_RESPONSE_OK
             size = 3 if is_ack else 5
             if len(remaining) < size:
