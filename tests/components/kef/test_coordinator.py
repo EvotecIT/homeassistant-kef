@@ -25,8 +25,58 @@ from custom_components.kef.const import (
 )
 from custom_components.kef.coordinator import KefCoordinator
 from custom_components.kef.exceptions import KefAuthenticationRequiredError, KefError
+from custom_components.kef.kef_client.client import LegacyBinaryClient
 from custom_components.kef.models import KefBackend
 from tests.conftest import TEST_HOST, TEST_PORT, TEST_SNAPSHOT
+from tests.test_legacy_transport import legacy_server
+
+
+@pytest.mark.usefixtures("socket_enabled")
+async def test_legacy_optical_transition_keeps_coordinator_available(hass) -> None:
+    """Source writes and remote changes keep publishing state past three polls."""
+    source = 34
+    volume = 36
+
+    async def handler(reader, writer):
+        nonlocal source
+        command = received[-1]
+        if command[0] == ord("S"):
+            assert command[1] == ord("0")
+            source = command[3]
+            reply = b"R\x11\xff"
+        elif command[1] == ord("0"):
+            reply = bytes([82, 48, 129, source, 67])
+        elif command[1] == ord("%"):
+            reply = bytes([82, 37, 129, volume, 12])
+        else:
+            assert command[1] == ord("1")
+            reply = b"R\x12\xff" if source == 43 else b"R1\x81\x81\xff"
+        writer.write(reply)
+        await writer.drain()
+        assert await reader.read() == b""
+
+    async with legacy_server(handler, command_length=None) as (port, received, _):
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={"host": "127.0.0.1", CONF_BACKEND: "legacy", CONF_TCP_PORT: port},
+        )
+        coordinator = KefCoordinator(hass, entry)
+        coordinator.client = LegacyBinaryClient("127.0.0.1", port=port)
+        await coordinator.async_refresh()
+        assert coordinator.data.source == "Wifi"
+        await coordinator.client.async_select_source("Opt")
+        optical_start = len(received)
+        for volume in [36, 37, 38, 39]:
+            await coordinator.async_refresh()
+            assert coordinator.last_update_success
+            assert not coordinator.is_offline
+            assert coordinator.data.source == "Opt"
+            assert coordinator.data.volume_raw == volume
+        assert b"G1\x80" not in received[optical_start:]
+        source = 34  # Physical remote returns the speaker to Wi-Fi.
+        await coordinator.async_refresh()
+        assert coordinator.data.source == "Wifi"
+        assert coordinator.data.playback.state == "playing"
 
 
 async def test_legacy_address_change_preserves_entity_identity(hass) -> None:

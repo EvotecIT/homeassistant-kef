@@ -8,6 +8,7 @@ AUTH_MODE_SETDATA = "setData"
 
 DEFAULT_PORT = 80
 DEFAULT_LEGACY_PORT = 50001
+LEGACY_PLAYBACK_SOURCES = frozenset({"Wifi", "Bluetooth"})
 
 # Subwoofer preset gain/crossover values, extracted from the KEF Connect
 # APK's SubwooferModelKt.java / SubwooferModelSubGainKt.java. Setting a

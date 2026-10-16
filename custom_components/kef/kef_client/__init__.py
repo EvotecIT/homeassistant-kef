@@ -8,6 +8,7 @@ from .client import (
 )
 from .exceptions import (
     KefAuthenticationRequiredError,
+    KefCommandRejectedError,
     KefConnectionError,
     KefError,
     KefResponseError,
@@ -29,6 +30,7 @@ __all__ = [
     "KefBackend",
     "KefAuthenticationRequiredError",
     "KefCalibrationStatus",
+    "KefCommandRejectedError",
     "KefConnectionError",
     "KefDeviceInfo",
     "KefEqProfile",

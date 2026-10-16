@@ -23,6 +23,12 @@ volume, standby, wake behavior, LEDs, and additional settings. Playback controls
 depend on the current source. Do not assume a TV or optical input supports the
 same transport actions as a streaming source.
 
+On first-generation LSX and LS50 Wireless, playback status and play/pause/track
+controls are available on Wi-Fi and Bluetooth. Optical, AUX, and USB keep power,
+volume, mute, and source controls without polling playback status. A rejected
+playback query during a source change leaves valid source and volume readings
+available; connection failures still report an unavailable speaker.
+
 Modern devices use event-assisted refresh where available, with polling as a
 fallback. An offline speaker is retried at the offline retry interval and
 reconnects as soon as it announces itself on the network again; see

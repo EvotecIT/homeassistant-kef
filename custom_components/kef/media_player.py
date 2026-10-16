@@ -24,6 +24,7 @@ from .const import AUTH_FAILURE_MESSAGE, DOMAIN, model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .exceptions import KefAuthenticationRequiredError, KefError
+from .kef_client.const import LEGACY_PLAYBACK_SOURCES
 from .models import KefBackend
 
 # Ask HA to serialize action calls within this platform for each entry.
@@ -118,7 +119,10 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         features = self._base_supported_features
 
         if snapshot.device.backend.value == "legacy":
-            return features | self._legacy_transport_features
+            return (
+                features | self._legacy_transport_features
+                if snapshot.source in LEGACY_PLAYBACK_SOURCES else features
+            )
 
         playback = snapshot.playback
         if playback is None:

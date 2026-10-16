@@ -6,6 +6,7 @@ from aiohttp import ClientSession
 
 from kef_client import (
     BaseKefClient,
+    KefCommandRejectedError,
     KefDeviceInfo,
     ModernKefClient,
     async_create_client,
@@ -27,4 +28,7 @@ async def read(session: ClientSession) -> int | None:
     try:
         return await other.async_get_volume_raw()
     except KefConnectionError:
+        return None
+    except KefCommandRejectedError as err:
+        assert_type(err.command, str | None)
         return None

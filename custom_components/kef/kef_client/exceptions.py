@@ -37,6 +37,10 @@ class KefResponseError(KefError):
     """Raised when the speaker returns unexpected data."""
 
 
+class KefCommandRejectedError(KefResponseError):
+    """Raised when the legacy speaker returns a terminal command rejection."""
+
+
 class KefAuthenticationRequiredError(KefResponseError):
     """Raised when the speaker API requires authentication."""
 
