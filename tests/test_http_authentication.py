@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from custom_components.kef.kef_client.client import ModernKefClient
 from custom_components.kef.kef_client.exceptions import KefAuthenticationRequiredError
-from tests.test_http_session import local_server
+from tests.http_server import local_server
 
 pytestmark = pytest.mark.usefixtures("socket_enabled")
 
