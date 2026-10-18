@@ -19,6 +19,7 @@ from urllib.parse import urlencode
 
 import aiohttp
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from yarl import URL
 
 from .connection import ConnectionAttempts, async_open_legacy_connection, async_probe
 from .const import (
@@ -2026,7 +2027,9 @@ class ModernKefClient(BaseKefClient):
         read_timeout: float | None = None,
     ) -> Any:
         """Issue an authenticated request using the KEF HMAC/AES scheme."""
-        url = self._build_url(endpoint, params=params)
+        # Sign aiohttp's canonical URL, including its query requoting. Signing
+        # urlencode's escaped form would mismatch the URL sent on protected GETs.
+        url = str(URL(self._build_url(endpoint, params=params)))
         headers: dict[str, str] = {}
         body = None
         salt_b64, key = self._build_secure_key()
