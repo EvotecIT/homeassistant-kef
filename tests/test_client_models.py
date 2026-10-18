@@ -4,7 +4,8 @@ from copy import deepcopy
 
 import pytest
 
-from custom_components.kef.kef_client.models import (
+from kef_client import KefResponseError
+from kef_client.models import (
     KefCalibrationStatus,
     KefEqProfile,
     KefFirmwareUpdateInfo,
@@ -40,8 +41,12 @@ def test_incomplete_firmware_image_preserves_reported_state():
 
 @pytest.mark.parametrize(
     "payload",
-    [{}, {"networkInfo": {}}, {"networkInfo": {"wireless": {}}},
-     {"networkInfo": {"wireless": None}}],
+    [
+        {},
+        {"networkInfo": {}},
+        {"networkInfo": {"wireless": {}}},
+        {"networkInfo": {"wireless": None}},
+    ],
     ids=["missing-network", "missing-wireless", "empty-wireless", "no-wireless"],
 )
 def test_absent_wifi_details_are_unknown(payload):
@@ -95,3 +100,76 @@ def test_invalid_v2_profile_is_unknown():
     assert profile.profile_id is None
     assert profile.balance is None
     assert profile.subwoofer_out is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        pytest.param("balance", True, id="boolean-number"),
+        pytest.param("trebleAmount", "not a number", id="invalid-string"),
+        pytest.param("subwooferGain", float("nan"), id="nan-gain"),
+        pytest.param("highPassModeFreq", float("inf"), id="infinite-frequency"),
+        pytest.param("deskModeSetting", [], id="array-number"),
+        pytest.param("wallModeSetting", {}, id="object-number"),
+        pytest.param("subOutLPFreq", "-inf", id="non-finite-string"),
+    ],
+)
+def test_invalid_v1_eq_numeric_field_is_canonical_error(field, value):
+    """Every converted wire field rejects malformed or non-finite numbers."""
+    payload = {"kefEqProfile": {"dspInfo": {field: value}}}
+    with pytest.raises(KefResponseError, match="EQ numeric value"):
+        KefEqProfile.from_modern_value(payload)
+
+
+def test_v1_eq_numeric_strings_preserve_physical_units_and_payload():
+    """Numeric strings retain the established wire compatibility and units."""
+    payload = {
+        "kefEqProfile": {
+            "dspInfo": {
+                "balance": "30",
+                "trebleAmount": "8",
+                "subwooferGain": "10",
+                "highPassModeFreq": "0",
+                "deskModeSetting": "0",
+                "wallModeSetting": "20",
+                "subOutLPFreq": "8",
+            }
+        }
+    }
+    before = deepcopy(payload)
+    profile = KefEqProfile.from_modern_value(payload)
+    assert profile.balance == 0
+    assert profile.treble_amount == 0
+    assert profile.subwoofer_gain == 0
+    assert profile.high_pass_frequency == 50
+    assert profile.desk_mode_setting == -10
+    assert profile.wall_mode_setting == 0
+    assert profile.sub_out_low_pass_frequency == 80
+    assert payload == before
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param({"kefEqProfile": None}, id="missing-profile"),
+        pytest.param({"kefEqProfile": []}, id="array-profile"),
+        pytest.param(
+            {"kefEqProfile": {"profileName": "Retained", "dspInfo": None}},
+            id="missing-dsp",
+        ),
+        pytest.param(
+            {"kefEqProfile": {"profileName": "Retained", "dspInfo": []}}, id="array-dsp"
+        ),
+    ],
+)
+def test_invalid_v1_profile_preserves_metadata_and_unknown_settings(payload):
+    """An incomplete optional DSP section does not fabricate EQ settings."""
+    before = deepcopy(payload)
+    profile = KefEqProfile.from_modern_value(payload)
+    assert profile.api_version == "v1"
+    assert profile.balance is None
+    assert profile.treble_amount is None
+    assert profile.wall_mounted is None
+    expected_name = "Retained" if isinstance(payload["kefEqProfile"], dict) else None
+    assert profile.profile_name == expected_name
+    assert payload == before

@@ -6,9 +6,9 @@ import json
 import pytest
 from aiohttp import ClientSession, web
 
-from custom_components.kef.kef_client.client import ModernKefClient
-from custom_components.kef.kef_client.const import PROBE_PATHS
-from custom_components.kef.kef_client.exceptions import KefAuthenticationRequiredError
+from kef_client.client import ModernKefClient
+from kef_client.const import PROBE_PATHS
+from kef_client.exceptions import KefAuthenticationRequiredError
 from tests.http_server import local_server
 
 pytestmark = pytest.mark.usefixtures("socket_enabled")

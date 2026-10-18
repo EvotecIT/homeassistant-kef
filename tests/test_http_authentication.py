@@ -11,8 +11,8 @@ from aiohttp import ClientSession, TCPConnector, web
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from custom_components.kef.kef_client.client import ModernKefClient
-from custom_components.kef.kef_client.exceptions import KefAuthenticationRequiredError
+from kef_client.client import ModernKefClient
+from kef_client.exceptions import KefAuthenticationRequiredError
 from tests.http_server import local_server
 
 pytestmark = pytest.mark.usefixtures("socket_enabled")
@@ -38,6 +38,17 @@ def verify_authenticated_request(request, body, password):
     return key
 
 
+def decrypt_written_value(value, key):
+    """Independently decode the speaker's received AES value."""
+    encrypted = base64.b64decode(value, validate=True)
+    assert len(encrypted) >= 32
+    decryptor = Cipher(algorithms.AES(key), modes.CBC(encrypted[:16])).decryptor()
+    padded = decryptor.update(encrypted[16:]) + decryptor.finalize()
+    unpadder = padding.PKCS7(128).unpadder()
+    plaintext = unpadder.update(padded) + unpadder.finalize()
+    return json.loads(plaintext)
+
+
 @pytest.mark.parametrize(
     ("auth_mode", "protected_probe", "host"),
     [
@@ -49,7 +60,9 @@ def verify_authenticated_request(request, body, password):
     ],
 )
 async def test_secure_http_roundtrip_preserves_authentication_and_value(
-    auth_mode, protected_probe, host,
+    auth_mode,
+    protected_probe,
+    host,
 ):
     """Public commands arrive with valid signatures and decrypt to typed values."""
     password = "synthetic-local-password"
@@ -87,13 +100,7 @@ async def test_secure_http_roundtrip_preserves_authentication_and_value(
         payload = json.loads(body)
         assert payload["path"] == "player:volume"
         assert payload["role"] == "value"
-        encrypted = base64.b64decode(payload["value"], validate=True)
-        assert len(encrypted) >= 32
-        decryptor = Cipher(algorithms.AES(key), modes.CBC(encrypted[:16])).decryptor()
-        padded = decryptor.update(encrypted[16:]) + decryptor.finalize()
-        unpadder = padding.PKCS7(128).unpadder()
-        plaintext = unpadder.update(padded) + unpadder.finalize()
-        writes.append(json.loads(plaintext))
+        writes.append(decrypt_written_value(payload["value"], key))
         return web.json_response({})
 
     async with (
@@ -114,7 +121,8 @@ async def test_secure_http_roundtrip_preserves_authentication_and_value(
 
 
 @pytest.mark.parametrize(
-    "password", ["", "synthetic-password"],
+    "password",
+    ["", "synthetic-password"],
     ids=["missing-password", "rejected-password"],
 )
 @pytest.mark.parametrize("status", [401, 403])
@@ -140,4 +148,53 @@ async def test_secure_http_denial_is_not_replayed(status, password):
         assert len(writes) == 1
         if password:
             assert password not in str(error.value)
+        assert not session.closed
+
+
+@pytest.mark.parametrize("changed_mode", ["setData", "all"])
+async def test_changed_authentication_mode_retries_only_the_rejected_plain_write(
+    changed_mode,
+):
+    """A cached open API can switch to protection without duplicating a command."""
+    password = "synthetic-local-password"
+    mode = "none"
+    probes = []
+    attempts = []
+    writes = []
+
+    async def handler(request):
+        if request.method == "GET":
+            if request.query["path"] == "settings:/webserver/authMode":
+                probes.append(mode)
+                return web.json_response(
+                    [{"type": "webserverAuthMode", "webserverAuthMode": mode}]
+                )
+            assert request.query["path"] == "player:volume"
+            if mode == "all":
+                verify_authenticated_request(request, "", password)
+            else:
+                assert "Authorization" not in request.headers
+            return web.json_response([{"type": "i32_", "i32_": 42}])
+        body = await request.text()
+        authenticated = "Authorization" in request.headers
+        attempts.append(authenticated)
+        if not authenticated:
+            # Authentication is established by status, even with bad UI text.
+            return web.Response(status=401, body=b"\xff")
+        key = verify_authenticated_request(request, body, password)
+        payload = json.loads(body)
+        assert payload["path"] == "player:volume"
+        assert payload["role"] == "value"
+        writes.append(decrypt_written_value(payload["value"], key))
+        return web.json_response({})
+
+    async with local_server(handler) as port, ClientSession() as session:
+        client = ModernKefClient("127.0.0.1", session, port=port, password=password)
+        assert await client.async_get_volume_raw() == 42
+        mode = changed_mode
+        await client.async_set_volume_raw(37)
+        assert await client.async_get_volume_raw() == 42
+        assert probes == ["none", changed_mode]
+        assert attempts == [False, True]
+        assert writes == [{"type": "i32_", "i32_": 37}]
         assert not session.closed

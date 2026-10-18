@@ -4,7 +4,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from math import isfinite as _isfinite
 from typing import Any
+
+from .exceptions import KefResponseError as _KefResponseError
+
+
+def _eq_number(value: Any) -> float:
+    """Normalize EQ numbers without exposing Python conversion errors."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError) as err:
+        raise _KefResponseError("Unexpected KEF EQ numeric value") from err
+    if isinstance(value, bool) or not _isfinite(number):
+        raise _KefResponseError("Unexpected KEF EQ numeric value")
+    return number
 
 
 def _legacy_eq_profile_to_native(dsp_info: dict[str, Any]) -> dict[str, Any]:
@@ -12,18 +26,18 @@ def _legacy_eq_profile_to_native(dsp_info: dict[str, Any]) -> dict[str, Any]:
     profile = dict(dsp_info)
 
     if (value := profile.get("balance")) is not None:
-        profile["balance"] = round(float(value)) - 30
+        profile["balance"] = round(_eq_number(value)) - 30
     if (value := profile.get("trebleAmount")) is not None:
-        profile["trebleAmount"] = round((float(value) / 16.0 * 6.0) - 3.0, 3)
+        profile["trebleAmount"] = round((_eq_number(value) / 16.0 * 6.0) - 3.0, 3)
     if (value := profile.get("subwooferGain")) is not None:
-        profile["subwooferGain"] = round(float(value)) - 10
+        profile["subwooferGain"] = round(_eq_number(value)) - 10
     if (value := profile.get("highPassModeFreq")) is not None:
-        profile["highPassModeFreq"] = 50 + round(float(value)) * 5
+        profile["highPassModeFreq"] = 50 + round(_eq_number(value)) * 5
     for key in ("deskModeSetting", "wallModeSetting"):
         if (value := profile.get(key)) is not None:
-            profile[key] = round((float(value) / 2.0) - 10.0, 1)
+            profile[key] = round((_eq_number(value) / 2.0) - 10.0, 1)
     if (value := profile.get("subOutLPFreq")) is not None:
-        profile["subOutLPFreq"] = round(float(value) * 10.0)
+        profile["subOutLPFreq"] = round(_eq_number(value) * 10.0)
 
     return profile
 
@@ -33,21 +47,21 @@ def _native_eq_profile_to_legacy(profile: dict[str, Any]) -> dict[str, Any]:
     dsp_info = dict(profile)
 
     if (value := dsp_info.get("balance")) is not None:
-        dsp_info["balance"] = max(0, min(60, round(float(value) + 30)))
+        dsp_info["balance"] = max(0, min(60, round(_eq_number(value) + 30)))
     if (value := dsp_info.get("trebleAmount")) is not None:
-        legacy = round((float(value) + 3.0) / 6.0 * 16.0)
+        legacy = round((_eq_number(value) + 3.0) / 6.0 * 16.0)
         dsp_info["trebleAmount"] = max(0, min(16, legacy))
     if (value := dsp_info.get("subwooferGain")) is not None:
-        dsp_info["subwooferGain"] = max(0, min(20, round(float(value) + 10)))
+        dsp_info["subwooferGain"] = max(0, min(20, round(_eq_number(value) + 10)))
     if (value := dsp_info.get("highPassModeFreq")) is not None:
-        legacy = round((float(value) - 50.0) / 5.0)
+        legacy = round((_eq_number(value) - 50.0) / 5.0)
         dsp_info["highPassModeFreq"] = max(0, min(10, legacy))
     for key in ("deskModeSetting", "wallModeSetting"):
         if (value := dsp_info.get(key)) is not None:
-            legacy = round((float(value) + 10.0) * 2.0)
+            legacy = round((_eq_number(value) + 10.0) * 2.0)
             dsp_info[key] = max(0, min(20, legacy))
     if (value := dsp_info.get("subOutLPFreq")) is not None:
-        legacy = round(float(value) / 10.0)
+        legacy = round(_eq_number(value) / 10.0)
         dsp_info["subOutLPFreq"] = max(4, min(25, legacy))
 
     return dsp_info
@@ -211,7 +225,11 @@ class KefEqProfile:
             return cls.from_modern_v2_value(value)
 
         profile = value.get("kefEqProfile", {})
+        if not isinstance(profile, dict):
+            profile = {}
         dsp_info = profile.get("dspInfo", {})
+        if not isinstance(dsp_info, dict):
+            dsp_info = {}
         native_dsp_info = _legacy_eq_profile_to_native(dsp_info)
         return cls(
             api_version="v1",
