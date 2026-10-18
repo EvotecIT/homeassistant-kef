@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+# HA aliases voluptuous to Probatio at runtime from 2026.9. Static typing cannot
+# follow the alias; only the service-schema argument needs a suppression.
 import voluptuous as vol
 from homeassistant.const import ATTR_ENTITY_ID, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -86,7 +88,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
         DOMAIN,
         SERVICE_INSTALL_FIRMWARE_FILE,
         async_handle_install_firmware_file,
-        schema=vol.Schema(
+        schema=vol.Schema(  # type: ignore[arg-type, unused-ignore]
             {
                 vol.Required(ATTR_ENTITY_ID): cv.entity_id,
                 vol.Required(ATTR_FIRMWARE_FILE_PATH): cv.string,

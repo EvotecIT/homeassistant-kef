@@ -10,6 +10,8 @@ import time
 from html import escape
 from typing import TYPE_CHECKING, Any
 
+# HA aliases voluptuous to Probatio at runtime from 2026.9. Static typing cannot
+# follow the alias; only these five form-schema arguments need suppressions.
 import voluptuous as vol
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
@@ -121,7 +123,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
+            data_schema=vol.Schema(  # type: ignore[arg-type, unused-ignore]
                 {
                     vol.Required(CONF_HOST): str,
                     vol.Optional(CONF_PASSWORD, default=self._password): str,
@@ -149,7 +151,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=vol.Schema(
+            data_schema=vol.Schema(  # type: ignore[arg-type, unused-ignore]
                 {
                     vol.Required(CONF_HOST, default=entry.data[CONF_HOST]): str,
                     vol.Optional(
@@ -192,7 +194,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema(
+            data_schema=vol.Schema(  # type: ignore[arg-type, unused-ignore]
                 {
                     vol.Optional(CONF_PASSWORD, default=self._password): str,
                 }
@@ -406,7 +408,7 @@ class KefConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="confirm",
-            data_schema=vol.Schema(
+            data_schema=vol.Schema(  # type: ignore[arg-type, unused-ignore]
                 {}
                 if self._discovered_backend is KefBackend.LEGACY
                 else {
@@ -547,7 +549,7 @@ class KefOptionsFlow(OptionsFlow):
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
+            data_schema=vol.Schema(  # type: ignore[arg-type, unused-ignore]
                 {
                     vol.Optional(
                         CONF_PASSWORD,

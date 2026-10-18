@@ -193,3 +193,71 @@ async def test_configuration_service_preserves_wire_value_and_state(
             assert not session.closed
     finally:
         assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.parametrize("status", [200, 503], ids=["accepted", "unavailable"])
+async def test_xio_calibration_service_reports_wire_result(hass, status):
+    """Calibrate through HA and the HTTP client; refresh only an accepted write."""
+    snapshot = replace(
+        TEST_SNAPSHOT,
+        device=replace(TEST_SNAPSHOT.device, model="XIO", model_code="XIO"),
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=snapshot.device.device_name,
+        unique_id=snapshot.device.unique_id,
+        data={CONF_HOST: TEST_HOST, CONF_BACKEND: snapshot.device.backend},
+    )
+    entry.add_to_hass(hass)
+
+    async def refresh(coordinator):
+        coordinator.async_set_updated_data(snapshot)
+
+    with patch.object(KefCoordinator, "async_config_entry_first_refresh", refresh):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    captured = []
+
+    async def handler(request):
+        if request.method == "GET":
+            assert request.query["path"] == "settings:/webserver/authMode"
+            return web.json_response([{"type": "string_", "string_": "none"}])
+        assert request.path == "/api/setData"
+        captured.append(await request.json())
+        return web.json_response({}, status=status)
+
+    try:
+        async with local_server(handler) as port, ClientSession() as session:
+            entry.runtime_data.client = ModernKefClient(
+                "127.0.0.1", session, port=port,
+            )
+            refresh_after_write = AsyncMock()
+            entry.runtime_data.async_request_refresh = refresh_after_write
+            entity_id = er.async_get(hass).async_get_entity_id(
+                "button", DOMAIN, f"{snapshot.device.unique_id}_start_calibration",
+            )
+            assert entity_id is not None
+            action = hass.services.async_call(
+                "button", "press", {"entity_id": entity_id}, blocking=True,
+            )
+            if status == 200:
+                await action
+                refresh_after_write.assert_awaited_once_with()
+            else:
+                with pytest.raises(HomeAssistantError) as error:
+                    await action
+                assert error.value.translation_domain == DOMAIN
+                assert error.value.translation_key == "command_failed"
+                assert error.value.translation_placeholders["error"]
+                refresh_after_write.assert_not_awaited()
+            assert captured == [
+                {
+                    "path": "kefdsp:/calibration/start",
+                    "role": "activate",
+                    "value": {},
+                }
+            ]
+            assert not session.closed
+    finally:
+        assert await hass.config_entries.async_unload(entry.entry_id)
