@@ -27,7 +27,7 @@ from .const import (
     model_supports_feature,
 )
 from .coordinator import KefConfigEntry, KefCoordinator
-from .entity import KefEntity, apply_eq_profile_change
+from .entity import KefEntity, apply_eq_profile_change, get_initialized_client
 from .kef_client.const import model_has_subwoofer_preset_values
 from .models import KefBackend, KefSnapshot
 
@@ -40,9 +40,7 @@ async def _async_set_standby_mode(
     value: str,
 ) -> None:
     """Set the standby mode."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_standby_mode(value)
     coordinator.async_apply_local_change(standby_mode=value)
 
@@ -52,9 +50,7 @@ async def _async_set_wake_source(
     value: str,
 ) -> None:
     """Set the wake source."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_wake_source(value)
     coordinator.async_apply_local_change(wake_source=value)
 
@@ -64,9 +60,7 @@ async def _async_set_master_channel(
     value: str,
 ) -> None:
     """Set the master channel assignment."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_master_channel(value)
     coordinator.async_apply_local_change(master_channel=value)
 
@@ -76,9 +70,7 @@ async def _async_set_cable_mode(
     value: str,
 ) -> None:
     """Set the cable mode."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_cable_mode(value)
     coordinator.async_apply_local_change(cable_mode=value)
 
@@ -88,9 +80,7 @@ async def _async_set_bass_extension(
     value: str,
 ) -> None:
     """Set the EQ bass extension."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_bass_extension(value)
     apply_eq_profile_change(coordinator, bass_extension=value)
 
@@ -100,9 +90,7 @@ async def _async_set_remote_ir_code(
     value: str,
 ) -> None:
     """Set the IR remote code set."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_remote_ir_code(value)
     coordinator.async_apply_local_change(remote_ir_code=value)
 
@@ -112,9 +100,7 @@ async def _async_set_streaming_quality(
     value: str,
 ) -> None:
     """Set the Airable streaming quality."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_streaming_quality(value)
     coordinator.async_apply_local_change(streaming_quality=value)
 
@@ -124,9 +110,7 @@ async def _async_set_favourite_button(
     value: str,
 ) -> None:
     """Set the favourite button action."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_favourite_button_action(value)
     coordinator.async_apply_local_change(favourite_button=value)
 
@@ -136,9 +120,7 @@ async def _async_set_eq_button_1(
     value: str,
 ) -> None:
     """Set the first EQ button action."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_eq_button_action(1, value)
     coordinator.async_apply_local_change(eq_button_1=value)
 
@@ -148,9 +130,7 @@ async def _async_set_eq_button_2(
     value: str,
 ) -> None:
     """Set the second EQ button action."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_eq_button_action(2, value)
     coordinator.async_apply_local_change(eq_button_2=value)
 
@@ -160,9 +140,7 @@ async def _async_set_subwoofer_polarity(
     value: str,
 ) -> None:
     """Set the subwoofer polarity."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_subwoofer_polarity(value)
     apply_eq_profile_change(coordinator, subwoofer_polarity=value)
 
@@ -172,9 +150,7 @@ async def _async_set_audio_polarity(
     value: str,
 ) -> None:
     """Set the main speaker audio polarity."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_audio_polarity(value)
     apply_eq_profile_change(coordinator, audio_polarity=value)
 
@@ -184,9 +160,7 @@ async def _async_set_subwoofer_preset(
     value: str,
 ) -> None:
     """Set the subwoofer model preset."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     applied = await client.async_set_subwoofer_preset(
         value, coordinator.data.device.model
     )
@@ -203,9 +177,7 @@ async def _async_set_sound_profile(
     value: str,
 ) -> None:
     """Set the sound profile preset."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_sound_profile(value)
     apply_eq_profile_change(coordinator, sound_profile=value)
 

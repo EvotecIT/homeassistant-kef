@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import WAKE_SOURCE_OPTIONS, model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
-from .entity import KefEntity, apply_eq_profile_change
+from .entity import KefEntity, apply_eq_profile_change, get_initialized_client
 from .models import KefBackend, KefSnapshot
 
 # Ask HA to serialize action calls within this platform for each entry.
@@ -25,9 +25,7 @@ async def _async_set_default_volume_global(
     value: float,
 ) -> None:
     """Set the global startup volume."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_default_volume_global(round(value))
     coordinator.async_apply_local_change(default_volume_global=round(value))
 
@@ -37,9 +35,7 @@ async def _async_set_maximum_volume(
     value: float,
 ) -> None:
     """Set the maximum volume."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_maximum_volume(round(value))
     coordinator.async_apply_local_change(maximum_volume=round(value))
 
@@ -49,9 +45,7 @@ async def _async_set_volume_step(
     value: float,
 ) -> None:
     """Set the volume step."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_volume_step(round(value))
     coordinator.async_apply_local_change(volume_step=round(value))
 
@@ -61,9 +55,7 @@ async def _async_set_fixed_volume_level(
     value: float,
 ) -> None:
     """Set the fixed volume level."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_fixed_volume_level(round(value))
     coordinator.async_apply_local_change(fixed_volume_level=round(value))
 
@@ -73,9 +65,7 @@ async def _async_set_balance(
     value: float,
 ) -> None:
     """Set EQ balance."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_balance(round(value))
     apply_eq_profile_change(coordinator, balance=round(value))
 
@@ -85,9 +75,7 @@ async def _async_set_treble_amount(
     value: float,
 ) -> None:
     """Set EQ treble amount."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     applied = await client.async_set_treble_amount(value)
     apply_eq_profile_change(
         coordinator,
@@ -100,9 +88,7 @@ async def _async_set_subwoofer_gain(
     value: float,
 ) -> None:
     """Set EQ subwoofer gain."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_subwoofer_gain(round(value))
     apply_eq_profile_change(
         coordinator, subwoofer_gain=round(value), subwoofer_preset="custom"
@@ -114,9 +100,7 @@ async def _async_set_high_pass_frequency(
     value: float,
 ) -> None:
     """Set EQ high-pass frequency."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     applied = await client.async_set_high_pass_frequency(value)
     apply_eq_profile_change(
         coordinator,
@@ -130,9 +114,7 @@ async def _async_set_sub_out_low_pass_frequency(
     value: float,
 ) -> None:
     """Set the subwoofer output low-pass crossover frequency."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     applied = await client.async_set_sub_out_low_pass_frequency(value)
     apply_eq_profile_change(
         coordinator,
@@ -146,9 +128,7 @@ async def _async_set_desk_mode_db(
     value: float,
 ) -> None:
     """Set the desk mode attenuation."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     applied = await client.async_set_desk_mode_db(value)
     apply_eq_profile_change(
         coordinator,
@@ -161,9 +141,7 @@ async def _async_set_wall_mode_db(
     value: float,
 ) -> None:
     """Set the wall mode attenuation."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     applied = await client.async_set_wall_mode_db(value)
     apply_eq_profile_change(
         coordinator,
@@ -177,9 +155,7 @@ async def _async_set_source_volume(
     value: float,
 ) -> None:
     """Set the startup volume for a single source."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_default_volume_for_source(source, round(value))
     updated_by_source = {
         **coordinator.data.default_volume_by_source,

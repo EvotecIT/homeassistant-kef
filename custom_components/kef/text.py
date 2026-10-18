@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import KefConfigEntry, KefCoordinator
-from .entity import KefEntity
+from .entity import KefEntity, get_initialized_client
 from .models import KefBackend, KefSnapshot
 
 # Ask HA to serialize action calls within this platform for each entry.
@@ -24,9 +24,7 @@ async def _async_set_ui_language(
     value: str,
 ) -> None:
     """Set the speaker UI language."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_ui_language(value.strip())
 
 
@@ -35,9 +33,7 @@ async def _async_set_speaker_location(
     value: str,
 ) -> None:
     """Set the speaker country or region code."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_speaker_location(value.strip().upper())
 
 

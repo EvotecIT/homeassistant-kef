@@ -29,6 +29,10 @@ volume, mute, and source controls without polling playback status. A rejected
 playback query during a source change leaves valid source and volume readings
 available; connection failures still report an unavailable speaker.
 
+Modern devices expose a configuration link to their HTTP interface. The legacy
+binary control port is not a web page, so legacy devices do not advertise that
+port as a configuration link.
+
 Modern devices use event-assisted refresh where available, with polling as a
 fallback. An offline speaker is retried at the offline retry interval and
 reconnects as soon as it announces itself on the network again; see

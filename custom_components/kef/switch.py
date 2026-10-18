@@ -15,7 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
-from .entity import KefEntity, apply_eq_profile_change
+from .entity import KefEntity, apply_eq_profile_change, get_initialized_client
 from .models import KefBackend, KefSnapshot
 
 # Ask HA to serialize action calls within this platform for each entry.
@@ -27,9 +27,7 @@ async def _async_set_startup_tone(
     enabled: bool,
 ) -> None:
     """Set the startup tone state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_startup_tone_enabled(enabled)
     coordinator.async_apply_local_change(startup_tone_enabled=enabled)
 
@@ -39,9 +37,7 @@ async def _async_set_auto_switch_hdmi(
     enabled: bool,
 ) -> None:
     """Set HDMI auto switching."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_auto_switch_hdmi_enabled(enabled)
     coordinator.async_apply_local_change(auto_switch_hdmi=enabled)
 
@@ -51,9 +47,7 @@ async def _async_set_standby_led(
     enabled: bool,
 ) -> None:
     """Set the standby LED state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_standby_led_enabled(enabled)
     coordinator.async_apply_local_change(standby_led_enabled=enabled)
 
@@ -63,9 +57,7 @@ async def _async_set_front_led(
     enabled: bool,
 ) -> None:
     """Set the front LED state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_front_led_enabled(enabled)
     coordinator.async_apply_local_change(front_led_enabled=enabled)
 
@@ -75,9 +67,7 @@ async def _async_set_top_panel(
     enabled: bool,
 ) -> None:
     """Set the top-panel enabled state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_top_panel_enabled(enabled)
     coordinator.async_apply_local_change(top_panel_enabled=enabled)
 
@@ -87,9 +77,7 @@ async def _async_set_top_panel_led(
     enabled: bool,
 ) -> None:
     """Set the active top-panel LED state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_top_panel_led_enabled(enabled)
     coordinator.async_apply_local_change(top_panel_led_enabled=enabled)
 
@@ -99,9 +87,7 @@ async def _async_set_top_panel_standby_led(
     enabled: bool,
 ) -> None:
     """Set the standby top-panel LED state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_top_panel_standby_led_enabled(enabled)
     coordinator.async_apply_local_change(top_panel_standby_led_enabled=enabled)
 
@@ -111,9 +97,7 @@ async def _async_set_usb_charging(
     enabled: bool,
 ) -> None:
     """Set the USB charging state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_usb_charging_enabled(enabled)
     coordinator.async_apply_local_change(usb_charging_enabled=enabled)
 
@@ -123,9 +107,7 @@ async def _async_set_startup_volume(
     enabled: bool,
 ) -> None:
     """Set whether startup volume is enabled."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_startup_volume_enabled(enabled)
     coordinator.async_apply_local_change(startup_volume_enabled=enabled)
 
@@ -135,9 +117,7 @@ async def _async_set_per_input_startup_volume(
     enabled: bool,
 ) -> None:
     """Set whether per-input startup volume is enabled."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_per_input_startup_volume_enabled(enabled)
     coordinator.async_apply_local_change(per_input_startup_volume_enabled=enabled)
 
@@ -147,9 +127,7 @@ async def _async_set_volume_limit(
     enabled: bool,
 ) -> None:
     """Set whether the volume limiter is enabled."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_volume_limit_enabled(enabled)
     coordinator.async_apply_local_change(volume_limit_enabled=enabled)
 
@@ -159,9 +137,7 @@ async def _async_set_subwoofer_wake(
     enabled: bool,
 ) -> None:
     """Set wired subwoofer wake-on-startup."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_subwoofer_wake_enabled(enabled)
     coordinator.async_apply_local_change(subwoofer_wake_enabled=enabled)
 
@@ -171,9 +147,7 @@ async def _async_set_kw1_wake(
     enabled: bool,
 ) -> None:
     """Set KW1 subwoofer wake-on-startup."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_kw1_wake_enabled(enabled)
     coordinator.async_apply_local_change(kw1_wake_enabled=enabled)
 
@@ -183,9 +157,7 @@ async def _async_set_subwoofer_enabled(
     enabled: bool,
 ) -> None:
     """Enable or disable subwoofer output."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     applied = await client.async_set_subwoofer_enabled(enabled)
     raw_count = applied.get("subwooferCount")
     subwoofer_count = (
@@ -211,9 +183,7 @@ async def _async_set_kw1_adapter(
     enabled: bool,
 ) -> None:
     """Enable or disable the KW1 wireless subwoofer adapter."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_kw1_enabled(enabled)
     apply_eq_profile_change(coordinator, is_kw1=enabled)
 
@@ -223,9 +193,7 @@ async def _async_set_sub_enable_stereo(
     enabled: bool,
 ) -> None:
     """Enable or disable dual-subwoofer stereo channel separation."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_sub_enable_stereo(enabled)
     apply_eq_profile_change(coordinator, sub_enable_stereo=enabled)
 
@@ -235,9 +203,7 @@ async def _async_set_remote_ir(
     enabled: bool,
 ) -> None:
     """Set IR remote control state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_remote_ir_enabled(enabled)
     coordinator.async_apply_local_change(remote_ir_enabled=enabled)
 
@@ -247,9 +213,7 @@ async def _async_set_analytics(
     enabled: bool,
 ) -> None:
     """Set KEF analytics state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_analytics_enabled(enabled)
     coordinator.async_apply_local_change(analytics_enabled=enabled)
 
@@ -259,9 +223,7 @@ async def _async_set_app_analytics(
     enabled: bool,
 ) -> None:
     """Set app analytics state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_app_analytics_enabled(enabled)
     coordinator.async_apply_local_change(app_analytics_enabled=enabled)
 
@@ -271,9 +233,7 @@ async def _async_set_desk_mode(
     enabled: bool,
 ) -> None:
     """Set the desk mode state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_desk_mode_enabled(enabled)
     apply_eq_profile_change(coordinator, desk_mode=enabled)
 
@@ -283,9 +243,7 @@ async def _async_set_wall_mode(
     enabled: bool,
 ) -> None:
     """Set the wall mode state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_wall_mode_enabled(enabled)
     apply_eq_profile_change(coordinator, wall_mode=enabled)
 
@@ -295,9 +253,7 @@ async def _async_set_phase_correction(
     enabled: bool,
 ) -> None:
     """Set the phase correction state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_phase_correction_enabled(enabled)
     apply_eq_profile_change(coordinator, phase_correction=enabled)
 
@@ -307,9 +263,7 @@ async def _async_set_high_pass_mode(
     enabled: bool,
 ) -> None:
     """Set the high-pass mode state."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_high_pass_mode_enabled(enabled)
     apply_eq_profile_change(coordinator, high_pass_mode=enabled)
 
@@ -319,9 +273,7 @@ async def _async_set_auto_detect_placement(
     enabled: bool,
 ) -> None:
     """Enable or disable automatic placement detection."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_auto_detect_placement(enabled)
     coordinator.async_apply_local_change(auto_detect_placement=enabled)
 
@@ -338,9 +290,7 @@ async def _async_set_wall_mounted(
             "Turn off auto-detect placement before changing wall mounted",
             translation_domain=DOMAIN, translation_key="automatic_placement_enabled",
         )
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     applied = await client.async_set_wall_mounted(mounted)
     apply_eq_profile_change(coordinator, wall_mounted=bool(applied["wallMounted"]))
 
@@ -350,9 +300,7 @@ async def _async_set_prefer_virtual_x(
     enabled: bool,
 ) -> None:
     """Prefer DTS Virtual:X over the Dolby virtualizer."""
-    client = coordinator.client
-    if client is None:
-        return
+    client = get_initialized_client(coordinator)
     await client.async_set_prefer_virtual_x(enabled)
     coordinator.async_apply_local_change(prefer_virtual_x=enabled)
 

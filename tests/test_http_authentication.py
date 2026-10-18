@@ -4,9 +4,10 @@ import base64
 import hashlib
 import hmac
 import json
+import socket
 
 import pytest
-from aiohttp import ClientSession, web
+from aiohttp import ClientSession, TCPConnector, web
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
@@ -37,12 +38,18 @@ def verify_authenticated_request(request, body, password):
     return key
 
 
-@pytest.mark.parametrize("auth_mode", ["setData", "all"])
 @pytest.mark.parametrize(
-    "protected_probe", [False, True], ids=["open-probe", "protected-probe"],
+    ("auth_mode", "protected_probe", "host"),
+    [
+        pytest.param("setData", False, "127.0.0.1", id="open-probe-setData"),
+        pytest.param("all", False, "127.0.0.1", id="open-probe-all"),
+        pytest.param("setData", True, "127.0.0.1", id="protected-probe-setData"),
+        pytest.param("all", True, "127.0.0.1", id="protected-probe-all"),
+        pytest.param("setData", False, "LOCALHOST", id="canonical-hostname"),
+    ],
 )
 async def test_secure_http_roundtrip_preserves_authentication_and_value(
-    auth_mode, protected_probe,
+    auth_mode, protected_probe, host,
 ):
     """Public commands arrive with valid signatures and decrypt to typed values."""
     password = "synthetic-local-password"
@@ -89,8 +96,11 @@ async def test_secure_http_roundtrip_preserves_authentication_and_value(
         writes.append(json.loads(plaintext))
         return web.json_response({})
 
-    async with local_server(handler) as port, ClientSession() as session:
-        client = ModernKefClient("127.0.0.1", session, port=port, password=password)
+    async with (
+        local_server(handler) as port,
+        ClientSession(connector=TCPConnector(family=socket.AF_INET)) as session,
+    ):
+        client = ModernKefClient(host, session, port=port, password=password)
         assert await client.async_get_volume_raw() == 42
         await client.async_set_volume_raw(37)
         await client.async_set_volume_raw(38)

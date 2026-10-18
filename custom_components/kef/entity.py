@@ -14,8 +14,20 @@ from .api import BaseKefClient
 from .const import AUTH_FAILURE_MESSAGE, DOMAIN
 from .coordinator import KefCoordinator
 from .exceptions import KefAuthenticationRequiredError, KefError
+from .models import KefBackend
 
 _T = TypeVar("_T")
+
+
+def get_initialized_client(coordinator: KefCoordinator) -> BaseKefClient:
+    """Return the current client or the shared translated initialization error."""
+    client = coordinator.client
+    if client is None:
+        raise HomeAssistantError(
+            "KEF speaker is not initialized", translation_domain=DOMAIN,
+            translation_key="not_initialized",
+        )
+    return client
 
 
 class KefEntity:
@@ -30,13 +42,7 @@ class KefEntity:
     @property
     def client(self) -> BaseKefClient:
         """Return the initialized client for an entity action."""
-        client = self.coordinator.client
-        if client is None:
-            raise HomeAssistantError(
-                "KEF speaker is not initialized", translation_domain=DOMAIN,
-                translation_key="not_initialized",
-            )
-        return client
+        return get_initialized_client(self.coordinator)
 
     async def async_call_kef(self, action: Callable[[], Awaitable[_T]]) -> _T:
         """Run a KEF client action and surface integration-friendly errors."""
@@ -73,7 +79,7 @@ class KefEntity:
             "serial_number": device.serial_number or device.mac_address,
             "configuration_url": str(
                 URL.build(scheme="http", host=device.host.strip("[]"), port=device.port)
-            ) if device.host else None,
+            ) if device.host and device.backend is KefBackend.MODERN else None,
         }
 
 
