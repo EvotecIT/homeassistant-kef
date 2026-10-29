@@ -7,49 +7,25 @@
 [![License](https://img.shields.io/github/license/EvotecIT/homeassistant-kef?style=for-the-badge)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/EvotecIT/homeassistant-kef?style=for-the-badge)](https://github.com/EvotecIT/homeassistant-kef/stargazers)
 
-Requires **Home Assistant 2026.7.2 or newer**. Upgrade the Home Assistant host before
-installing this integration; the host owns its zeroconf and DNS dependencies.
+Control your KEF speakers from Home Assistant over your home network, with no
+cloud account. Turn them on, change volume and input, and adjust the speaker
+settings you'd normally find in the KEF Connect app.
 
-## Overview
+## What you get
 
-Control KEF speakers over your local network from Home Assistant. The
-integration brings together modern and first-generation speaker families with
-discovery, a media player, and the settings each device exposes.
+- **Everyday control:** power, volume, mute, input, and playback.
+- **Speaker settings:** startup volume, standby, wake-up sources, LEDs, and more,
+  as your model allows.
+- **Firmware updates** from Home Assistant, plus optional diagnostics.
+- **Found automatically** on your network.
 
-- Volume, mute, source selection, and supported playback controls.
-- Startup volume, standby, wake sources, LEDs, and other supported device settings.
-- Firmware update controls and optional diagnostics.
+**Speakers:** tested on the LSX II. The LSX II LT, LS50 Wireless II, LS60, and
+XIO use the same connection and are expected to work. The first-generation LSX
+and LS50 Wireless are supported through a separate legacy connection. See
+[device support](docs/device-support.md) for what each model offers.
 
-LSX II has the strongest real-device validation. LSX II LT, LS50 Wireless II,
-LS60, and XIO are modern-API compatibility targets; first-generation LSX and
-LS50 Wireless use a separate legacy connection. Check the
-[device support guide](docs/device-support.md) for the evidence and limitations.
-
-## Sponsor
-
-Support development and maintenance through
-[GitHub Sponsors](https://github.com/sponsors/PrzemyslawKlys).
-Sponsorship is optional; these projects remain open source.
-
-## More for your Home Assistant home
-
-Other integrations and dashboards we maintain:
-
-- [Dreame & MOVA mowers](https://github.com/EvotecIT/homeassistant-dreamelawnmower) — Mowing controls, maps, schedules, and supported cameras.
-- [Lawn Mower Card](https://github.com/EvotecIT/lovelace-lawn-mower-card) — A dashboard for mower state, maps, and controls.
-- [Devialet](https://github.com/EvotecIT/homeassistant-devialet) — Local speaker control, with Dione support.
-- [Siegenia](https://github.com/EvotecIT/homeassistant-siegenia) — Local control for supported window controllers.
-- [EasyControlX](https://github.com/EvotecIT/homeassistant-easycontrolx) — Connect supported Windows and macOS hosts.
-- [Waste Pickup Planner](https://github.com/EvotecIT/lovelace-waste-pickup-planner) — Waste collection dates, bin overviews, cards, and badges.
-
-For a native app connected to the same Home Assistant setup:
-
-- [CasaRay](https://casaray.dev/) — rooms, devices, cameras, and home activity on
-  iPhone, iPad, and Mac.
-- [Tactra Remote](https://tactra.dev/) — media players, speakers, and TV controls
-  on iPhone, iPad, Apple Watch, and Mac.
-
-Neither app is required to use this project.
+Requires **Home Assistant 2026.7.2 or newer**. Update Home Assistant itself
+before you install.
 
 ## Installation
 
@@ -124,3 +100,29 @@ to delete speaker entries and uninstall a Marketplace, HACS, or manual installat
 speaker model, firmware, integration version, and steps to reproduce. Download
 integration diagnostics and review attachments before posting. Never include
 the speaker password or other credentials.
+
+## Sponsor
+
+Support development and maintenance through
+[GitHub Sponsors](https://github.com/sponsors/PrzemyslawKlys).
+Sponsorship is optional; these projects remain open source.
+
+## More for your Home Assistant home
+
+Other integrations and dashboards we maintain:
+
+- [Dreame & MOVA mowers](https://github.com/EvotecIT/homeassistant-dreamelawnmower) — Mowing controls, maps, schedules, and supported cameras.
+- [Lawn Mower Card](https://github.com/EvotecIT/lovelace-lawn-mower-card) — A dashboard for mower state, maps, and controls.
+- [Devialet](https://github.com/EvotecIT/homeassistant-devialet) — Local speaker control, with Dione support.
+- [Siegenia](https://github.com/EvotecIT/homeassistant-siegenia) — Local control for supported window controllers.
+- [EasyControlX](https://github.com/EvotecIT/homeassistant-easycontrolx) — Connect supported Windows and macOS hosts.
+- [Waste Pickup Planner](https://github.com/EvotecIT/lovelace-waste-pickup-planner) — Waste collection dates, bin overviews, cards, and badges.
+
+For a native app connected to the same Home Assistant setup:
+
+- [CasaRay](https://casaray.dev/) — rooms, devices, cameras, and home activity on
+  iPhone, iPad, and Mac.
+- [Tactra Remote](https://tactra.dev/) — media players, speakers, and TV controls
+  on iPhone, iPad, Apple Watch, and Mac.
+
+Neither app is required to use this project.
