@@ -19,6 +19,7 @@ from urllib.parse import urlencode
 
 import aiohttp
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from yarl import URL
 
 from .connection import ConnectionAttempts, async_open_legacy_connection, async_probe
 from .const import (
@@ -1611,7 +1612,7 @@ class ModernKefClient(BaseKefClient):
                     auto_decompress=True,
                     timeout=aiohttp.ClientTimeout(total=None),
                 ) as response:
-                    await response.text()
+                    await self._read_response_text(response, endpoint="firmware upload")
             except aiohttp.ClientError as err:
                 raise KefConnectionError(str(err)) from err
             except TimeoutError as err:
@@ -2026,7 +2027,9 @@ class ModernKefClient(BaseKefClient):
         read_timeout: float | None = None,
     ) -> Any:
         """Issue an authenticated request using the KEF HMAC/AES scheme."""
-        url = self._build_url(endpoint, params=params)
+        # Sign aiohttp's canonical URL, including its query requoting. Signing
+        # urlencode's escaped form would mismatch the URL sent on protected GETs.
+        url = str(URL(self._build_url(endpoint, params=params)))
         headers: dict[str, str] = {}
         body = None
         salt_b64, key = self._build_secure_key()
@@ -2093,6 +2096,22 @@ class ModernKefClient(BaseKefClient):
             sock_read=sock_read,
         )
 
+    @staticmethod
+    async def _read_response_text(
+        response: aiohttp.ClientResponse, *, endpoint: str
+    ) -> str:
+        """Keep decoding failures in the client error contract and retain status."""
+        try:
+            return await response.text()
+        except UnicodeDecodeError as err:
+            # These responses are classified by their status and redirect header.
+            # An undecodable body must not hide an auth failure or HTTP error.
+            if response.status >= 400 or response.status in {301, 302, 303, 307, 308}:
+                return ""
+            raise KefResponseError(
+                f"KEF speaker returned invalid text for {endpoint}"
+            ) from err
+
     async def _execute_json_request(
         self,
         method: str,
@@ -2112,7 +2131,7 @@ class ModernKefClient(BaseKefClient):
                 timeout=self._client_timeout(read_timeout),
                 headers=dict(headers) if headers else None, data=body,
             ) as response:
-                text = await response.text()
+                text = await self._read_response_text(response, endpoint=endpoint)
         except aiohttp.ClientError as err:
             raise KefConnectionError(
                 str(err), backend="modern", port=self._port,

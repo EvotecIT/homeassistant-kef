@@ -2,29 +2,16 @@
 
 import gzip
 import json
-from contextlib import asynccontextmanager
 
 import pytest
 from aiohttp import ClientSession, web
 
-from custom_components.kef.kef_client.client import ModernKefClient
-from custom_components.kef.kef_client.const import PROBE_PATHS
-from custom_components.kef.kef_client.exceptions import KefAuthenticationRequiredError
+from kef_client.client import ModernKefClient
+from kef_client.const import PROBE_PATHS
+from kef_client.exceptions import KefAuthenticationRequiredError
+from tests.http_server import local_server
 
 pytestmark = pytest.mark.usefixtures("socket_enabled")
-
-
-@asynccontextmanager
-async def local_server(handler):
-    app = web.Application()
-    app.router.add_route("*", "/{tail:.*}", handler)
-    runner = web.AppRunner(app, access_log=None)
-    await runner.setup()
-    try:
-        await web.TCPSite(runner, "127.0.0.1", 0).start()
-        yield runner.addresses[0][1]
-    finally:
-        await runner.cleanup()
 
 
 @pytest.mark.parametrize("status", [401, 403])

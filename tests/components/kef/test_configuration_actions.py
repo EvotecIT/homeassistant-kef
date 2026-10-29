@@ -13,8 +13,9 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.kef.const import CONF_BACKEND, DOMAIN
 from custom_components.kef.coordinator import KefCoordinator
 from custom_components.kef.kef_client.client import ModernKefClient
-from tests.conftest import TEST_HOST, TEST_SNAPSHOT
-from tests.test_http_session import local_server
+from custom_components.kef.models import KefEqProfile
+from tests.conftest import EQ_PROFILE_V2_VALUE, TEST_HOST, TEST_SNAPSHOT
+from tests.http_server import local_server
 
 pytestmark = pytest.mark.usefixtures("socket_enabled")
 
@@ -65,6 +66,24 @@ pytestmark = pytest.mark.usefixtures("socket_enabled")
             "select", "streaming_quality", "256 kbps",
             "settings:/airable/bitrate", "airableStreamBitrate", "256",
         ),
+        (
+            "number", "default_volume_global", 37,
+            "settings:/kef/host/defaultVolumeGlobal", "i32_", 37,
+        ),
+        (
+            "number", "maximum_volume", 80,
+            "settings:/kef/host/maximumVolume", "i32_", 80,
+        ),
+        (
+            "number", "volume_step", 4,
+            "settings:/kef/host/volumeStep", "i16_", 4,
+        ),
+        ("switch", "startup_tone", False,
+         "settings:/kef/host/startupTone", "bool_", False),
+        ("switch", "front_led", True,
+         "settings:/kef/host/disableFrontLED", "bool_", False),
+        ("switch", "standby_led", False,
+         "settings:/kef/host/disableFrontStandbyLED", "bool_", True),
         *[
             ("switch", key, enabled, path, "bool_", not enabled)
             for key, path in (
@@ -77,6 +96,7 @@ pytestmark = pytest.mark.usefixtures("socket_enabled")
 )
 async def test_configuration_service_preserves_wire_value_and_state(
     hass,
+    monkeypatch,
     domain,
     key,
     value,
@@ -94,12 +114,21 @@ async def test_configuration_service_preserves_wire_value_and_state(
     entry.add_to_hass(hass)
 
     snapshot = TEST_SNAPSHOT
+    if key == "front_led":
+        snapshot = replace(
+            snapshot,
+            device=replace(snapshot.device, model="LS50W2", model_code="LS50W2"),
+            eq_profile=KefEqProfile.from_modern_value(EQ_PROFILE_V2_VALUE),
+        )
     if domain == "switch":
         snapshot = replace(snapshot, **{f"{key}_enabled": not value})
 
     async def refresh(coordinator):
         coordinator.async_set_updated_data(snapshot)
 
+    monkeypatch.setattr(
+        KefCoordinator, "_async_update_data", AsyncMock(return_value=snapshot)
+    )
     with patch.object(KefCoordinator, "async_config_entry_first_refresh", refresh):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -134,8 +163,8 @@ async def test_configuration_service_preserves_wire_value_and_state(
             if domain == "switch":
                 service = "turn_on" if value else "turn_off"
             else:
-                service = "set_value" if domain == "text" else "select_option"
-                data["value" if domain == "text" else "option"] = value
+                service = "select_option" if domain == "select" else "set_value"
+                data["option" if domain == "select" else "value"] = value
             action = hass.services.async_call(domain, service, data, blocking=True)
             if status == 200:
                 await action
@@ -161,7 +190,81 @@ async def test_configuration_service_preserves_wire_value_and_state(
                     expected_state = value
                 elif domain == "switch":
                     expected_state = "on" if value else "off"
-            assert hass.states.get(entity_id).state == expected_state
+            if domain == "number" and status == 200:
+                assert float(hass.states.get(entity_id).state) == normalized
+            else:
+                assert hass.states.get(entity_id).state == expected_state
+            assert not session.closed
+    finally:
+        assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.parametrize("status", [200, 503], ids=["accepted", "unavailable"])
+async def test_xio_calibration_service_reports_wire_result(hass, monkeypatch, status):
+    """Calibrate through HA and the HTTP client; refresh only an accepted write."""
+    snapshot = replace(
+        TEST_SNAPSHOT,
+        device=replace(TEST_SNAPSHOT.device, model="XIO", model_code="XIO"),
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=snapshot.device.device_name,
+        unique_id=snapshot.device.unique_id,
+        data={CONF_HOST: TEST_HOST, CONF_BACKEND: snapshot.device.backend},
+    )
+    entry.add_to_hass(hass)
+
+    async def refresh(coordinator):
+        coordinator.async_set_updated_data(snapshot)
+
+    monkeypatch.setattr(
+        KefCoordinator, "_async_update_data", AsyncMock(return_value=snapshot)
+    )
+    with patch.object(KefCoordinator, "async_config_entry_first_refresh", refresh):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    captured = []
+
+    async def handler(request):
+        if request.method == "GET":
+            assert request.query["path"] == "settings:/webserver/authMode"
+            return web.json_response([{"type": "string_", "string_": "none"}])
+        assert request.path == "/api/setData"
+        captured.append(await request.json())
+        return web.json_response({}, status=status)
+
+    try:
+        async with local_server(handler) as port, ClientSession() as session:
+            entry.runtime_data.client = ModernKefClient(
+                "127.0.0.1", session, port=port,
+            )
+            refresh_after_write = AsyncMock()
+            entry.runtime_data.async_request_refresh = refresh_after_write
+            entity_id = er.async_get(hass).async_get_entity_id(
+                "button", DOMAIN, f"{snapshot.device.unique_id}_start_calibration",
+            )
+            assert entity_id is not None
+            action = hass.services.async_call(
+                "button", "press", {"entity_id": entity_id}, blocking=True,
+            )
+            if status == 200:
+                await action
+                refresh_after_write.assert_awaited_once_with()
+            else:
+                with pytest.raises(HomeAssistantError) as error:
+                    await action
+                assert error.value.translation_domain == DOMAIN
+                assert error.value.translation_key == "command_failed"
+                assert error.value.translation_placeholders["error"]
+                refresh_after_write.assert_not_awaited()
+            assert captured == [
+                {
+                    "path": "kefdsp:/calibration/start",
+                    "role": "activate",
+                    "value": {},
+                }
+            ]
             assert not session.closed
     finally:
         assert await hass.config_entries.async_unload(entry.entry_id)

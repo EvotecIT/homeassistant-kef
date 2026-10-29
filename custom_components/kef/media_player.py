@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime
 
-from homeassistant.components.media_player import (
+# HA 2026.7 defines the enum here; newer HA keeps its runtime alias but omits
+# the typing export. Retain the import that supports the declared minimum.
+from homeassistant.components.media_player import (  # type: ignore[attr-defined, unused-ignore]
     MediaPlayerDeviceClass,
     MediaPlayerEntity,
 )
