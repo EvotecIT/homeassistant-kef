@@ -37,7 +37,8 @@ def _legacy_eq_profile_to_native(dsp_info: dict[str, Any]) -> dict[str, Any]:
         if (value := profile.get(key)) is not None:
             profile[key] = round((_eq_number(value) / 2.0) - 10.0, 1)
     if (value := profile.get("subOutLPFreq")) is not None:
-        profile["subOutLPFreq"] = round(_eq_number(value) * 10.0)
+        scaled = _eq_number(value) * 10.0
+        profile["subOutLPFreq"] = round(_eq_number(scaled))
 
     return profile
 

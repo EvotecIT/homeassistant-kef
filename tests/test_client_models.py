@@ -112,6 +112,8 @@ def test_invalid_v2_profile_is_unknown():
         pytest.param("deskModeSetting", [], id="array-number"),
         pytest.param("wallModeSetting", {}, id="object-number"),
         pytest.param("subOutLPFreq", "-inf", id="non-finite-string"),
+        pytest.param("subOutLPFreq", 1e308, id="positive-scaling-overflow"),
+        pytest.param("subOutLPFreq", -1e308, id="negative-scaling-overflow"),
     ],
 )
 def test_invalid_v1_eq_numeric_field_is_canonical_error(field, value):

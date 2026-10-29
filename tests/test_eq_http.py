@@ -113,6 +113,15 @@ async def test_eq_write_preserves_opaque_fields_and_unchanged_wire_units(version
             "EQ",
             id="v1-invalid-known-value",
         ),
+        pytest.param(
+            {
+                "type": "kefEqProfile",
+                "kefEqProfile": {"dspInfo": {"subOutLPFreq": 1e308}},
+            },
+            1,
+            "EQ",
+            id="v1-scaling-overflow",
+        ),
     ],
 )
 async def test_malformed_eq_response_never_writes_a_profile(

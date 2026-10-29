@@ -11,7 +11,9 @@ from tests.http_server import local_server
 pytestmark = pytest.mark.usefixtures("socket_enabled")
 
 
-@pytest.mark.parametrize("interruption", ["timeout", "cancel", "disconnect"])
+@pytest.mark.parametrize(
+    "interruption", ["timeout", "cancel", "disconnect", "partial_body"]
+)
 async def test_interrupted_http_read_releases_response_and_recovers(interruption):
     """Deadlines, cancellation and disconnects allow a subsequent public read."""
     entered = asyncio.Event()
@@ -29,6 +31,13 @@ async def test_interrupted_http_read_releases_response_and_recovers(interruption
             if interruption == "disconnect":
                 request.transport.abort()
                 return web.Response()
+            if interruption == "partial_body":
+                response = web.StreamResponse()
+                response.content_type = "application/json"
+                await response.prepare(request)
+                await response.write(b'[{"type": "i32_", ')
+                await release.wait()
+                return response
             await release.wait()
         return web.json_response([{"type": "i32_", "i32_": 42}])
 

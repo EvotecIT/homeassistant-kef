@@ -3,6 +3,7 @@
 import pytest
 from homeassistant.const import CONF_HOST
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.translation import async_get_translations
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kef import number, select, switch, text
@@ -24,6 +25,7 @@ async def uninitialized_coordinator(hass):
 
 
 async def test_uninitialized_coordinator_client_has_translated_error(
+    hass,
     uninitialized_coordinator,
 ):
     """Before the first refresh, every action's client accessor has one error."""
@@ -34,6 +36,10 @@ async def test_uninitialized_coordinator_client_has_translated_error(
         _ = entity.client
     assert error.value.translation_domain == DOMAIN
     assert error.value.translation_key == "not_initialized"
+    translations = await async_get_translations(hass, "en", "exceptions", {DOMAIN})
+    assert translations[
+        "component.kef.exceptions.not_initialized.message"
+    ] == str(error.value)
     assert coordinator.client is None
 
 
