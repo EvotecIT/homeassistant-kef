@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/github/license/EvotecIT/homeassistant-kef?style=for-the-badge)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/EvotecIT/homeassistant-kef?style=for-the-badge)](https://github.com/EvotecIT/homeassistant-kef/stargazers)
 
-Requires Home Assistant 2026.7.2 or later. Upgrade the Home Assistant host before
+Requires **Home Assistant 2026.7.2 or newer**. Upgrade the Home Assistant host before
 installing this integration; the host owns its zeroconf and DNS dependencies.
 
 ## Overview
@@ -116,7 +116,7 @@ if its network address changes.
 ## Removal
 
 Follow the [removal instructions](docs/configuration.md#remove-the-integration)
-to delete speaker entries and uninstall the HACS or manual installation.
+to delete speaker entries and uninstall a Marketplace, HACS, or manual installation.
 
 ## Support
 
