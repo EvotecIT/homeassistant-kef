@@ -96,6 +96,7 @@ pytestmark = pytest.mark.usefixtures("socket_enabled")
 )
 async def test_configuration_service_preserves_wire_value_and_state(
     hass,
+    monkeypatch,
     domain,
     key,
     value,
@@ -125,6 +126,9 @@ async def test_configuration_service_preserves_wire_value_and_state(
     async def refresh(coordinator):
         coordinator.async_set_updated_data(snapshot)
 
+    monkeypatch.setattr(
+        KefCoordinator, "_async_update_data", AsyncMock(return_value=snapshot)
+    )
     with patch.object(KefCoordinator, "async_config_entry_first_refresh", refresh):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -196,7 +200,7 @@ async def test_configuration_service_preserves_wire_value_and_state(
 
 
 @pytest.mark.parametrize("status", [200, 503], ids=["accepted", "unavailable"])
-async def test_xio_calibration_service_reports_wire_result(hass, status):
+async def test_xio_calibration_service_reports_wire_result(hass, monkeypatch, status):
     """Calibrate through HA and the HTTP client; refresh only an accepted write."""
     snapshot = replace(
         TEST_SNAPSHOT,
@@ -213,6 +217,9 @@ async def test_xio_calibration_service_reports_wire_result(hass, status):
     async def refresh(coordinator):
         coordinator.async_set_updated_data(snapshot)
 
+    monkeypatch.setattr(
+        KefCoordinator, "_async_update_data", AsyncMock(return_value=snapshot)
+    )
     with patch.object(KefCoordinator, "async_config_entry_first_refresh", refresh):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
