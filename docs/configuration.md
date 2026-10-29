@@ -213,7 +213,8 @@ controls extra entities and is not required for either download.
    integration entry, and choose **Delete**. Repeat for any other speakers you
    want to remove.
 3. To uninstall the custom integration, delete all KEF entries first, then
-   remove **KEF** in HACS. For a manual installation, remove
+   uninstall **KEF** through **Settings → Marketplace** on HA 2026.11 or newer,
+   or through HACS on older HA versions. For a manual installation, remove
    `config/custom_components/kef`. Restart Home Assistant.
 
 Entry deletion removes the HA connection configuration. KEF does not keep a
