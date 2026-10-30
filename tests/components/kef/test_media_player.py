@@ -95,6 +95,39 @@ def _wire_volume_writes(player, device_volume=None):
     return written, device
 
 
+@pytest.mark.parametrize(
+    ("command", "cached_state", "speaker_state", "toggles", "published_state"),
+    [
+        ("async_media_pause", "playing", "paused", 0, None),
+        ("async_media_pause", "paused", "playing", 1, "paused"),
+        ("async_media_play", "paused", "playing", 0, None),
+        ("async_media_play", "playing", "paused", 1, "playing"),
+    ],
+)
+def test_transport_commands_follow_speaker_state_over_cached_state(
+    command, cached_state, speaker_state, toggles, published_state
+) -> None:
+    """A stale state must not undo a pause or swallow a command."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    assert snapshot.playback is not None
+    snapshot.playback.state = cached_state
+    player = _build_player(snapshot)
+    toggle = AsyncMock()
+    player.coordinator.client = SimpleNamespace(
+        async_get_playback_state=AsyncMock(return_value=speaker_state),
+        async_toggle_play_pause=toggle,
+    )
+
+    asyncio.run(getattr(player, command)())
+
+    assert toggle.await_count == toggles
+    if published_state is None:
+        player.coordinator.async_apply_local_change.assert_not_called()
+    else:
+        published = player.coordinator.async_apply_local_change.call_args.kwargs
+        assert published["playback"].state == published_state
+
+
 def test_extra_state_attributes_hide_unsupported_model_features() -> None:
     """Attributes for a capability the model doesn't have should not appear."""
     snapshot = deepcopy(TEST_SNAPSHOT)

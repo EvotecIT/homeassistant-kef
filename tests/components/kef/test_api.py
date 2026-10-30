@@ -402,6 +402,21 @@ async def test_modern_set_volume_posts_typed_payload(monkeypatch, hass) -> None:
     }
 
 
+async def test_modern_playback_state_reads_player_data(monkeypatch, hass) -> None:
+    """Transport commands decide from this read, so it must reach the speaker."""
+    reads: list[str] = []
+
+    async def fake_get_value(self, path, *, typed_key=None):
+        reads.append(path)
+        return {"state": "paused"}
+
+    monkeypatch.setattr(ModernKefClient, "_get_path_value", fake_get_value)
+    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
+
+    assert await client.async_get_playback_state() == "paused"
+    assert reads == [PROBE_PATHS["player_data"]]
+
+
 async def test_modern_set_muted_posts_bool_payload(monkeypatch, hass) -> None:
     """Modern client should post a bool payload when muting."""
     captured = {}

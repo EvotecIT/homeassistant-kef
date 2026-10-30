@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime
 
 # HA 2026.7 defines the enum here; newer HA keeps its runtime alias but omits
@@ -33,6 +34,8 @@ from .models import KefBackend
 PARALLEL_UPDATES = 1
 
 VOLUME_STEP = 4
+
+_TOGGLED_PLAYBACK_STATE = {"playing": "paused", "paused": "playing"}
 
 # Sources with no real track metadata, where the speaker just passes audio
 # through from an external device. The codec/virtualizer info is worth
@@ -480,19 +483,50 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
 
     async def async_media_play(self) -> None:
         """Play or resume playback."""
-        if self.state != MediaPlayerState.PLAYING:
-            await self.async_call_kef(
-                self.client.async_toggle_play_pause
-            )
-            await self.coordinator.async_request_refresh()
+        playback_state = await self._async_live_playback_state()
+        if playback_state != "playing":
+            await self._async_toggle_playback(playback_state)
 
     async def async_media_pause(self) -> None:
         """Pause playback."""
-        if self.state == MediaPlayerState.PLAYING:
-            await self.async_call_kef(
-                self.client.async_toggle_play_pause
-            )
+        playback_state = await self._async_live_playback_state()
+        if playback_state == "playing":
+            await self._async_toggle_playback(playback_state)
+
+    async def _async_live_playback_state(self) -> str | None:
+        """Read the playback state from the speaker, not from cached state.
+
+        The speaker's only transport command is a toggle, and cached state can
+        trail it by several seconds in either direction. Deciding from a stale
+        state would resume a track someone just paused, or drop the command.
+        """
+        try:
+            live = await self.coordinator.client.async_get_playback_state()
+        except KefAuthenticationRequiredError as err:
+            self.coordinator.config_entry.async_start_reauth(self.coordinator.hass)
+            raise HomeAssistantError(AUTH_FAILURE_MESSAGE) from err
+        except KefError:
+            live = None
+        if live is not None:
+            return live
+        playback = self.coordinator.data.playback
+        return playback.state if playback is not None else None
+
+    async def _async_toggle_playback(self, playback_state: str | None) -> None:
+        """Toggle playback and publish the state the speaker moved to."""
+        await self.async_call_kef(self.coordinator.client.async_toggle_play_pause)
+        playback = self.coordinator.data.playback
+        toggled_state = _TOGGLED_PLAYBACK_STATE.get(playback_state)
+        if (
+            playback is None
+            or toggled_state is None
+            or self.coordinator.data.device.backend is KefBackend.LEGACY
+        ):
             await self.coordinator.async_request_refresh()
+            return
+        self.coordinator.async_apply_local_change(
+            playback=replace(playback, state=toggled_state)
+        )
 
     async def async_media_next_track(self) -> None:
         """Skip to the next track."""
