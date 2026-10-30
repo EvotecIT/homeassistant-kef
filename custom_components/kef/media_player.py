@@ -501,7 +501,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         state would resume a track someone just paused, or drop the command.
         """
         try:
-            live = await self.coordinator.client.async_get_playback_state()
+            live = await self.client.async_get_playback_state()
         except KefAuthenticationRequiredError as err:
             self.coordinator.config_entry.async_start_reauth(self.coordinator.hass)
             raise HomeAssistantError(AUTH_FAILURE_MESSAGE) from err
@@ -514,9 +514,9 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
 
     async def _async_toggle_playback(self, playback_state: str | None) -> None:
         """Toggle playback and publish the state the speaker moved to."""
-        await self.async_call_kef(self.coordinator.client.async_toggle_play_pause)
+        await self.async_call_kef(self.client.async_toggle_play_pause)
         playback = self.coordinator.data.playback
-        toggled_state = _TOGGLED_PLAYBACK_STATE.get(playback_state)
+        toggled_state = _TOGGLED_PLAYBACK_STATE.get(playback_state or "")
         if (
             playback is None
             or toggled_state is None
