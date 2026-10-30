@@ -71,6 +71,7 @@ For modern devices, `async_refresh()` includes source, power state, volume, mute
 - `async_turn_on()`
 - `async_turn_off()`
 - `async_set_volume_raw(volume)`
+- `async_get_playback_state()`
 - `async_toggle_play_pause()`
 - `async_set_muted(muted)`
 - `async_next_track()`

@@ -156,6 +156,10 @@ class BaseKefClient(ABC):
     async def async_get_volume_raw(self) -> int | None:
         """Read the raw 0..100 volume value in a single round trip."""
 
+    async def async_get_playback_state(self) -> str | None:
+        """Read just the playback state, when the backend has a cheap read."""
+        return None
+
     @abstractmethod
     async def async_toggle_play_pause(self) -> None:
         """Toggle play/pause."""
@@ -995,8 +999,18 @@ class ModernKefClient(BaseKefClient):
             raise KefResponseError("Unexpected KEF volume payload")
         return value
 
+    async def async_get_playback_state(self) -> str | None:
+        """Read just the playback state (one request, unlike async_refresh)."""
+        player_data = await self._get_path_value(PROBE_PATHS["player_data"])
+        state = player_data.get("state") if isinstance(player_data, dict) else None
+        return state if isinstance(state, str) else None
+
     async def async_toggle_play_pause(self) -> None:
-        """Toggle play/pause."""
+        """Toggle play/pause.
+
+        ``pause`` is the speaker's only resume command too. A bare ``play``
+        ends a Spotify Connect session instead of resuming it.
+        """
         await self._set_data(
             "player:player/control",
             role="activate",

@@ -183,6 +183,12 @@ step per button press, and whether the ceiling is enforced;
 
 ## Playback data
 
+`player:player/control` with `{"control": "pause"}` is a toggle: it pauses a
+playing session and resumes a paused one. An LSX II on firmware 3.0.137 applied
+it to Spotify Connect at once, with `player:player/data` changing within 1.5 s.
+A bare `{"control": "play"}` is not a resume: on that speaker it answered
+"Directory is empty. No playable items found." and ended the Spotify session.
+
 `player:player/data` describes the current session:
 
 - `state`, for example `playing` or `stopped`
