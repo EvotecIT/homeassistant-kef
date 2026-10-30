@@ -98,9 +98,9 @@ def _wire_volume_writes(player, device_volume=None):
 @pytest.mark.parametrize(
     ("command", "cached_state", "speaker_state", "toggles", "published_state"),
     [
-        ("async_media_pause", "playing", "paused", 0, None),
+        ("async_media_pause", "playing", "paused", 0, "paused"),
         ("async_media_pause", "paused", "playing", 1, "paused"),
-        ("async_media_play", "paused", "playing", 0, None),
+        ("async_media_play", "paused", "playing", 0, "playing"),
         ("async_media_play", "playing", "paused", 1, "playing"),
     ],
 )
@@ -121,11 +121,8 @@ def test_transport_commands_follow_speaker_state_over_cached_state(
     asyncio.run(getattr(player, command)())
 
     assert toggle.await_count == toggles
-    if published_state is None:
-        player.coordinator.async_apply_local_change.assert_not_called()
-    else:
-        published = player.coordinator.async_apply_local_change.call_args.kwargs
-        assert published["playback"].state == published_state
+    published = player.coordinator.async_apply_local_change.call_args.kwargs
+    assert published["playback"].state == published_state
 
 
 def test_extra_state_attributes_hide_unsupported_model_features() -> None:

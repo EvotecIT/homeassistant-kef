@@ -1002,7 +1002,8 @@ class ModernKefClient(BaseKefClient):
     async def async_get_playback_state(self) -> str | None:
         """Read just the playback state (one request, unlike async_refresh)."""
         player_data = await self._get_path_value(PROBE_PATHS["player_data"])
-        return player_data.get("state") if isinstance(player_data, dict) else None
+        state = player_data.get("state") if isinstance(player_data, dict) else None
+        return state if isinstance(state, str) else None
 
     async def async_toggle_play_pause(self) -> None:
         """Toggle play/pause.

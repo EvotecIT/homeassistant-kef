@@ -484,14 +484,18 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
     async def async_media_play(self) -> None:
         """Play or resume playback."""
         playback_state = await self._async_live_playback_state()
-        if playback_state != "playing":
-            await self._async_toggle_playback(playback_state)
+        if playback_state == "playing":
+            self._publish_playback_state(playback_state)
+            return
+        await self._async_toggle_playback(playback_state)
 
     async def async_media_pause(self) -> None:
         """Pause playback."""
         playback_state = await self._async_live_playback_state()
-        if playback_state == "playing":
-            await self._async_toggle_playback(playback_state)
+        if playback_state != "playing":
+            self._publish_playback_state(playback_state)
+            return
+        await self._async_toggle_playback(playback_state)
 
     async def _async_live_playback_state(self) -> str | None:
         """Read the playback state from the speaker, not from cached state.
@@ -524,9 +528,15 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         ):
             await self.coordinator.async_request_refresh()
             return
-        self.coordinator.async_apply_local_change(
-            playback=replace(playback, state=toggled_state)
-        )
+        self._publish_playback_state(toggled_state)
+
+    def _publish_playback_state(self, playback_state: str | None) -> None:
+        """Show the speaker's playback state ahead of the next poll."""
+        playback = self.coordinator.data.playback
+        if playback is not None and playback.state != playback_state:
+            self.coordinator.async_apply_local_change(
+                playback=replace(playback, state=playback_state)
+            )
 
     async def async_media_next_track(self) -> None:
         """Skip to the next track."""
