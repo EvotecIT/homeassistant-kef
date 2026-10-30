@@ -96,7 +96,7 @@ def _wire_volume_writes(player, device_volume=None):
 
 
 @pytest.mark.parametrize(
-    ("command", "cached_state", "speaker_state", "toggles", "published_state"),
+    ("command", "cached_state", "speaker_state", "toggles", "shown_state"),
     [
         ("async_media_pause", "playing", "paused", 0, "paused"),
         ("async_media_pause", "paused", "playing", 1, "paused"),
@@ -105,7 +105,7 @@ def _wire_volume_writes(player, device_volume=None):
     ],
 )
 def test_transport_commands_follow_speaker_state_over_cached_state(
-    command, cached_state, speaker_state, toggles, published_state
+    command, cached_state, speaker_state, toggles, shown_state
 ) -> None:
     """A stale state must not undo a pause or swallow a command."""
     snapshot = deepcopy(TEST_SNAPSHOT)
@@ -118,11 +118,15 @@ def test_transport_commands_follow_speaker_state_over_cached_state(
         async_toggle_play_pause=toggle,
     )
 
+    def _apply(**changes) -> None:
+        player.coordinator.data = replace(player.coordinator.data, **changes)
+
+    player.coordinator.async_apply_local_change = Mock(side_effect=_apply)
+
     asyncio.run(getattr(player, command)())
 
     assert toggle.await_count == toggles
-    published = player.coordinator.async_apply_local_change.call_args.kwargs
-    assert published["playback"].state == published_state
+    assert player.coordinator.data.playback.state == shown_state
 
 
 def test_extra_state_attributes_hide_unsupported_model_features() -> None:
