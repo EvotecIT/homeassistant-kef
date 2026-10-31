@@ -103,6 +103,21 @@ some settings, including selecting the XIO's KW2 wireless subwoofer. Writing
 the matching fields over the HTTP API returns 403, so those settings are not
 available to the integration.
 
+## Power and input selection
+
+Modern **Turn on** reads only `settings:/kef/play/physicalSource`. An active input
+is left alone. From standby it selects the running client's last known input
+once, falling back to Wi-Fi when no input is remembered. The client avoids a full
+state refresh before waking and does not send an off/on cycle.
+
+An October 2026 LSX II check on firmware `3.0.137.0xf884312` activated
+`powermanager:targetRequest` with `{"target":"online","reason":"userActivity"}`
+after confirmed network standby. The request was accepted and the power target
+became `online`, but speaker status and physical source remained `standby`.
+Selecting USB restored `powerOn` and the Windows USB audio endpoint. A power
+target acknowledgement therefore does not prove that the speaker's audio is
+awake; the integration keeps using source selection for this workflow.
+
 ## Event queue
 
 `modifyQueue` takes a list of paths to subscribe to and returns a queue id.
@@ -218,7 +233,8 @@ what the three tested speakers returned for a plain read.
 | Area | Paths | Observed |
 | --- | --- | --- |
 | Power | `powermanager:target` | `powerTarget` with `target` (`online` or `networkStandby`) and `reason` |
-| Power | `powermanager:targetRequest`, `powermanager:goReboot` | Action paths, not probed |
+| Power | `powermanager:targetRequest` | Action accepted on LSX II but did not restore audio from standby; see [power and input selection](#power-and-input-selection) |
+| Power | `powermanager:goReboot` | Action path, not probed |
 | Scheduled reboot | `settings:/kef/scheduledReboot/enabled`, `/dayOfWeek`, `/time` | Present on all three; off, day `1`, `03:00` by default |
 | Bluetooth | `bluetooth:state` | `bluetoothState` with `connected`, `discoverable`, `pairable`, and the speaker's name |
 | Bluetooth | `bluetooth:disconnect`, `bluetooth:externalDiscoverable`, `bluetooth:clearAllDevices` | Action paths, not probed |

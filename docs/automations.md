@@ -59,6 +59,31 @@ actions:
 mode: single
 ```
 
+## Select USB for a computer
+
+For a Home Assistant remote, use the standard `media_player.turn_on` action for
+power. It leaves an active input alone; from standby it selects the running
+client's last known input once, or Wi-Fi when no input is remembered. No off/on
+cycle is required. Use source selection when the listener wants a specific input.
+
+For an LSX II or another model with USB audio, select the input explicitly when
+returning to the computer. This also requests that the speaker leave standby;
+a separate **Turn on** action is unnecessary. It does not start network playback
+or change the volume. Audio already being sent by the computer may become audible.
+
+```yaml
+action: media_player.select_source
+target:
+  entity_id: media_player.kef_speaker
+data:
+  source: usb
+```
+
+The action's success and the reported `usb` input do not prove that Windows or
+macOS has detected the USB audio device. Check the computer's sound output list
+as well. For automatic USB wake, review the separate
+[standby and wake-source settings](configuration.md#standby-usb-audio-and-computer-visibility).
+
 ## Other settings
 
 Use standard `select.select_option`, `number.set_value`, or switch actions for
