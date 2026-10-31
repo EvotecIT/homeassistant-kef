@@ -117,7 +117,7 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         self._last_volume_before_mute = coordinator.data.volume_raw or 15
         self._volume_lock = asyncio.Lock()
         self._transport_lock = asyncio.Lock()
-        self._expected_playback: tuple[str, float] | None = None
+        self._expected_playback: tuple[str, float, bool] | None = None
 
     @property
     def available(self) -> bool:
@@ -379,12 +379,16 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
 
     async def async_turn_on(self) -> None:
         """Turn on the speaker."""
-        await self.async_call_kef(self.client.async_turn_on)
+        async with self._transport_lock:
+            self._expected_playback = None
+            await self.async_call_kef(self.client.async_turn_on)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self) -> None:
         """Turn off the speaker."""
-        await self.async_call_kef(self.client.async_turn_off)
+        async with self._transport_lock:
+            self._expected_playback = None
+            await self.async_call_kef(self.client.async_turn_off)
         await self.coordinator.async_request_refresh()
 
     async def async_set_volume_level(self, volume: float) -> None:
@@ -476,16 +480,20 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
 
     async def async_select_source(self, source: str) -> None:
         """Select the input source."""
-        history = self.coordinator.diagnostic_events
-        transition = history.begin_source_change(self.coordinator.data.source, source)
-        try:
-            await self.async_call_kef(
-                lambda: self.client.async_select_source(source)
+        async with self._transport_lock:
+            self._expected_playback = None
+            history = self.coordinator.diagnostic_events
+            transition = history.begin_source_change(
+                self.coordinator.data.source, source
             )
-        except HomeAssistantError:
-            history.record("source_change_failed", transition=transition)
-            raise
-        history.source_acknowledged(transition)
+            try:
+                await self.async_call_kef(
+                    lambda: self.client.async_select_source(source)
+                )
+            except HomeAssistantError:
+                history.record("source_change_failed", transition=transition)
+                raise
+            history.source_acknowledged(transition)
         await self.coordinator.async_request_refresh()
 
     async def async_media_play(self) -> None:
@@ -523,8 +531,10 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         except KefError:
             live = None
         if self._expected_playback is not None:
-            expected, settles_at = self._expected_playback
-            if live != expected and time.monotonic() < settles_at:
+            expected, settles_at, reversed_command = self._expected_playback
+            if time.monotonic() < settles_at and (
+                live != expected or reversed_command
+            ):
                 return expected
             self._expected_playback = None
         if live is not None:
@@ -538,9 +548,12 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         playback = self.coordinator.data.playback
         toggled_state = _TOGGLED_PLAYBACK_STATE.get(playback_state or "")
         if toggled_state is not None:
+            # After a rapid reversal, even a matching read may still describe
+            # the state before either toggle. Keep the full settling window.
             self._expected_playback = (
                 toggled_state,
                 time.monotonic() + _PLAYBACK_SETTLE_SECONDS,
+                self._expected_playback is not None,
             )
         if (
             playback is None

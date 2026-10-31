@@ -130,23 +130,63 @@ def test_transport_commands_follow_speaker_state_over_cached_state(
 
 
 @pytest.mark.parametrize(
-    ("commands", "toggles", "shown_state"),
+    ("commands", "speaker_states", "command_times", "toggles", "shown_state"),
     [
-        (("async_media_pause", "async_media_pause"), 1, "paused"),
-        (("async_media_pause", "async_media_play"), 2, "playing"),
+        (
+            ("async_media_pause", "async_media_pause"),
+            ["playing", "playing"],
+            [100, 100],
+            1,
+            "paused",
+        ),
+        (
+            ("async_media_pause", "async_media_play"),
+            ["playing", "playing"],
+            [100, 100],
+            2,
+            "playing",
+        ),
+        (
+            ("async_media_pause", "async_media_pause", "async_media_pause"),
+            ["playing", "paused", "playing"],
+            [100, 100, 100],
+            2,
+            "paused",
+        ),
+        (
+            ("async_media_pause", "async_media_play", "async_media_play",
+             "async_media_play"),
+            ["playing", "playing", "playing", "paused"],
+            [100, 100.1, 100.2, 102.9],
+            2,
+            "playing",
+        ),
+        (
+            ("async_media_pause", "async_media_play", "async_media_play",
+             "async_media_play", "async_media_play"),
+            ["playing", "playing", "playing", "paused", "paused"],
+            [100, 100.1, 100.2, 102.9, 103.1],
+            3,
+            "playing",
+        ),
     ],
 )
-def test_a_second_command_waits_for_the_first_to_show_on_the_speaker(
-    commands, toggles, shown_state
+def test_transport_settles_until_the_speaker_confirms_the_command(
+    commands, speaker_states, command_times, toggles, shown_state, monkeypatch
 ) -> None:
-    """The speaker still reads "playing" just after pausing; a double tap must hold."""
+    """Trust confirmation unless a rapid reversal makes it ambiguous until expiry."""
+    now = 100.0
+    monkeypatch.setattr(
+        "custom_components.kef.media_player.time",
+        SimpleNamespace(monotonic=lambda: now),
+    )
     snapshot = deepcopy(TEST_SNAPSHOT)
     assert snapshot.playback is not None
     snapshot.playback.state = "playing"
     player = _build_player(snapshot)
     toggle = AsyncMock()
     player.coordinator.client = SimpleNamespace(
-        async_get_playback_state=AsyncMock(return_value="playing"),
+        async_get_playback_state=AsyncMock(side_effect=speaker_states),
         async_toggle_play_pause=toggle,
     )
 
@@ -156,13 +196,116 @@ def test_a_second_command_waits_for_the_first_to_show_on_the_speaker(
     player.coordinator.async_apply_local_change = Mock(side_effect=_apply)
 
     async def _press() -> None:
-        for command in commands:
+        nonlocal now
+        for command, command_time in zip(commands, command_times, strict=True):
+            now = command_time
             await getattr(player, command)()
 
     asyncio.run(_press())
 
     assert toggle.await_count == toggles
     assert player.coordinator.data.playback.state == shown_state
+
+
+@pytest.mark.parametrize(
+    ("command", "args"),
+    [
+        ("async_select_source", ("bluetooth",)),
+        ("async_turn_off", ()),
+        ("async_turn_on", ()),
+    ],
+)
+async def test_session_change_discards_pending_playback_intent(
+    command, args, monkeypatch
+) -> None:
+    """A pause on the new session must use its own playback state."""
+    monkeypatch.setattr(
+        "custom_components.kef.media_player.time",
+        SimpleNamespace(monotonic=lambda: 100),
+    )
+    player = _build_player(deepcopy(TEST_SNAPSHOT))
+    toggle = AsyncMock()
+    change_session = AsyncMock()
+    player.coordinator.client = SimpleNamespace(
+        async_get_playback_state=AsyncMock(return_value="playing"),
+        async_toggle_play_pause=toggle,
+        **{command: change_session},
+    )
+    player.coordinator.async_request_refresh = AsyncMock()
+
+    await player.async_media_pause()
+    await getattr(player, command)(*args)
+    await player.async_media_pause()
+
+    assert toggle.await_count == 2
+    change_session.assert_awaited_once_with(*args)
+    player.coordinator.async_request_refresh.assert_awaited_once_with()
+
+
+@pytest.mark.parametrize("blocked_action", ["toggle", "source"])
+async def test_source_change_serializes_with_in_flight_transport(
+    blocked_action, monkeypatch
+) -> None:
+    """Neither side of an overlapping source change may reuse prior intent."""
+    monkeypatch.setattr(
+        "custom_components.kef.media_player.time",
+        SimpleNamespace(monotonic=lambda: 100),
+    )
+    player = _build_player(deepcopy(TEST_SNAPSHOT))
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    queued = asyncio.Event()
+
+    async def _block(*_args) -> None:
+        entered.set()
+        await release.wait()
+
+    toggle = AsyncMock(side_effect=_block if blocked_action == "toggle" else None)
+    select = AsyncMock(side_effect=_block if blocked_action == "source" else None)
+    read = AsyncMock(return_value="playing")
+    player.coordinator.client = SimpleNamespace(
+        async_get_playback_state=read,
+        async_toggle_play_pause=toggle,
+        async_select_source=select,
+    )
+    player.coordinator.async_request_refresh = AsyncMock()
+
+    async def _select() -> None:
+        await player.async_select_source("bluetooth")
+
+    if blocked_action == "source":
+        await player.async_media_pause()
+        first, second = _select, player.async_media_pause
+    else:
+        first, second = player.async_media_pause, _select
+
+    async def _queue_second() -> None:
+        queued.set()
+        await second()
+
+    first_task = asyncio.create_task(first())
+    second_task = None
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        second_task = asyncio.create_task(_queue_second())
+        await asyncio.wait_for(queued.wait(), timeout=1)
+        if blocked_action == "toggle":
+            select.assert_not_awaited()
+        else:
+            assert read.await_count == 1
+        release.set()
+        await asyncio.wait_for(asyncio.gather(first_task, second_task), timeout=1)
+        if blocked_action == "toggle":
+            toggle.side_effect = None
+            await player.async_media_pause()
+        assert toggle.await_count == 2
+        select.assert_awaited_once_with("bluetooth")
+    finally:
+        release.set()
+        tasks = [task for task in (first_task, second_task) if task is not None]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def test_extra_state_attributes_hide_unsupported_model_features() -> None:
