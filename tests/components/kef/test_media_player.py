@@ -129,6 +129,42 @@ def test_transport_commands_follow_speaker_state_over_cached_state(
     assert player.coordinator.data.playback.state == shown_state
 
 
+@pytest.mark.parametrize(
+    ("commands", "toggles", "shown_state"),
+    [
+        (("async_media_pause", "async_media_pause"), 1, "paused"),
+        (("async_media_pause", "async_media_play"), 2, "playing"),
+    ],
+)
+def test_a_second_command_waits_for_the_first_to_show_on_the_speaker(
+    commands, toggles, shown_state
+) -> None:
+    """The speaker still reads "playing" just after pausing; a double tap must hold."""
+    snapshot = deepcopy(TEST_SNAPSHOT)
+    assert snapshot.playback is not None
+    snapshot.playback.state = "playing"
+    player = _build_player(snapshot)
+    toggle = AsyncMock()
+    player.coordinator.client = SimpleNamespace(
+        async_get_playback_state=AsyncMock(return_value="playing"),
+        async_toggle_play_pause=toggle,
+    )
+
+    def _apply(**changes) -> None:
+        player.coordinator.data = replace(player.coordinator.data, **changes)
+
+    player.coordinator.async_apply_local_change = Mock(side_effect=_apply)
+
+    async def _press() -> None:
+        for command in commands:
+            await getattr(player, command)()
+
+    asyncio.run(_press())
+
+    assert toggle.await_count == toggles
+    assert player.coordinator.data.playback.state == shown_state
+
+
 def test_extra_state_attributes_hide_unsupported_model_features() -> None:
     """Attributes for a capability the model doesn't have should not appear."""
     snapshot = deepcopy(TEST_SNAPSHOT)

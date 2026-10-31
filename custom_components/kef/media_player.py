@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import replace
 from datetime import datetime
+import time
 
 # HA 2026.7 defines the enum here; newer HA keeps its runtime alias but omits
 # the typing export. Retain the import that supports the declared minimum.
@@ -36,6 +37,10 @@ PARALLEL_UPDATES = 1
 VOLUME_STEP = 4
 
 _TOGGLED_PLAYBACK_STATE = {"playing": "paused", "paused": "playing"}
+
+# How long a toggle's result outranks the speaker's own read. Its player data
+# was measured changing within 1.5 s of the command.
+_PLAYBACK_SETTLE_SECONDS = 3.0
 
 # Sources with no real track metadata, where the speaker just passes audio
 # through from an external device. The codec/virtualizer info is worth
@@ -111,6 +116,8 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         self._attr_name = None
         self._last_volume_before_mute = coordinator.data.volume_raw or 15
         self._volume_lock = asyncio.Lock()
+        self._transport_lock = asyncio.Lock()
+        self._expected_playback: tuple[str, float] | None = None
 
     @property
     def available(self) -> bool:
@@ -483,19 +490,21 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
 
     async def async_media_play(self) -> None:
         """Play or resume playback."""
-        playback_state = await self._async_live_playback_state()
-        if playback_state == "playing":
-            self._publish_playback_state(playback_state)
-            return
-        await self._async_toggle_playback(playback_state)
+        async with self._transport_lock:
+            playback_state = await self._async_live_playback_state()
+            if playback_state == "playing":
+                self._publish_playback_state(playback_state)
+                return
+            await self._async_toggle_playback(playback_state)
 
     async def async_media_pause(self) -> None:
         """Pause playback."""
-        playback_state = await self._async_live_playback_state()
-        if playback_state != "playing":
-            self._publish_playback_state(playback_state)
-            return
-        await self._async_toggle_playback(playback_state)
+        async with self._transport_lock:
+            playback_state = await self._async_live_playback_state()
+            if playback_state != "playing":
+                self._publish_playback_state(playback_state)
+                return
+            await self._async_toggle_playback(playback_state)
 
     async def _async_live_playback_state(self) -> str | None:
         """Read the playback state from the speaker, not from cached state.
@@ -503,6 +512,8 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         The speaker's only transport command is a toggle, and cached state can
         trail it by several seconds in either direction. Deciding from a stale
         state would resume a track someone just paused, or drop the command.
+        The speaker also takes a moment to report its own toggle, so a second
+        command in that window decides from the state the first one asked for.
         """
         try:
             live = await self.client.async_get_playback_state()
@@ -511,6 +522,11 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
             raise HomeAssistantError(AUTH_FAILURE_MESSAGE) from err
         except KefError:
             live = None
+        if self._expected_playback is not None:
+            expected, settles_at = self._expected_playback
+            if live != expected and time.monotonic() < settles_at:
+                return expected
+            self._expected_playback = None
         if live is not None:
             return live
         playback = self.coordinator.data.playback
@@ -521,6 +537,11 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         await self.async_call_kef(self.client.async_toggle_play_pause)
         playback = self.coordinator.data.playback
         toggled_state = _TOGGLED_PLAYBACK_STATE.get(playback_state or "")
+        if toggled_state is not None:
+            self._expected_playback = (
+                toggled_state,
+                time.monotonic() + _PLAYBACK_SETTLE_SECONDS,
+            )
         if (
             playback is None
             or toggled_state is None
