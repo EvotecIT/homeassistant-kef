@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import replace
 from datetime import datetime
-import time
 
 # HA 2026.7 defines the enum here; newer HA keeps its runtime alias but omits
 # the typing export. Retain the import that supports the declared minimum.
