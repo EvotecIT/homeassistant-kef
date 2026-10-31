@@ -53,14 +53,11 @@ async def test_host_translations_preserve_labels_and_custom_names(
 
     translations = await async_get_translations(hass, language, "entity", {DOMAIN})
     assert translations[
-        "component.kef.entity.select.standby_mode.state.20 minutes"
-    ] == "ECO (20 minutes)"
-    assert translations[
-        "component.kef.entity.select.wake_source.state.Default"
-    ] == "None"
+        "component.kef.entity.select.standby_mode.name"
+    ] == "HW: Standby mode (20 min = ECO)"
     assert translations[
         "component.kef.entity.select.wake_source.name"
-    ] == "HW: Second wake-up source"
+    ] == "HW: Second wake-up source (Default = none)"
     children = [
         child
         for child in er.async_entries_for_config_entry(registry, entry.entry_id)

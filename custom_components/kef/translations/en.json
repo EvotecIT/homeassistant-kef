@@ -108,26 +108,8 @@
       "source_startup_volume": { "name": "VOL: {source} startup volume" }
     },
     "select": {
-      "standby_mode": {
-        "name": "HW: Standby mode",
-        "state": {
-          "Never": "Never",
-          "20 minutes": "ECO (20 minutes)",
-          "30 minutes": "30 minutes",
-          "60 minutes": "60 minutes"
-        }
-      },
-      "wake_source": {
-        "name": "HW: Second wake-up source",
-        "state": {
-          "Default": "None",
-          "Wi-Fi": "Wi-Fi",
-          "Bluetooth": "Bluetooth",
-          "USB": "USB",
-          "Optical": "Optical",
-          "TV": "TV"
-        }
-      },
+      "standby_mode": { "name": "HW: Standby mode (20 min = ECO)" },
+      "wake_source": { "name": "HW: Second wake-up source (Default = none)" },
       "master_channel": { "name": "HW: Master channel" },
       "cable_mode": { "name": "HW: Cable mode" },
       "bass_extension": { "name": "DSP: Bass extension" },
