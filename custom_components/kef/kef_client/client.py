@@ -964,15 +964,16 @@ class ModernKefClient(BaseKefClient):
         )
 
     async def async_turn_on(self) -> None:
-        """Turn on the speaker by selecting a reasonable source."""
-        snapshot = await self.async_refresh()
-        target_source = self._last_active_source
-        if target_source in (None, STATE_OFF):
-            current_source = snapshot.source
-            target_source = (
-                current_source if current_source not in (None, STATE_OFF) else "wifi"
+        """Keep an active input, or wake once on the last known input."""
+        source = self._extract_string(
+            await self._get_path_value(
+                PROBE_PATHS["source"], typed_key="kefPhysicalSource",
             )
-        await self.async_select_source(target_source)
+        )
+        if source not in (None, STATE_OFF):
+            self._last_active_source = source
+            return
+        await self.async_select_source(self._last_active_source or "wifi")
 
     async def async_turn_off(self) -> None:
         """Turn off the speaker."""
@@ -1043,13 +1044,13 @@ class ModernKefClient(BaseKefClient):
 
     async def async_select_source(self, source: str) -> None:
         """Select the active source."""
-        if source != STATE_OFF:
-            self._last_active_source = source
         await self._set_data(
             PROBE_PATHS["source"],
             role="value",
             value={"type": "kefPhysicalSource", "kefPhysicalSource": source},
         )
+        if source != STATE_OFF:
+            self._last_active_source = source
 
     async def async_set_standby_mode(self, mode: str) -> None:
         """Set the automatic standby mode."""

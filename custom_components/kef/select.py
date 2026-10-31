@@ -8,12 +8,14 @@ from dataclasses import dataclass
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     BASS_EXTENSION_OPTIONS,
     CABLE_MODE_OPTIONS,
+    DOMAIN,
     EQ_BUTTON_OPTIONS,
     FAVOURITE_BUTTON_OPTIONS,
     IR_CODE_OPTIONS,
@@ -363,7 +365,22 @@ class KefSelect(KefEntity, CoordinatorEntity[KefCoordinator], SelectEntity):
         self._attr_unique_id = (
             f"{coordinator.data.device.unique_id}_{description.key}"
         )
-        self._attr_options = list(description.options_map.values())
+
+    @property
+    def options(self) -> list[str]:
+        """Offer wake inputs the speaker has, respecting ECO standby."""
+        options = self.entity_description.options_map
+        data = self.coordinator.data
+        if self.entity_description.key == "wake_source":
+            allowed = {"wakeup_default"}
+            if data.standby_mode != "standby_20mins":
+                allowed.update(data.source_list)
+            return [label for raw, label in options.items() if raw in allowed]
+        if self.entity_description.key == "standby_mode" and data.wake_source not in (
+            None, "wakeup_default",
+        ):
+            return [label for raw, label in options.items() if raw != "standby_20mins"]
+        return list(options.values())
 
     @property
     def current_option(self) -> str | None:
@@ -380,6 +397,31 @@ class KefSelect(KefEntity, CoordinatorEntity[KefCoordinator], SelectEntity):
             for raw, friendly in self.entity_description.options_map.items()
         }
         raw_value = reverse_map.get(option, option)
+        key = self.entity_description.key
+        data = self.coordinator.data
+        if (
+            key == "standby_mode"
+            and raw_value == "standby_20mins"
+            and data.wake_source not in (None, "wakeup_default")
+        ) or (
+            key == "wake_source"
+            and raw_value != "wakeup_default"
+            and data.standby_mode == "standby_20mins"
+        ):
+            raise HomeAssistantError(
+                "ECO standby does not support a second wake-up source",
+                translation_domain=DOMAIN,
+                translation_key="eco_wake_source",
+            )
+        if key == "wake_source" and raw_value not in {
+            raw for raw, label in self.entity_description.options_map.items()
+            if label in self.options
+        }:
+            raise HomeAssistantError(
+                "This wake-up source is not supported by the speaker",
+                translation_domain=DOMAIN,
+                translation_key="unsupported_wake_source",
+            )
         await self.async_call_kef(
             lambda: self.entity_description.async_set_fn(
                 self.coordinator, raw_value

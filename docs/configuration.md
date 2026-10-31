@@ -113,21 +113,31 @@ and `source` separately from the computer's audio-device list.
 
 For an LSX II used as a USB speaker:
 
-- Select **USB** as the active input. The **Turn on** action restores the last
-  input remembered by the running client, or falls back to Wi-Fi when no active
-  input is known. Use [explicit USB selection](automations.md#select-usb-for-a-computer)
-  when the computer needs USB rather than whichever input was used last.
-- Set **Wake source** to **USB** if USB audio should wake the speaker. This is
-  separate from selecting USB as the current input; **Default** does not select
-  USB as an additional wake source.
+- Select **USB** as the active input when returning to the computer. On modern
+  speakers, **Turn on** leaves an active input alone. From standby it selects
+  the last input remembered by the running client once, falling back to Wi-Fi
+  if none is known. It does not cycle the speaker off and on.
+  Use [explicit USB selection](automations.md#select-usb-for-a-computer)
+  when the computer needs that input, including after an integration restart
+  while the speaker is in standby.
+- Set **Second wake-up source** to **USB** if USB audio should wake the speaker.
+  This is separate from selecting USB as the current input. **None** leaves
+  Wi-Fi wake available without adding a physical wake input.
 - KEF calls the 20-minute standby option **ECO**. A second wake-up source is
-  unavailable in ECO mode. Use a supported non-ECO standby option for USB wake.
+  unavailable in ECO mode. The controls exclude incompatible choices; select
+  **None** as the additional wake source before selecting ECO, or leave ECO
+  before enabling USB wake.
   **Never** disables the inactivity timer; it does not prevent manual standby.
-- Keep **USB charging** off for USB audio. KEF documents that enabling it changes
+- Keep **USB power / KW-1 mode** off for USB audio. Enabling it changes
   the primary speaker's USB port from audio input to power output.
 
 These settings follow the [LSX II manual, sections 12 and 14.7](https://assets.kef.com/product-support/lsx-2/LSX_II_Product_Manual_EN_v9.pdf).
 Other models can have different inputs and wake behavior.
+
+Existing entity IDs and automation values remain unchanged: the ECO option uses
+`20 minutes` and the additional wake source's **None** option uses `Default` in
+`select.select_option` actions. The displayed labels explain those existing
+values without requiring automations to be rewritten.
 
 If the USB device disappears, collect diagnostics before changing the input.
 Select USB once and check whether the computer detects the speaker again. If KEF

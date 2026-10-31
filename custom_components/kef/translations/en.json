@@ -108,8 +108,26 @@
       "source_startup_volume": { "name": "VOL: {source} startup volume" }
     },
     "select": {
-      "standby_mode": { "name": "HW: Standby mode" },
-      "wake_source": { "name": "HW: Wake source" },
+      "standby_mode": {
+        "name": "HW: Standby mode",
+        "state": {
+          "Never": "Never",
+          "20 minutes": "ECO (20 minutes)",
+          "30 minutes": "30 minutes",
+          "60 minutes": "60 minutes"
+        }
+      },
+      "wake_source": {
+        "name": "HW: Second wake-up source",
+        "state": {
+          "Default": "None",
+          "Wi-Fi": "Wi-Fi",
+          "Bluetooth": "Bluetooth",
+          "USB": "USB",
+          "Optical": "Optical",
+          "TV": "TV"
+        }
+      },
       "master_channel": { "name": "HW: Master channel" },
       "cable_mode": { "name": "HW: Cable mode" },
       "bass_extension": { "name": "DSP: Bass extension" },
@@ -135,7 +153,7 @@
       "top_panel": { "name": "LED: Top touch panel" },
       "top_panel_led": { "name": "LED: Top panel" },
       "top_panel_standby_led": { "name": "LED: Top panel standby" },
-      "usb_charging": { "name": "HW: USB charging" },
+      "usb_charging": { "name": "HW: USB power / KW-1 mode" },
       "startup_volume": { "name": "VOL: Use startup volume" },
       "per_input_startup_volume": { "name": "VOL: Per-input startup volumes" },
       "volume_limit": { "name": "VOL: Limiter" },
@@ -163,6 +181,12 @@
     }
   },
   "exceptions": {
+    "eco_wake_source": {
+      "message": "ECO standby does not support a second wake-up source. Select a non-ECO standby mode before enabling one, or select None as the second wake-up source before enabling ECO."
+    },
+    "unsupported_wake_source": {
+      "message": "This wake-up source is not supported by the speaker. Select an input available on this model."
+    },
     "authentication_required": {
       "message": "KEF speaker requires a valid web UI password. Reconfigure the KEF integration and enter the password configured in the speaker web interface."
     },
