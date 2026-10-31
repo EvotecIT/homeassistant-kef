@@ -103,6 +103,39 @@ has no manual wall-mounted setting, so this switch is the only way to override
 the detected placement. Turning auto-detect off here keeps the existing room
 calibration; run **Start calibration** if the soundbar is physically moved.
 
+### Standby, USB audio, and computer visibility
+
+Home Assistant connects to the speaker over the network. A reachable speaker can
+be in standby, and a powered-on speaker can be reachable while its USB audio
+device is absent from Windows or macOS. The media player's availability confirms
+network communication, not the computer's USB connection. Check `speaker_status`
+and `source` separately from the computer's audio-device list.
+
+For an LSX II used as a USB speaker:
+
+- Select **USB** as the active input. The **Turn on** action restores the last
+  input remembered by the running client, or falls back to Wi-Fi when no active
+  input is known. Use [explicit USB selection](automations.md#select-usb-for-a-computer)
+  when the computer needs USB rather than whichever input was used last.
+- Set **Wake source** to **USB** if USB audio should wake the speaker. This is
+  separate from selecting USB as the current input; **Default** does not select
+  USB as an additional wake source.
+- KEF calls the 20-minute standby option **ECO**. A second wake-up source is
+  unavailable in ECO mode. Use a supported non-ECO standby option for USB wake.
+  **Never** disables the inactivity timer; it does not prevent manual standby.
+- Keep **USB charging** off for USB audio. KEF documents that enabling it changes
+  the primary speaker's USB port from audio input to power output.
+
+These settings follow the [LSX II manual, sections 12 and 14.7](https://assets.kef.com/product-support/lsx-2/LSX_II_Product_Manual_EN_v9.pdf).
+Other models can have different inputs and wake behavior.
+
+If the USB device disappears, collect diagnostics before changing the input.
+Select USB once and check whether the computer detects the speaker again. If KEF
+reports `powerOn` and `usb` but the computer still has no USB device, investigate
+the USB connection, hub, cable, and speaker's USB interface. Reloading the Home
+Assistant integration does not reconnect a USB device to the computer. Avoid an
+automation that repeatedly forces USB, since it would interrupt other inputs.
+
 ## Firmware updates
 
 The update entity exposes supported firmware updates. Use a maintenance window

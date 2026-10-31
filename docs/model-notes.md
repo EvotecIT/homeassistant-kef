@@ -77,6 +77,16 @@ In late 2025, ECO was only available with wake source `wakeup_default`; with
 LSX II models defaulted to ECO; the XIO defaulted to 30 minutes with wake
 source `tv`.
 
+An October 2026 LSX II check on firmware `3.0.137.0xf884312` found the speaker
+reachable over the network with `speakerStatus=powerOn`, physical source `wifi`,
+`powermanager:target` reporting `online`, and
+`settings:/imx8AudioFramework/afInStandby=false`, while Windows had no present
+KEF USB audio device. Selecting `usb` through Home Assistant restored the USB
+audio interface and sound output endpoint without changing volume, restarting
+the speaker, or resetting Windows devices. This demonstrates USB recovery by
+input selection on that speaker; it does not establish that every missing USB
+device is caused by standby or input selection.
+
 ## LSX II and LSX II LT
 
 The two models expose the same settings apart from their inputs and the
