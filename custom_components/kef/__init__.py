@@ -27,6 +27,7 @@ from .exceptions import KefAuthenticationRequiredError, KefError
 
 PLATFORMS = [
     Platform.MEDIA_PLAYER,
+    Platform.BINARY_SENSOR,
     Platform.SWITCH,
     Platform.SELECT,
     Platform.NUMBER,
@@ -243,6 +244,10 @@ async def _async_cleanup_optional_entities(
             if not unique_id.startswith(f"{device_unique_id}_"):
                 continue
             key = unique_id.removeprefix(f"{device_unique_id}_")
+            if platform == "switch" and key == "prefer_virtual_x":
+                # Replaced by the preferred virtualiser select.
+                registry.async_remove(entity_entry.entity_id)
+                continue
             feature = model_features_by_platform[platform].get(key)
             select_unavailable = (
                 platform == "select"

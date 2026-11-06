@@ -50,6 +50,16 @@ async def _async_set_volume_step(
     coordinator.async_apply_local_change(volume_step=round(value))
 
 
+async def _async_set_wireless_rear_gain(
+    coordinator: KefCoordinator,
+    value: float,
+) -> None:
+    """Set the wireless rear speaker gain."""
+    client = get_initialized_client(coordinator)
+    await client.async_set_wireless_rear_gain(value)
+    coordinator.async_apply_local_change(wireless_rear_gain=value)
+
+
 async def _async_set_fixed_volume_level(
     coordinator: KefCoordinator,
     value: float,
@@ -281,6 +291,17 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
             data.eq_profile.sub_out_low_pass_frequency if data.eq_profile else None
         ),
         async_set_fn=_async_set_sub_out_low_pass_frequency,
+    ),
+    KefNumberDescription(
+        key="wireless_rear_gain",
+        translation_key="wireless_rear_gain",
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=-10.0,
+        native_max_value=10.0,
+        native_step=0.5,
+        value_fn=lambda data: data.wireless_rear_gain,
+        async_set_fn=_async_set_wireless_rear_gain,
+        model_feature="xio",
     ),
     KefNumberDescription(
         key="desk_mode_db",
