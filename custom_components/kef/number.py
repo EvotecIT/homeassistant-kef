@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 
 from homeassistant.components.number import NumberEntity, NumberEntityDescription
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -344,14 +344,27 @@ async def async_setup_entry(
     if coordinator.data.device.backend is not KefBackend.MODERN:
         return
 
-    entities: list[NumberEntity] = [
-        KefNumber(coordinator, description)
-        for description in NUMBERS
-        if description.value_fn(coordinator.data) is not None
-        and model_supports_feature(
-            coordinator.data.device.model, description.model_feature
-        )
-    ]
+    known_numbers: set[str] = set()
+
+    @callback
+    def _async_add_numbers() -> None:
+        """Discover optional controls when firmware starts reporting their values."""
+        entities = [
+            KefNumber(coordinator, description)
+            for description in NUMBERS
+            if description.key not in known_numbers
+            and description.value_fn(coordinator.data) is not None
+            and model_supports_feature(
+                coordinator.data.device.model, description.model_feature
+            )
+        ]
+        known_numbers.update(entity.entity_description.key for entity in entities)
+        if entities:
+            async_add_entities(entities)
+
+    _async_add_numbers()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_numbers))
+    entities: list[NumberEntity] = []
     for source, value in coordinator.data.default_volume_by_source.items():
         entities.append(
             KefSourceVolumeNumber(

@@ -40,7 +40,7 @@ PLATFORMS = [
 ATTR_FIRMWARE_FILE_PATH = "file_path"
 SERVICE_INSTALL_FIRMWARE_FILE = "install_firmware_file"
 
-_ACTIVE_BINARY_SENSOR_ENTITY_KEYS: set[str] = set()
+_ACTIVE_BINARY_SENSOR_ENTITY_KEYS: set[str] = {"surround_mode"}
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -184,7 +184,9 @@ async def _async_cleanup_optional_entities(
     xio_supported = model_supports_feature(
         device_model, "xio"
     )
-    expected_sensor_keys = {"backend", "speaker_status", "play_mode"}
+    expected_sensor_keys = {
+        "backend", "speaker_status", "play_mode", "surround_master_channel"
+    }
     if diagnostics_enabled:
         expected_sensor_keys.update(
             {
@@ -271,5 +273,12 @@ async def _async_cleanup_optional_entities(
         key = unique_id.removeprefix(f"{device_unique_id}_")
         if platform == "sensor" and key not in expected_sensor_keys:
             registry.async_remove(entity_entry.entity_id)
-        if platform == "binary_sensor" and key not in expected_binary_sensor_keys:
+        paired_surround_sensor = (
+            xio_supported and key.startswith("surround_") and key.endswith("_connected")
+        )
+        if (
+            platform == "binary_sensor"
+            and key not in expected_binary_sensor_keys
+            and not paired_surround_sensor
+        ):
             registry.async_remove(entity_entry.entity_id)

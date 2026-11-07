@@ -478,6 +478,9 @@ class KefSelect(KefEntity, CoordinatorEntity[KefCoordinator], SelectEntity):
         raw_value = reverse_map.get(option, option)
         key = self.entity_description.key
         data = self.coordinator.data
+        if key == "wireless_rear_mode" and data.prefer_virtual_x:
+            # The displayed DTS layout is rendered, not a writable rear mode.
+            return
         if (
             key == "standby_mode"
             and raw_value == "standby_20mins"

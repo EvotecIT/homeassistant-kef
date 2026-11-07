@@ -109,10 +109,12 @@ wireless surround, gets a **Channel layout** select (5.1.2 or 7.1.2), a **Rear
 volume** slider (-10 to 10 in steps of 0.5), and a **Connected** sensor for each
 paired surround speaker. The **Preferred virtualiser** select (Dolby Surround or
 DTS Virtual:X) uses the same prefix; it replaces the earlier "Prefer DTS Virtual:X"
-switch. The KEF Connect app greys out the channel layout while DTS Virtual:X is
-preferred, and notes that most content is mixed for 5.1.2 and that the preferred
-virtualiser has no effect in Direct mode or while DTS content plays. While DTS
-Virtual:X is preferred, the channel layout select shows 7.1.4 and offers no other
+switch. Update automations and dashboards targeting the old switch to use
+the **Preferred virtualiser** select with `Dolby Surround` or `DTS Virtual:X`.
+The KEF Connect app notes that most content is mixed for 5.1.2 and that the
+preferred virtualiser has no effect in Direct mode or while DTS content plays.
+While DTS Virtual:X is preferred, the app greys out the channel layout. The
+channel layout select shows 7.1.4 and offers no other
 choice, because DTS Virtual:X renders 7.1.4 whatever layout is stored; the stored
 layout returns when Dolby Surround is preferred again. Changing the channel
 layout or the preferred virtualiser interrupts the sound briefly.

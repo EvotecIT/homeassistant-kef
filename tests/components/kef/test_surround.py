@@ -15,6 +15,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.kef import _async_cleanup_optional_entities
 from custom_components.kef.api import ModernKefClient
 from custom_components.kef.const import CONF_BACKEND, DOMAIN, PROBE_PATHS
 from custom_components.kef.coordinator import KefCoordinator
@@ -324,6 +325,46 @@ async def test_surround_entities_appear_after_a_firmware_update(hass) -> None:
 
     assert _entity_id(hass, "binary_sensor", "surround_8417152d11d2_connected")
     assert _entity_id(hass, "select", "wireless_rear_mode")
+    gain = _entity_id(hass, "number", "wireless_rear_gain")
+    assert gain is not None
+    assert hass.states.get(gain).state == "3.0"
+
+    coordinator.async_set_updated_data(
+        replace(coordinator.data, wireless_rear_gain=4.0)
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(gain).state == "4.0"
+
+
+@pytest.mark.parametrize(
+    ("model", "platform", "suffix"),
+    [
+        ("XIO", "binary_sensor", "surround_8417152d11d2_connected"),
+        ("LSX II", "binary_sensor", "surround_mode"),
+        ("LSX II", "sensor", "surround_master_channel"),
+    ],
+)
+async def test_cleanup_preserves_surround_registry_settings(
+    hass, model, platform, suffix
+) -> None:
+    """A missing optional read must not erase a remembered sensor's settings."""
+    snapshot = _xio_snapshot()
+    snapshot.device = replace(snapshot.device, model=model)
+    entry = await _setup(hass, snapshot)
+    registry = er.async_get(hass)
+    registered = registry.async_get_or_create(
+        platform, DOMAIN, f"{snapshot.device.unique_id}_{suffix}", config_entry=entry
+    )
+    custom = registry.async_update_entity(
+        registered.entity_id,
+        new_entity_id=f"{platform}.my_surround_sensor",
+        name="My surround sensor",
+        disabled_by=er.RegistryEntryDisabler.USER,
+    )
+
+    await _async_cleanup_optional_entities(hass, entry, entry.runtime_data)
+
+    assert registry.async_get(custom.entity_id) == custom
 
 
 async def test_connected_sensor_follows_the_device_list(hass) -> None:
@@ -508,6 +549,20 @@ async def test_the_former_virtualiser_switch_is_removed(hass) -> None:
         await hass.async_block_till_done()
 
     assert registry.async_get(old.entity_id) is None
+
+
+async def test_selecting_dts_rendered_layout_does_not_write(hass, monkeypatch) -> None:
+    """The displayed DTS layout is not a writable rear-mode protocol value."""
+    snapshot = _xio_snapshot(wireless_rear_mode="rearSurround", prefer_virtual_x=True)
+    async with _entry_with_local_speaker(hass, monkeypatch, snapshot, 200) as sent:
+        entity_id = _entity_id(hass, "select", "wireless_rear_mode")
+        await hass.services.async_call(
+            "select", "select_option",
+            {"entity_id": entity_id, "option": "7.1.4"}, blocking=True,
+        )
+        assert sent == []
+        assert hass.states.get(entity_id).state == "7.1.4"
+        assert snapshot.wireless_rear_mode == "rearSurround"
 
 
 async def test_channel_layout_shows_7_1_4_while_dts_virtual_x_is_preferred(
