@@ -374,6 +374,7 @@ SURROUND_SELECTS: tuple[KefSelectDescription, ...] = (
         value_fn=lambda data: data.wireless_rear_mode,
         async_set_fn=_async_set_wireless_rear_mode,
         options_map=WIRELESS_REAR_MODE_OPTIONS,
+        model_feature="xio",
     ),
 )
 
@@ -388,32 +389,26 @@ async def async_setup_entry(
     if coordinator.data.device.backend is not KefBackend.MODERN:
         return
 
-    entities = [
-        KefSelect(coordinator, description)
-        for description in SELECTS
-        if description.value_fn(coordinator.data) is not None
-        and description.model_available_fn(coordinator.data.device.model)
-        and model_supports_feature(
-            coordinator.data.device.model, description.model_feature
-        )
-    ]
-    async_add_entities(entities)
-
-    surround_added = False
+    known_selects: set[str] = set()
 
     @callback
-    def _async_add_surround_selects() -> None:
-        """Add the surround selects once the speaker reports them."""
-        nonlocal surround_added
-        if surround_added or coordinator.data.wireless_rear_mode is None:
-            return
-        surround_added = True
-        async_add_entities(
-            KefSelect(coordinator, description) for description in SURROUND_SELECTS
-        )
+    def _async_add_selects() -> None:
+        """Discover optional selects when the speaker starts reporting them."""
+        data = coordinator.data
+        entities = [
+            KefSelect(coordinator, description)
+            for description in (*SELECTS, *SURROUND_SELECTS)
+            if description.key not in known_selects
+            and description.value_fn(data) is not None
+            and description.model_available_fn(data.device.model)
+            and model_supports_feature(data.device.model, description.model_feature)
+        ]
+        known_selects.update(entity.entity_description.key for entity in entities)
+        if entities:
+            async_add_entities(entities)
 
-    _async_add_surround_selects()
-    entry.async_on_unload(coordinator.async_add_listener(_async_add_surround_selects))
+    _async_add_selects()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_selects))
 
 
 class KefSelect(KefEntity, CoordinatorEntity[KefCoordinator], SelectEntity):

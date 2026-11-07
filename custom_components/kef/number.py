@@ -299,7 +299,9 @@ NUMBERS: tuple[KefNumberDescription, ...] = (
         native_min_value=-10.0,
         native_max_value=10.0,
         native_step=0.5,
-        value_fn=lambda data: data.wireless_rear_gain,
+        value_fn=lambda data: (
+            data.wireless_rear_gain if data.wireless_rear_mode is not None else None
+        ),
         async_set_fn=_async_set_wireless_rear_gain,
         model_feature="xio",
     ),

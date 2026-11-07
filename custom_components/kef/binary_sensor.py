@@ -8,9 +8,11 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import DOMAIN
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity
 from .models import KefSurroundDevice
@@ -36,6 +38,9 @@ async def async_setup_entry(
     """Set up KEF binary sensors."""
     coordinator = entry.runtime_data
     surround_mode_added = False
+    surround_mode_registered = er.async_get(hass).async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{coordinator.data.device.unique_id}_surround_mode"
+    ) is not None
     known_devices: set[str] = set()
 
     @callback
@@ -44,12 +49,12 @@ async def async_setup_entry(
         nonlocal surround_mode_added
         data = coordinator.data
         entities: list[BinarySensorEntity] = []
-        # Only a speaker that is used as a rear speaker gets the flag. Every
+        # Only a speaker that has been used as a rear speaker gets the flag. Every
         # speaker on current firmware reports it, mostly as off, and the XIO
         # transmits to its rear speakers without being one.
         if (
             not surround_mode_added
-            and data.surround_mode
+            and (data.surround_mode or surround_mode_registered)
             and data.device.model.upper() != "XIO"
         ):
             surround_mode_added = True

@@ -19,6 +19,7 @@ from custom_components.kef import _async_cleanup_optional_entities
 from custom_components.kef.api import ModernKefClient
 from custom_components.kef.const import CONF_BACKEND, DOMAIN, PROBE_PATHS
 from custom_components.kef.coordinator import KefCoordinator
+from custom_components.kef.exceptions import KefResponseError
 from custom_components.kef.models import KefSurroundDevice
 from tests.conftest import (
     DEVICE_NAME_VALUE,
@@ -56,11 +57,17 @@ DEVICE_LIST = [
 ]
 
 SURROUND_RESPONSES = {
-    PROBE_PATHS["surround_mode"]: True,
-    PROBE_PATHS["surround_device_list"]: DEVICE_LIST,
-    PROBE_PATHS["wireless_rear_mode"]: "rearSurround",
-    PROBE_PATHS["wireless_rear_gain"]: 5.0,
-    PROBE_PATHS["surround_master_channel"]: "left",
+    PROBE_PATHS["surround_mode"]: {"type": "bool_", "bool_": True},
+    PROBE_PATHS["surround_device_list"]: {
+        "type": "surroundModeDeviceList", "surroundModeDeviceList": DEVICE_LIST,
+    },
+    PROBE_PATHS["wireless_rear_mode"]: {
+        "type": "kefDspWirelessRearMode", "kefDspWirelessRearMode": "rearSurround",
+    },
+    PROBE_PATHS["wireless_rear_gain"]: {"type": "double_", "double_": 5.0},
+    PROBE_PATHS["surround_master_channel"]: {
+        "type": "kefMasterChannelMode", "kefMasterChannelMode": "left",
+    },
 }
 
 
@@ -113,28 +120,28 @@ def _responses(release_text: str) -> dict:
         PROBE_PATHS["release_text"]: {"type": "string_", "string_": release_text},
         PROBE_PATHS["mac"]: MAC_VALUE,
         PROBE_PATHS["model_code"]: MODEL_CODE_VALUE,
-        PROBE_PATHS["speaker_status"]: SPEAKER_STATUS_VALUE["kefSpeakerStatus"],
-        PROBE_PATHS["source"]: SOURCE_VALUE["kefPhysicalSource"],
-        PROBE_PATHS["volume"]: VOLUME_VALUE["i32_"],
-        PROBE_PATHS["mute"]: MUTE_VALUE["bool_"],
-        PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE["playerPlayMode"],
+        PROBE_PATHS["speaker_status"]: SPEAKER_STATUS_VALUE,
+        PROBE_PATHS["source"]: SOURCE_VALUE,
+        PROBE_PATHS["volume"]: VOLUME_VALUE,
+        PROBE_PATHS["mute"]: MUTE_VALUE,
+        PROBE_PATHS["play_mode"]: PLAY_MODE_VALUE,
         **SURROUND_RESPONSES,
     }
 
 
-async def _refresh(monkeypatch, hass, release_text: str, extra: dict | None = None):
+async def _refresh(
+    monkeypatch, hass, release_text: str, extra: dict | None = None, *, asked=None
+):
     responses = _responses(release_text) | (extra or {})
 
-    async def fake_get_value(self, path, *, typed_key=None):
+    async def fake_get_item(self, path, *, roles="value"):
+        if asked is not None:
+            asked.append(path)
+        if responses.get(path) is None:
+            raise KefResponseError("Unsupported path")
         return responses[path]
 
-    async def fake_get_optional_value(self, path, *, typed_key=None):
-        return responses.get(path)
-
-    monkeypatch.setattr(ModernKefClient, "_get_path_value", fake_get_value)
-    monkeypatch.setattr(
-        ModernKefClient, "_get_optional_path_value", fake_get_optional_value
-    )
+    monkeypatch.setattr(ModernKefClient, "_get_path_item", fake_get_item)
     client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
     return await client.async_refresh()
 
@@ -173,19 +180,7 @@ async def test_other_models_only_read_the_receiver_flag(monkeypatch, hass) -> No
     """Speakers other than the XIO are not asked for the transmitter values."""
     asked: list[str] = []
 
-    async def fake_get_value(self, path, *, typed_key=None):
-        return _responses("LSXII_V30137")[path]
-
-    async def fake_get_optional_value(self, path, *, typed_key=None):
-        asked.append(path)
-        return _responses("LSXII_V30137").get(path)
-
-    monkeypatch.setattr(ModernKefClient, "_get_path_value", fake_get_value)
-    monkeypatch.setattr(
-        ModernKefClient, "_get_optional_path_value", fake_get_optional_value
-    )
-    client = ModernKefClient(TEST_HOST, async_get_clientsession(hass))
-    snapshot = await client.async_refresh()
+    snapshot = await _refresh(monkeypatch, hass, "LSXII_V30137", asked=asked)
 
     assert snapshot.surround_mode is True
     assert snapshot.surround_master_channel == "left"
@@ -260,7 +255,7 @@ async def test_surround_entities_report_the_xio_state(hass) -> None:
 
 async def test_older_xio_firmware_creates_no_surround_entities(hass) -> None:
     """No surround paths, no entities."""
-    await _setup(hass, _xio_snapshot())
+    await _setup(hass, _xio_snapshot(wireless_rear_gain=0.0))
 
     for platform, suffix in (
         ("binary_sensor", "surround_mode"),
@@ -283,6 +278,16 @@ async def test_speakers_that_are_not_rear_speakers_get_no_surround_mode(hass) ->
     await hass.async_block_till_done()
     mode = _entity_id(hass, "binary_sensor", "surround_mode")
     assert hass.states.get(mode).state == STATE_ON
+
+    off = replace(entry.runtime_data.data, surround_mode=False)
+
+    async def refresh(coordinator):
+        coordinator.async_set_updated_data(off)
+
+    with patch.object(KefCoordinator, "async_config_entry_first_refresh", refresh):
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+    assert hass.states.get(mode).state == STATE_OFF
 
 
 async def test_speakers_without_the_flag_create_no_surround_entities(hass) -> None:
@@ -309,8 +314,9 @@ async def test_a_rear_speaker_reports_that_it_is_a_surround_receiver(hass) -> No
 
 async def test_surround_entities_appear_after_a_firmware_update(hass) -> None:
     """An XIO updated while Home Assistant runs gains the entities without a reload."""
-    entry = await _setup(hass, _xio_snapshot())
+    entry = await _setup(hass, _xio_snapshot(prefer_virtual_x=None))
     assert _entity_id(hass, "select", "wireless_rear_mode") is None
+    assert _entity_id(hass, "select", "preferred_virtualiser") is None
 
     coordinator = entry.runtime_data
     coordinator.async_set_updated_data(
@@ -319,12 +325,16 @@ async def test_surround_entities_appear_after_a_firmware_update(hass) -> None:
             surround_devices=KefSurroundDevice.from_modern_list(DEVICE_LIST),
             wireless_rear_mode="surround",
             wireless_rear_gain=3.0,
+            prefer_virtual_x=False,
         )
     )
     await hass.async_block_till_done()
 
     assert _entity_id(hass, "binary_sensor", "surround_8417152d11d2_connected")
     assert _entity_id(hass, "select", "wireless_rear_mode")
+    virtualiser = _entity_id(hass, "select", "preferred_virtualiser")
+    assert virtualiser is not None
+    assert hass.states.get(virtualiser).state == "Dolby Surround"
     gain = _entity_id(hass, "number", "wireless_rear_gain")
     assert gain is not None
     assert hass.states.get(gain).state == "3.0"
