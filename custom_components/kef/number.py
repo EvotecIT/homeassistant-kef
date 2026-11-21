@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import WAKE_SOURCE_OPTIONS, model_supports_feature
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity, apply_eq_profile_change, get_initialized_client
+from .kef_client.legacy_dsp import LEGACY_DSP_NUMBERS
 from .models import KefBackend, KefSnapshot
 
 # Ask HA to serialize action calls within this platform for each entry.
@@ -343,19 +344,31 @@ async def async_setup_entry(
 ) -> None:
     """Set up KEF configuration numbers."""
     coordinator = entry.runtime_data
-    if coordinator.data.device.backend is not KefBackend.MODERN:
-        return
-
+    legacy = coordinator.data.device.backend is KefBackend.LEGACY
+    descriptions = (
+        tuple(row for row in NUMBERS if row.key in LEGACY_DSP_NUMBERS)
+        if legacy else NUMBERS
+    )
     known_numbers: set[str] = set()
 
     @callback
     def _async_add_numbers() -> None:
         """Discover optional controls when firmware starts reporting their values."""
+        data = coordinator.data
         entities = [
             KefNumber(coordinator, description)
-            for description in NUMBERS
+            for description in descriptions
             if description.key not in known_numbers
-            and description.value_fn(coordinator.data) is not None
+            and (
+                description.value_fn(data) is not None
+                # Legacy speakers can withhold the frequency until the filter is on.
+                or (
+                    legacy
+                    and description.key == "high_pass_frequency"
+                    and data.eq_profile is not None
+                    and data.eq_profile.high_pass_mode is not None
+                )
+            )
             and model_supports_feature(
                 coordinator.data.device.model, description.model_feature
             )
@@ -366,6 +379,8 @@ async def async_setup_entry(
 
     _async_add_numbers()
     entry.async_on_unload(coordinator.async_add_listener(_async_add_numbers))
+    if legacy:
+        return
     entities: list[NumberEntity] = []
     for source, value in coordinator.data.default_volume_by_source.items():
         entities.append(
@@ -392,7 +407,15 @@ class KefNumber(KefEntity, CoordinatorEntity[KefCoordinator], NumberEntity):
         CoordinatorEntity.__init__(self, coordinator)
         KefEntity.__init__(self, coordinator)
         eq_profile = coordinator.data.eq_profile
-        if eq_profile is not None and eq_profile.api_version == "v1":
+        if coordinator.data.device.backend is KefBackend.LEGACY:
+            setting = LEGACY_DSP_NUMBERS[description.key]
+            description = replace(
+                description,
+                native_min_value=setting.values[0],
+                native_max_value=setting.values[-1],
+                native_step=setting.step,
+            )
+        elif eq_profile is not None and eq_profile.api_version == "v1":
             if description.key == "treble_amount":
                 description = replace(description, native_step=0.375)
             elif description.key == "high_pass_frequency":

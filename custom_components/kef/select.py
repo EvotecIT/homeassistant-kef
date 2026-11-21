@@ -386,8 +386,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up KEF configuration selects."""
     coordinator = entry.runtime_data
-    if coordinator.data.device.backend is not KefBackend.MODERN:
-        return
+    descriptions = (*SELECTS, *SURROUND_SELECTS)
+    if coordinator.data.device.backend is KefBackend.LEGACY:
+        descriptions = tuple(
+            row for row in SELECTS
+            if row.key in {"bass_extension", "subwoofer_polarity"}
+        )
 
     known_selects: set[str] = set()
 
@@ -397,7 +401,7 @@ async def async_setup_entry(
         data = coordinator.data
         entities = [
             KefSelect(coordinator, description)
-            for description in (*SELECTS, *SURROUND_SELECTS)
+            for description in descriptions
             if description.key not in known_selects
             and description.value_fn(data) is not None
             and description.model_available_fn(data.device.model)

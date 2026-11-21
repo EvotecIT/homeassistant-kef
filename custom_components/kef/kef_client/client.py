@@ -51,6 +51,7 @@ from .exceptions import (
     KefResponseError,
     KefUnsupportedDeviceError,
 )
+from .legacy_dsp import LegacyDsp
 from .models import (
     KefBackend,
     KefCalibrationStatus,
@@ -2588,6 +2589,7 @@ class LegacyBinaryClient(BaseKefClient):
         self._request_timeout = request_timeout
         self._standby_time = standby_time
         self._command_lock = asyncio.Lock()
+        self._dsp = LegacyDsp(self._async_read_dsp, self._async_write_dsp)
 
     async def async_identify(self) -> KefDeviceInfo:
         """Probe the legacy speaker."""
@@ -2643,7 +2645,7 @@ class LegacyBinaryClient(BaseKefClient):
             is_muted=is_muted,
             play_mode=None,
             playback=KefPlaybackInfo(state=playback_state),
-            eq_profile=None,
+            eq_profile=await self._dsp.async_read_profile() if is_on else None,
             firmware_update=None,
             wifi_info=None,
             standby_mode=None,
@@ -2867,30 +2869,24 @@ class LegacyBinaryClient(BaseKefClient):
         raise KefUnsupportedDeviceError("EQ balance is not supported for legacy KEF")
 
     async def async_set_bass_extension(self, value: str) -> None:
-        """Legacy speakers do not expose bass-extension configuration."""
-        raise KefUnsupportedDeviceError(
-            "Bass extension is not supported for legacy KEF"
-        )
+        """Set the legacy bass extension."""
+        await self._dsp.async_set_bass_extension(value)
 
     async def async_set_treble_amount(self, value: float) -> dict[str, Any]:
-        """Legacy speakers do not expose treble configuration."""
-        raise KefUnsupportedDeviceError(
-            "Treble amount is not supported for legacy KEF"
-        )
+        """Set the legacy treble trim."""
+        await self._dsp.async_set_number("treble_amount", value)
+        return {"trebleAmount": value}
 
     async def async_set_subwoofer_gain(self, value: int) -> None:
-        """Legacy speakers do not expose subwoofer-gain configuration."""
-        raise KefUnsupportedDeviceError(
-            "Subwoofer gain is not supported for legacy KEF"
-        )
+        """Set the legacy subwoofer gain."""
+        await self._dsp.async_set_number("subwoofer_gain", value)
 
     async def async_set_sub_out_low_pass_frequency(
         self, value: float
     ) -> dict[str, Any]:
-        """Legacy speakers do not expose subwoofer low-pass configuration."""
-        raise KefUnsupportedDeviceError(
-            "Subwoofer low-pass frequency is not supported for legacy KEF"
-        )
+        """Set the legacy subwoofer crossover."""
+        await self._dsp.async_set_number("sub_out_low_pass_frequency", value)
+        return {"subOutLPFreq": value}
 
     async def async_set_subwoofer_enabled(self, enabled: bool) -> dict[str, Any]:
         """Legacy speakers do not expose subwoofer output configuration."""
@@ -2905,10 +2901,8 @@ class LegacyBinaryClient(BaseKefClient):
         )
 
     async def async_set_subwoofer_polarity(self, value: str) -> None:
-        """Legacy speakers do not expose subwoofer polarity configuration."""
-        raise KefUnsupportedDeviceError(
-            "Subwoofer polarity is not supported for legacy KEF"
-        )
+        """Set the legacy subwoofer polarity."""
+        await self._dsp.async_set_subwoofer_polarity(value)
 
     async def async_set_audio_polarity(self, value: str) -> None:
         """Legacy speakers do not expose audio polarity configuration."""
@@ -2969,20 +2963,22 @@ class LegacyBinaryClient(BaseKefClient):
         )
 
     async def async_set_desk_mode_enabled(self, enabled: bool) -> None:
-        """Legacy speakers do not expose desk-mode configuration."""
-        raise KefUnsupportedDeviceError("Desk mode is not supported for legacy KEF")
+        """Set the legacy desk mode."""
+        await self._dsp.async_set_switch("desk_mode", enabled)
 
     async def async_set_desk_mode_db(self, value: float) -> dict[str, Any]:
-        """Legacy speakers do not expose desk-mode configuration."""
-        raise KefUnsupportedDeviceError("Desk mode is not supported for legacy KEF")
+        """Set the legacy desk attenuation."""
+        await self._dsp.async_set_number("desk_mode_db", value)
+        return {"deskModeSetting": value}
 
     async def async_set_wall_mode_enabled(self, enabled: bool) -> None:
-        """Legacy speakers do not expose wall-mode configuration."""
-        raise KefUnsupportedDeviceError("Wall mode is not supported for legacy KEF")
+        """Set the legacy wall mode."""
+        await self._dsp.async_set_switch("wall_mode", enabled)
 
     async def async_set_wall_mode_db(self, value: float) -> dict[str, Any]:
-        """Legacy speakers do not expose wall-mode configuration."""
-        raise KefUnsupportedDeviceError("Wall mode is not supported for legacy KEF")
+        """Set the legacy wall attenuation."""
+        await self._dsp.async_set_number("wall_mode_db", value)
+        return {"wallModeSetting": value}
 
     async def async_set_phase_correction_enabled(self, enabled: bool) -> None:
         """Legacy speakers do not expose phase-correction configuration."""
@@ -2991,16 +2987,13 @@ class LegacyBinaryClient(BaseKefClient):
         )
 
     async def async_set_high_pass_mode_enabled(self, enabled: bool) -> None:
-        """Legacy speakers do not expose high-pass configuration."""
-        raise KefUnsupportedDeviceError(
-            "High-pass mode is not supported for legacy KEF"
-        )
+        """Set the legacy high-pass mode."""
+        await self._dsp.async_set_switch("high_pass_mode", enabled)
 
     async def async_set_high_pass_frequency(self, value: float) -> dict[str, Any]:
-        """Legacy speakers do not expose high-pass-frequency configuration."""
-        raise KefUnsupportedDeviceError(
-            "High-pass frequency is not supported for legacy KEF"
-        )
+        """Set the legacy high-pass crossover."""
+        await self._dsp.async_set_number("high_pass_frequency", value)
+        return {"highPassModeFreq": value}
 
     async def async_set_master_channel(self, channel: str) -> None:
         """Legacy speakers do not expose master-channel configuration."""
@@ -3139,6 +3132,16 @@ class LegacyBinaryClient(BaseKefClient):
             source_code += 128
         await self._send_command(
             bytes([_LEGACY_SET_START, ord("0"), _LEGACY_SET_MID, source_code])
+        )
+
+    async def _async_read_dsp(self, register: int) -> int:
+        return await self._send_command(
+            bytes([_LEGACY_GET_START, register, _LEGACY_GET_END])
+        )
+
+    async def _async_write_dsp(self, register: int, value: int) -> None:
+        await self._send_command(
+            bytes([_LEGACY_SET_START, register, _LEGACY_SET_MID, value])
         )
 
     async def _send_command(self, payload: bytes) -> int:

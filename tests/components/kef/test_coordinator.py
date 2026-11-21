@@ -48,6 +48,8 @@ async def test_legacy_optical_transition_keeps_coordinator_available(hass) -> No
             reply = bytes([82, 48, 129, source, 67])
         elif command[1] == ord("%"):
             reply = bytes([82, 37, 129, volume, 12])
+        elif command[1] == 0x27:
+            reply = b"R\x12\xff"
         else:
             assert command[1] == ord("1")
             reply = b"R\x12\xff" if source == 43 else b"R1\x81\x81\xff"

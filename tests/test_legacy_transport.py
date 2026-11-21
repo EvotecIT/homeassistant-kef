@@ -221,6 +221,7 @@ async def test_refresh_reads_original_speaker_reply_layout(
         ord("0"): bytes([82, 48, 129, source, 154]),
         ord("%"): bytes([82, 37, 129, volume, 68]),
         ord("1"): bytes([82, 49, 129, 129, 255]),
+        0x27: b"R\x12\xff",
     }
 
     async def handler(reader, writer):
@@ -242,6 +243,9 @@ async def test_refresh_reads_original_speaker_reply_layout(
         expected = [b"G0\x80", b"G0\x80", b"G%\x80"]
         if transport_supported:
             expected.append(b"G1\x80")
+        if status == "powerOn":
+            expected.append(b"G\x27\x80")
+        assert snapshot.eq_profile is None
         assert received == expected
 
 
@@ -254,6 +258,7 @@ async def test_physical_inputs_refresh_without_playback_query(source, name):
             ord("0"): bytes([82, 48, 129, source, 67]),
             ord("%"): b"R%\x81\x24\x0c",
             ord("1"): b"R\x12\xff",
+            0x27: b"R\x12\xff",
         }
         writer.write(replies[query])
         await writer.drain()
@@ -265,7 +270,8 @@ async def test_physical_inputs_refresh_without_playback_query(source, name):
         assert snapshot.volume_raw == 36
         assert snapshot.speaker_status == "powerOn"
         assert snapshot.playback.state is None
-        assert received == [b"G0\x80", b"G0\x80", b"G%\x80"]
+        assert b"G1\x80" not in received
+        assert snapshot.eq_profile is None
 
 
 @pytest.mark.parametrize("reject", [True, False])
@@ -277,6 +283,8 @@ async def test_optional_playback_rejection_preserves_mandatory_state(reject):
         if query == ord("1"):
             if not reject:
                 return
+            reply = b"R\x12\xff"
+        elif query == 0x27:
             reply = b"R\x12\xff"
         else:
             reply = replies[query]
@@ -295,7 +303,7 @@ async def test_optional_playback_rejection_preserves_mandatory_state(reject):
             with pytest.raises(KefResponseError) as raised:
                 await client.async_refresh()
             assert raised.value.command == "read_playback"
-        assert received[-1] == b"G1\x80"
+        assert b"G1\x80" in received
 
 
 @pytest.mark.parametrize("operation", ["read", "write"])

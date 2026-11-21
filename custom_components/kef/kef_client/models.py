@@ -235,7 +235,7 @@ class KefWifiInfo:
 
 @dataclass(slots=True)
 class KefEqProfile:
-    """Flattened modern KEF EQ information."""
+    """Flattened KEF DSP and EQ information."""
 
     api_version: str = "v1"
     is_expert_mode: bool | None = None
