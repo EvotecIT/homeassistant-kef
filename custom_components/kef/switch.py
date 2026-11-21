@@ -8,7 +8,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -511,18 +511,32 @@ async def async_setup_entry(
 ) -> None:
     """Set up KEF configuration switches."""
     coordinator = entry.runtime_data
-    if coordinator.data.device.backend is not KefBackend.MODERN:
-        return
+    legacy = coordinator.data.device.backend is KefBackend.LEGACY
+    descriptions = (
+        tuple(row for row in SWITCHES if row.key in {
+            "desk_mode", "wall_mode", "high_pass_mode",
+        })
+        if legacy else SWITCHES
+    )
+    known_switches: set[str] = set()
 
-    entities = [
-        KefSwitch(coordinator, description)
-        for description in SWITCHES
-        if description.value_fn(coordinator.data) is not None
-        and model_supports_feature(
-            coordinator.data.device.model, description.model_feature
-        )
-    ]
-    async_add_entities(entities)
+    @callback
+    def _async_add_switches() -> None:
+        data = coordinator.data
+        entities = [
+            KefSwitch(coordinator, description)
+            for description in descriptions
+            if description.key not in known_switches
+            and description.value_fn(data) is not None
+            and model_supports_feature(data.device.model, description.model_feature)
+        ]
+        known_switches.update(entity.entity_description.key for entity in entities)
+        if entities:
+            async_add_entities(entities)
+
+    _async_add_switches()
+    if legacy:
+        entry.async_on_unload(coordinator.async_add_listener(_async_add_switches))
 
 
 class KefSwitch(KefEntity, CoordinatorEntity[KefCoordinator], SwitchEntity):

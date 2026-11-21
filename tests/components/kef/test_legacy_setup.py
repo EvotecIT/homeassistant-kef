@@ -35,9 +35,9 @@ async def test_legacy_tcp_setup_and_reload_preserve_supported_entities(
     async def handler(reader, writer):
         command = received[-1]
         assert command[0] == ord("G"), "setup/reload must never write controls"
-        value = {ord("0"): source_code, ord("%"): 42, ord("1"): playback_code}[
-            command[1]
-        ]
+        value = {
+            ord("0"): source_code, ord("%"): 42, ord("1"): playback_code, 0x27: 255,
+        }[command[1]]
         assert value is not None
         writer.write(bytes([82, command[1], 129, value, 255]))
         await writer.drain()

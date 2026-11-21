@@ -18,6 +18,19 @@ not a separate KEF automation trigger. For a playback-state automation, use a
 state trigger on the media-player entity and account for `unknown` and
 `unavailable` during startup or a connection loss.
 
+## Switch DSP settings by input
+
+For a powered-on first-generation LS50 Wireless or LSX, use the DSP switch,
+number, and select entities that appear on the speaker's device page. Create a
+scene for each sound setup, such as **TV** and **Music**. Then trigger an
+automation when the media-player entity's `source` attribute changes, and
+activate the corresponding scene. Use the source values reported by your
+speaker, such as `Opt` or `Wifi`.
+
+If the speaker starts in standby, select its input or turn it on before applying
+a DSP scene. Wait for Home Assistant to report the speaker on and its DSP
+controls to be ready.
+
 ## Test an action first
 
 In **Developer tools → Actions**, select **Media player: Set volume**, choose
