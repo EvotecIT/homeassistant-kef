@@ -54,6 +54,13 @@ its entities retain their identities. Use **Reconfigure** to change the host.
 | Polling interval | 10 seconds; accepts 5–120 seconds |
 | Offline retry interval | 60 seconds; accepts 30–600 seconds. How often an offline speaker is retried |
 | Diagnostics | Off by default; enables optional diagnostic entities |
+| Home Assistant volume cap (legacy TCP) | 100% by default. Limits volume and unmute commands sent through this integration |
+
+The legacy volume cap applies to Home Assistant controls and automations,
+including Music Assistant when it uses the Home Assistant entity. Saving the
+cap leaves the current volume as it is. The next volume or unmute command
+applies the cap. The speaker's remote, KEF Control app, and other direct
+connections can still change the volume.
 
 ## Data updates
 

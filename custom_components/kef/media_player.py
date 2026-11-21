@@ -393,7 +393,9 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set the volume level."""
-        raw_volume = round(max(0.0, min(1.0, volume)) * 100)
+        raw_volume = min(
+            self._maximum_command_volume, round(max(0.0, min(1.0, volume)) * 100)
+        )
         if raw_volume > 0:
             self._last_volume_before_mute = raw_volume
         async with self._volume_lock:
@@ -423,10 +425,16 @@ class KefMediaPlayer(KefEntity, CoordinatorEntity[KefCoordinator], MediaPlayerEn
         """
         async with self._volume_lock:
             current = await self._async_live_volume()
-            target = max(0, min(100, current + delta))
+            target = max(0, min(self._maximum_command_volume, current + delta))
             if target == current:
                 return
             await self._async_write_volume(target)
+
+    @property
+    def _maximum_command_volume(self) -> int:
+        if self.coordinator.data.device.backend is KefBackend.LEGACY:
+            return self.coordinator.volume_cap
+        return 100
 
     async def _async_live_volume(self, fallback: int | None = None) -> int:
         """Read the level from the speaker, falling back to the last known one.

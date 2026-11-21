@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory
@@ -389,8 +389,13 @@ async def async_setup_entry(
     descriptions = (*SELECTS, *SURROUND_SELECTS)
     if coordinator.data.device.backend is KefBackend.LEGACY:
         descriptions = tuple(
-            row for row in SELECTS
-            if row.key in {"bass_extension", "subwoofer_polarity"}
+            replace(
+                row,
+                translation_key="speaker_channel_order",
+                options_map={"left": "Left / Right", "right": "Right / Left"},
+            ) if row.key == "master_channel" else row
+            for row in SELECTS
+            if row.key in {"bass_extension", "subwoofer_polarity", "master_channel"}
         )
 
     known_selects: set[str] = set()

@@ -28,10 +28,12 @@ CONF_BACKEND = "backend"
 CONF_DEVICE_ID = "device_id"
 CONF_DISCOVERY_ID = "discovery_id"
 CONF_ENABLE_DIAGNOSTICS = "enable_diagnostics"
+CONF_LEGACY_VOLUME_CAP = "legacy_volume_cap"
 CONF_OFFLINE_RETRY_INTERVAL = "offline_retry_interval"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_TCP_PORT = "tcp_port"
 
+DEFAULT_LEGACY_VOLUME_CAP = 100
 DEFAULT_ENABLE_DIAGNOSTICS = False
 
 AIRPLAY_ZEROCONF_TYPE = "_airplay._tcp.local."

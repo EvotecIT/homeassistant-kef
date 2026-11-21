@@ -12,7 +12,12 @@ from .models import KefEqProfile
 _MODE = 0x27
 _VALUE_BASE = 0x80
 _UNKNOWN = 0xFF
-_MODE_BITS = {"desk_mode": 0x01, "wall_mode": 0x02, "high_pass_mode": 0x08}
+_MODE_BITS = {
+    "desk_mode": 0x01,
+    "wall_mode": 0x02,
+    "phase_correction": 0x04,
+    "high_pass_mode": 0x08,
+}
 _SUB_POLARITY = 0x40
 _BASS_MASK = 0x30
 _BASS_VALUES = {"less": 0x20, "standard": 0, "extra": 0x10}
@@ -106,6 +111,7 @@ class LegacyDsp:
             desk_mode=bool(mode & _MODE_BITS["desk_mode"]),
             wall_mode=bool(mode & _MODE_BITS["wall_mode"]),
             high_pass_mode=bool(mode & _MODE_BITS["high_pass_mode"]),
+            phase_correction=bool(mode & _MODE_BITS["phase_correction"]),
             bass_extension=_BASS_BY_BITS.get(mode & _BASS_MASK),
             subwoofer_polarity="inverted" if mode & _SUB_POLARITY else "normal",
             desk_mode_setting=values.get("desk_mode_setting"),

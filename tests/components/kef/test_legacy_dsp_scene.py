@@ -2,6 +2,7 @@
 
 import pytest
 from homeassistant.const import CONF_HOST
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -9,6 +10,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.kef.const import (
     CONF_BACKEND,
     CONF_DEVICE_ID,
+    CONF_LEGACY_VOLUME_CAP,
     CONF_TCP_PORT,
     DOMAIN,
 )
@@ -66,7 +68,11 @@ async def test_legacy_dsp_scene_after_standby_startup(hass):
             treble = entity_id("number", "treble_amount")
             high = entity_id("switch", "high_pass_mode")
             crossover = entity_id("number", "high_pass_frequency")
-            assert all((desk, bass, wall, treble, high, crossover))
+            phase = entity_id("switch", "phase_correction")
+            orientation = entity_id("select", "master_channel")
+            assert all((desk, bass, wall, treble, high, crossover, phase, orientation))
+            assert hass.states.get(phase).state == "on"
+            assert hass.states.get(orientation).state == "Left / Right"
             assert entity_id("select", "standby_mode") is None
             assert hass.states.get(wall).attributes["min"] == -6
             assert hass.states.get(treble).attributes["max"] == 2
@@ -83,6 +89,8 @@ async def test_legacy_dsp_scene_after_standby_startup(hass):
                         wall: "-4.5",
                         high: "on",
                         crossover: "95",
+                        phase: "off",
+                        orientation: "Right / Left",
                     },
                 },
                 blocking=True,
@@ -90,13 +98,86 @@ async def test_legacy_dsp_scene_after_standby_startup(hass):
             await entry.runtime_data.async_refresh()
             await hass.async_block_till_done()
 
-            assert registers[0x27] == 0xAD
+            assert registers[0x27] == 0xA9
+            assert registers[ord("0")] == 75
+            assert hass.states.get(phase).state == "off"
+            assert hass.states.get(orientation).state == "Right / Left"
             assert registers[0x29] == 131
             assert registers[0x2B] == 137
             assert hass.states.get(desk).state == "on"
             assert hass.states.get(bass).state == "Less"
             assert float(hass.states.get(wall).state) == -4.5
             assert float(hass.states.get(crossover).state) == 95
+        finally:
+            assert await hass.config_entries.async_unload(entry.entry_id)
+            await hass.async_block_till_done()
+
+
+async def test_legacy_ha_volume_cap_limits_set_step_and_unmute(hass):
+    """Save the legacy option and enforce it through Home Assistant actions."""
+    registers = {ord("0"): 11, ord("%"): 32, 0x27: 255}
+    async with dsp_speaker(registers) as (port, received):
+        identity = "legacy-volume-cap-test"
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            title="Legacy volume cap",
+            unique_id=identity,
+            data={
+                CONF_HOST: "127.0.0.1",
+                CONF_BACKEND: "legacy",
+                CONF_TCP_PORT: port,
+                CONF_DEVICE_ID: identity,
+            },
+        )
+        entry.add_to_hass(hass)
+        options = hass.config_entries.options
+        flow = await options.async_init(entry.entry_id)
+        result = await options.async_configure(
+            flow["flow_id"],
+            {CONF_LEGACY_VOLUME_CAP: 40.0},
+        )
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        assert entry.options[CONF_LEGACY_VOLUME_CAP] == 40
+        assert type(entry.options[CONF_LEGACY_VOLUME_CAP]) is int
+
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        entity_id = er.async_get(hass).async_get_entity_id(
+            "media_player", DOMAIN, identity
+        )
+        assert entity_id is not None
+
+        async def action(service, **data):
+            await hass.services.async_call(
+                "media_player",
+                service,
+                {"entity_id": entity_id, **data},
+                blocking=True,
+            )
+
+        try:
+            await action("volume_set", volume_level=0.95)
+            assert registers[ord("%")] == 40
+            assert hass.states.get(entity_id).attributes["volume_level"] == 0.4
+
+            registers[ord("%")] = 39  # A direct device change before the next poll.
+            await action("volume_up")
+            assert registers[ord("%")] == 40
+            writes = [command for command in received if command.startswith(b"S%")]
+            await action("volume_up")
+            assert [
+                command for command in received if command.startswith(b"S%")
+            ] == writes
+
+            registers[ord("%")] = 90
+            await action("volume_mute", is_volume_muted=True)
+            assert registers[ord("%")] == 218
+            await action("volume_mute", is_volume_muted=False)
+            assert registers[ord("%")] == 40
+            await entry.runtime_data.async_refresh()
+            attrs = hass.states.get(entity_id).attributes
+            assert attrs["is_volume_muted"] is False
+            assert attrs["volume_level"] == 0.4
         finally:
             assert await hass.config_entries.async_unload(entry.entry_id)
             await hass.async_block_till_done()

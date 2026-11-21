@@ -21,9 +21,11 @@ from .api import BaseKefClient, async_create_client
 from .const import (
     CONF_BACKEND,
     CONF_DEVICE_ID,
+    CONF_LEGACY_VOLUME_CAP,
     CONF_OFFLINE_RETRY_INTERVAL,
     CONF_SCAN_INTERVAL,
     CONF_TCP_PORT,
+    DEFAULT_LEGACY_VOLUME_CAP,
     DEFAULT_OFFLINE_RETRY_INTERVAL_SECONDS,
     DEFAULT_SCAN_INTERVAL_SECONDS,
 )
@@ -63,6 +65,11 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
                 CONF_OFFLINE_RETRY_INTERVAL, DEFAULT_OFFLINE_RETRY_INTERVAL_SECONDS
             )
         )
+        self.volume_cap: int = (
+            entry.options.get(CONF_LEGACY_VOLUME_CAP, DEFAULT_LEGACY_VOLUME_CAP)
+            if entry.data.get(CONF_BACKEND) == KefBackend.LEGACY
+            else DEFAULT_LEGACY_VOLUME_CAP
+        )
         self._consecutive_failures = 0
         self.diagnostic_events = entry_history(hass, entry.entry_id)
         self.diagnostic_events.setup_started()
@@ -96,6 +103,7 @@ class KefCoordinator(DataUpdateCoordinator[KefSnapshot]):
                         self.config_entry.data.get(CONF_PASSWORD),
                     ),
                     tcp_port=self.config_entry.data.get(CONF_TCP_PORT),
+                    legacy_maximum_volume=self.volume_cap,
                     async_add_executor_job=self.hass.async_add_executor_job,
                 )
             started_at = time.monotonic()
