@@ -1,5 +1,6 @@
 """Legacy controls preserve volume and speaker settings on the binary wire."""
 
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -9,6 +10,7 @@ from custom_components.kef.kef_client.exceptions import (
     KefResponseError,
     KefUnsupportedDeviceError,
 )
+from tests.test_legacy_dsp import dsp_speaker
 from tests.test_legacy_transport import legacy_server
 
 pytestmark = pytest.mark.usefixtures("socket_enabled")
@@ -131,8 +133,6 @@ async def test_unknown_settings_prevent_control_writes(action):
         ("async_set_auto_detect_placement", (True,)),
         ("async_set_prefer_virtual_x", (True,)),
         ("async_start_calibration", ()),
-        ("async_set_phase_correction_enabled", (True,)),
-        ("async_set_master_channel", ("left",)),
         ("async_set_fixed_volume_level", (35,)),
         ("async_set_remote_ir_enabled", (True,)),
         ("async_set_remote_ir_code", ("ir_code_set_b",)),
@@ -170,3 +170,40 @@ async def test_legacy_optional_queries_remain_unknown_without_tcp():
         assert await client.async_poll_events(timeout=1) == []
         assert await client.async_reset_event_queue() is None
         connect.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("original", "channel", "target"),
+    [(47, "right", 111), (48, "left", 18), (107, "left", 43)],
+    ids=["paired-bluetooth", "wifi-reply-alias", "optical"],
+)
+async def test_channel_swap_preserves_input_and_standby(original, channel, target):
+    """Swap the channel bit while preserving the speaker's exact source settings."""
+    registers = {ord("0"): original, ord("%"): 42, ord("1"): 129, 0x27: 255}
+    async with dsp_speaker(registers) as (port, received):
+        client = LegacyBinaryClient("127.0.0.1", port=port)
+        await client.async_set_master_channel(channel)
+        assert received == [b"G0\x80", bytes([83, 48, 129, target])]
+        assert (await client.async_refresh()).master_channel == channel
+
+
+async def test_channel_swap_does_not_wake_the_speaker():
+    registers = {ord("0"): 139}
+    async with dsp_speaker(registers) as (port, received):
+        client = LegacyBinaryClient("127.0.0.1", port=port)
+        with pytest.raises(KefResponseError, match="Turn on the speaker"):
+            await client.async_set_master_channel("right")
+        assert received == [b"G0\x80"]
+
+
+async def test_channel_swap_and_source_change_preserve_both_updates():
+    registers = {ord("0"): 34}
+    async with dsp_speaker(registers) as (port, received):
+        client = LegacyBinaryClient("127.0.0.1", port=port)
+        await asyncio.gather(
+            client.async_set_master_channel("right"),
+            client.async_select_source("Opt"),
+        )
+        # Optical, R/L, no standby timeout.
+        assert registers[ord("0")] == 107
+        assert len([command for command in received if command[0] == ord("S")]) == 2

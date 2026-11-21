@@ -53,6 +53,7 @@
           "password": "Web UI password",
           "scan_interval": "Polling interval",
           "offline_retry_interval": "Offline retry interval",
+          "legacy_volume_cap": "Home Assistant volume cap",
           "enable_diagnostics": "Expose diagnostic sensors",
           "enable_eq_sensors": "Expose EQ read-only sensors (advanced)"
         },
@@ -60,6 +61,7 @@
           "password": "Only needed when the speaker's web interface is password protected. Leave empty otherwise.",
           "scan_interval": "How often the speaker is checked while it is online. On newer speakers, changes made in the KEF app or on the speaker arrive right away through the live event queue, and polling is the fallback. Lower is more responsive, higher means less network traffic.",
           "offline_retry_interval": "How often a speaker that stopped responding is checked again, for example when its power is switched off. A speaker counts as offline after three missed polls in a row. When it powers up, it announces itself on the network and reconnects right away, so this interval only matters if that announcement is missed.",
+          "legacy_volume_cap": "Caps volume changes and unmute commands sent through Home Assistant. 100% leaves the full range available. The speaker and other apps can still change the volume directly.",
           "enable_diagnostics": "Adds extra sensors for troubleshooting: Wi-Fi signal and network details, speed test results, alarm and timer counts, and raw audio values. Leave off to keep the device page tidy."
         }
       }
@@ -120,6 +122,7 @@
       "standby_mode": { "name": "HW: Standby mode (20 min = ECO)" },
       "wake_source": { "name": "HW: Second wake-up source (Default = none)" },
       "master_channel": { "name": "HW: Master channel" },
+      "speaker_channel_order": { "name": "HW: Speaker channel order" },
       "cable_mode": { "name": "HW: Cable mode" },
       "bass_extension": { "name": "DSP: Bass extension" },
       "remote_ir_code": { "name": "IR: Remote code" },

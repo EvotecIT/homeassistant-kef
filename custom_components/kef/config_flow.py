@@ -39,11 +39,13 @@ from .const import (
     CONF_DEVICE_ID,
     CONF_DISCOVERY_ID,
     CONF_ENABLE_DIAGNOSTICS,
+    CONF_LEGACY_VOLUME_CAP,
     CONF_OFFLINE_RETRY_INTERVAL,
     CONF_SCAN_INTERVAL,
     CONF_TCP_PORT,
     DEFAULT_ENABLE_DIAGNOSTICS,
     DEFAULT_LEGACY_PORT,
+    DEFAULT_LEGACY_VOLUME_CAP,
     DEFAULT_OFFLINE_RETRY_INTERVAL_SECONDS,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL_SECONDS,
@@ -585,6 +587,27 @@ class KefOptionsFlow(OptionsFlow):
                             DEFAULT_ENABLE_DIAGNOSTICS,
                         ),
                     ): bool,
-                }
+                } | self._legacy_audio_options()
             ),
         )
+
+    def _legacy_audio_options(self) -> dict[vol.Optional, vol.All]:
+        """Add the Home Assistant volume cap for legacy speakers."""
+        if self.config_entry.data.get(CONF_BACKEND) != KefBackend.LEGACY:
+            return {}
+        return {
+            vol.Optional(
+                CONF_LEGACY_VOLUME_CAP,
+                default=self.config_entry.options.get(
+                    CONF_LEGACY_VOLUME_CAP, DEFAULT_LEGACY_VOLUME_CAP
+                ),
+            ): vol.All(
+                NumberSelector(
+                    NumberSelectorConfig(
+                        min=0, max=100, step=1, mode=NumberSelectorMode.SLIDER,
+                        unit_of_measurement="%",
+                    )
+                ),
+                vol.Coerce(int),
+            )
+        }

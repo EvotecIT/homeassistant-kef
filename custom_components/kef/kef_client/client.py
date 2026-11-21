@@ -80,6 +80,7 @@ _LEGACY_GET_START = ord("G")
 _LEGACY_SET_START = ord("S")
 _LEGACY_GET_END = 128
 _LEGACY_SET_MID = 129
+_LEGACY_CHANNEL_SWAP_BIT = 64
 _FIRMWARE_UPDATE_PENDING_STATES = {
     "checkingForUpdate",
     "checkingForUpdates",
@@ -112,7 +113,7 @@ for source, code in _INPUT_SOURCES_BASE.items():
         for index, option in enumerate(_STANDBY_OPTIONS)
     }
     _INPUT_SOURCES[source] = {
-        option: (lr, lr + 64) for option, lr in source_map.items()
+        option: (lr, lr + _LEGACY_CHANNEL_SWAP_BIT) for option, lr in source_map.items()
     }
 for source, mapping in _INPUT_SOURCES.items():
     normalized_source = source.replace("_paired", "")
@@ -2582,14 +2583,19 @@ class LegacyBinaryClient(BaseKefClient):
         port: int = DEFAULT_LEGACY_PORT,
         request_timeout: float = 2.0,
         standby_time: int | None | Literal["preserve"] = "preserve",
+        maximum_volume: int = 100,
     ) -> None:
         """Initialize the legacy client."""
         super().__init__(host)
         self._port = port
         self._request_timeout = request_timeout
         self._standby_time = standby_time
+        if type(maximum_volume) is not int or not 0 <= maximum_volume <= 100:
+            raise ValueError("Maximum legacy volume must be an integer from 0 to 100")
+        self._maximum_volume = maximum_volume
+        self._source_lock = asyncio.Lock()
         self._command_lock = asyncio.Lock()
-        self._dsp = LegacyDsp(self._async_read_dsp, self._async_write_dsp)
+        self._dsp = LegacyDsp(self._async_read_register, self._async_write_register)
 
     async def async_identify(self) -> KefDeviceInfo:
         """Probe the legacy speaker."""
@@ -2614,7 +2620,9 @@ class LegacyBinaryClient(BaseKefClient):
         )
         is_on = source_response <= 128
         source_code = source_response % 128
-        source = _INPUT_SOURCES_RESPONSE.get(source_code, ("Unknown", None, "L/R"))[0]
+        source, _, orientation = _INPUT_SOURCES_RESPONSE.get(
+            source_code, ("Unknown", None, None)
+        )
         play_pause_response = None
         if source in LEGACY_PLAYBACK_SOURCES:
             try:
@@ -2639,7 +2647,7 @@ class LegacyBinaryClient(BaseKefClient):
             speaker_status="powerOn" if is_on else STATE_OFF,
             source=source,
             cable_mode=None,
-            master_channel=None,
+            master_channel={"L/R": "left", "R/L": "right"}.get(orientation or ""),
             volume_raw=volume_raw,
             volume_level=volume_raw / 100.0,
             is_muted=is_muted,
@@ -2706,7 +2714,7 @@ class LegacyBinaryClient(BaseKefClient):
 
     async def async_set_volume_raw(self, volume: int) -> None:
         """Set the raw volume level."""
-        clamped = max(0, min(100, volume))
+        clamped = max(0, min(self._maximum_volume, volume))
         await self._send_command(
             bytes([_LEGACY_SET_START, ord("%"), _LEGACY_SET_MID, clamped])
         )
@@ -2734,7 +2742,11 @@ class LegacyBinaryClient(BaseKefClient):
         )
         if volume % 128 > 100:
             raise KefResponseError(f"Invalid legacy volume: {volume}")
-        volume = volume % 128 + (128 if muted else 0)
+        volume = volume % 128
+        if muted:
+            volume += 128
+        else:
+            volume = min(self._maximum_volume, volume)
         await self._send_command(
             bytes([_LEGACY_SET_START, ord("%"), _LEGACY_SET_MID, volume])
         )
@@ -2981,10 +2993,8 @@ class LegacyBinaryClient(BaseKefClient):
         return {"wallModeSetting": value}
 
     async def async_set_phase_correction_enabled(self, enabled: bool) -> None:
-        """Legacy speakers do not expose phase-correction configuration."""
-        raise KefUnsupportedDeviceError(
-            "Phase correction is not supported for legacy KEF"
-        )
+        """Set the legacy phase-correction mode."""
+        await self._dsp.async_set_switch("phase_correction", enabled)
 
     async def async_set_high_pass_mode_enabled(self, enabled: bool) -> None:
         """Set the legacy high-pass mode."""
@@ -2996,10 +3006,28 @@ class LegacyBinaryClient(BaseKefClient):
         return {"highPassModeFreq": value}
 
     async def async_set_master_channel(self, channel: str) -> None:
-        """Legacy speakers do not expose master-channel configuration."""
-        raise KefUnsupportedDeviceError(
-            "Master channel is not supported for legacy KEF"
-        )
+        """Choose which stereo channel is assigned to the primary speaker."""
+        if channel not in {"left", "right"}:
+            raise KefUnsupportedDeviceError(f"Unsupported legacy channel: {channel}")
+        async with self._source_lock:
+            current = await self._async_read_register(ord("0"))
+            source_code = current % 128
+            settings = _INPUT_SOURCES_RESPONSE.get(source_code)
+            if settings is None:
+                raise KefResponseError(f"Unknown legacy source settings: {current}")
+            source, standby, orientation = settings
+            want_right = channel == "right"
+            if want_right == (orientation == "R/L"):
+                return
+            if current >= 128:
+                raise KefResponseError("Turn on the speaker before swapping channels")
+            if source_code == 48:
+                # Some LSX/LS50W speakers report this alias for Wi-Fi, R/L, 60m.
+                target = _INPUT_SOURCES[source][standby][0]
+            else:
+                # Preserve the exact input code, including the paired Bluetooth code.
+                target = source_code ^ _LEGACY_CHANNEL_SWAP_BIT
+            await self._async_write_register(ord("0"), target)
 
     async def async_set_wireless_rear_mode(self, mode: str) -> None:
         """Legacy speakers do not expose wireless surround."""
@@ -3104,42 +3132,39 @@ class LegacyBinaryClient(BaseKefClient):
         """Set source/power without overwriting channel or standby settings."""
         if source is not None and source not in _INPUT_SOURCES:
             raise KefUnsupportedDeviceError(f"Unsupported legacy source: {source}")
-        current = await self._send_command(
-            bytes([_LEGACY_GET_START, ord("0"), _LEGACY_GET_END])
-        )
-        settings = _INPUT_SOURCES_RESPONSE.get(current % 128)
-        if settings is None:
-            raise KefResponseError(f"Unknown legacy source settings: {current}")
-        if off and current >= 128:
-            return
-        current_source, current_standby, orientation = settings
-        source = source or current_source
-        standby = (
-            current_standby if self._standby_time == "preserve" else self._standby_time
-        )
-        channel = 1 if orientation == "R/L" else 0
-        source_code = _INPUT_SOURCES[source][standby][channel]
-        if off and (current_standby == 20 or standby == 20):
-            # Original speakers can crash their control server when powered
-            # off with 20-minute standby. Switch to 60 while on, then turn off.
-            safe_source_code = _INPUT_SOURCES[source][60][channel]
-            await self._send_command(
-                bytes([_LEGACY_SET_START, ord("0"), _LEGACY_SET_MID, safe_source_code])
+        async with self._source_lock:
+            current = await self._async_read_register(ord("0"))
+            settings = _INPUT_SOURCES_RESPONSE.get(current % 128)
+            if settings is None:
+                raise KefResponseError(f"Unknown legacy source settings: {current}")
+            if off and current >= 128:
+                return
+            current_source, current_standby, orientation = settings
+            source = source or current_source
+            standby = (
+                current_standby
+                if self._standby_time == "preserve"
+                else self._standby_time
             )
-            if standby == 20:
-                source_code = safe_source_code
-        if off:
-            source_code += 128
-        await self._send_command(
-            bytes([_LEGACY_SET_START, ord("0"), _LEGACY_SET_MID, source_code])
-        )
+            channel = 1 if orientation == "R/L" else 0
+            source_code = _INPUT_SOURCES[source][standby][channel]
+            if off and (current_standby == 20 or standby == 20):
+                # Original speakers can crash their control server when powered
+                # off with 20-minute standby. Switch to 60 while on, then turn off.
+                safe_source_code = _INPUT_SOURCES[source][60][channel]
+                await self._async_write_register(ord("0"), safe_source_code)
+                if standby == 20:
+                    source_code = safe_source_code
+            if off:
+                source_code += 128
+            await self._async_write_register(ord("0"), source_code)
 
-    async def _async_read_dsp(self, register: int) -> int:
+    async def _async_read_register(self, register: int) -> int:
         return await self._send_command(
             bytes([_LEGACY_GET_START, register, _LEGACY_GET_END])
         )
 
-    async def _async_write_dsp(self, register: int, value: int) -> None:
+    async def _async_write_register(self, register: int, value: int) -> None:
         await self._send_command(
             bytes([_LEGACY_SET_START, register, _LEGACY_SET_MID, value])
         )
@@ -3272,6 +3297,7 @@ async def async_create_client(
     port: int | None = None,
     password: str | None = None,
     tcp_port: int | None = None,
+    legacy_maximum_volume: int = 100,
     async_add_executor_job: Callable[..., Awaitable[Any]] | None = None,
 ) -> BaseKefClient:
     """Create the appropriate KEF backend client."""
@@ -3290,7 +3316,10 @@ async def async_create_client(
         return client
 
     if normalized_backend is KefBackend.LEGACY:
-        client = LegacyBinaryClient(host, port=tcp_port or DEFAULT_LEGACY_PORT)
+        client = LegacyBinaryClient(
+            host, port=tcp_port or DEFAULT_LEGACY_PORT,
+            maximum_volume=legacy_maximum_volume,
+        )
         await async_probe(client, tcp_port or DEFAULT_LEGACY_PORT)
         return client
 
@@ -3309,7 +3338,9 @@ async def async_create_client(
     else:
         return modern_client
 
-    legacy_client = LegacyBinaryClient(host, port=tcp_port or DEFAULT_LEGACY_PORT)
+    legacy_client = LegacyBinaryClient(
+        host, port=tcp_port or DEFAULT_LEGACY_PORT, maximum_volume=legacy_maximum_volume
+    )
     try:
         await async_probe(legacy_client, tcp_port or DEFAULT_LEGACY_PORT)
     except KefError as err:

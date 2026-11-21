@@ -514,7 +514,7 @@ async def async_setup_entry(
     legacy = coordinator.data.device.backend is KefBackend.LEGACY
     descriptions = (
         tuple(row for row in SWITCHES if row.key in {
-            "desk_mode", "wall_mode", "high_pass_mode",
+            "desk_mode", "wall_mode", "high_pass_mode", "phase_correction",
         })
         if legacy else SWITCHES
     )
