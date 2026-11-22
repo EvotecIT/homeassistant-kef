@@ -79,6 +79,62 @@ async def test_legacy_dsp_number_writes_and_reads_back(
         assert getattr(snapshot.eq_profile, field) == value
 
 
+@pytest.mark.parametrize(
+    ("register", "mode_bit", "field", "method", "initial", "fresh", "written"),
+    [
+        (0x28, 0x01, "desk_mode_setting", "async_set_desk_mode_db",
+         (130, -5.0), (136, -2.0), -1.0),
+        (0x29, 0x02, "wall_mode_setting", "async_set_wall_mode_db",
+         (129, -5.5), (134, -3.0), -4.0),
+        (0x2B, 0x08, "high_pass_frequency", "async_set_high_pass_frequency",
+         (132, 70), (137, 95), 100),
+    ],
+    ids=["desk", "wall", "high-pass"],
+)
+async def test_legacy_dsp_retains_confirmed_value_when_disabled(
+    register, mode_bit, field, method, initial, fresh, written,
+):
+    """An explicit unknown reading falls back only for a disabled mode."""
+    values = {
+        ord("0"): 11,
+        ord("%"): 42,
+        0x27: 0x80,
+        **dict.fromkeys(range(0x28, 0x2E), 255),
+    }
+    async with dsp_speaker(values) as (port, _):
+        client = LegacyBinaryClient("127.0.0.1", port=port)
+
+        async def read_value():
+            profile = (await client.async_refresh()).eq_profile
+            assert profile is not None
+            return getattr(profile, field)
+
+        assert await read_value() is None
+
+        values[0x27] |= mode_bit
+        values[register], initial_value = initial
+        assert await read_value() == initial_value
+
+        values[0x27] &= ~mode_bit
+        values[register] = 255
+        assert await read_value() == initial_value
+
+        values[register], fresh_value = fresh
+        assert await read_value() == fresh_value
+        values[register] = 255
+        assert await read_value() == fresh_value
+
+        await getattr(client, method)(written)
+        values[register] = 255
+        assert await read_value() == written
+
+        values[0x27] |= mode_bit
+        assert await read_value() is None
+
+        values[ord("0")] = 139  # Optical, in standby.
+        assert (await client.async_refresh()).eq_profile is None
+
+
 async def test_concurrent_mode_changes_keep_each_other_and_unrelated_bits():
     values = {
         ord("0"): 11,

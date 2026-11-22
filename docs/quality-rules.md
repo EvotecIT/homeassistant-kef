@@ -58,7 +58,7 @@ exemption needs the rule's permitted reason and product-specific evidence.
 | diagnostics | Partial | Privacy and nonmutation tests pass; inspect the downloaded artifact and all supported model payloads. |
 | discovery-update-info | Partial | Zeroconf update handling exists; verify address changes preserve identity and credentials. |
 | discovery | Partial | Manifest advertises AirPlay discovery; verify supported model matching and unrelated-device rejection. |
-| docs-data-update | Source verified | [Data updates](configuration.md#data-updates) describes polling defaults/ranges, modern event-triggered refresh, legacy polling, failure tolerance, setup retry and discovery recovery. Reconciled with coordinator.py and [coordinator tests](../tests/components/kef/test_coordinator.py). Per-model request budgets remain unmeasured. |
+| docs-data-update | Source verified | [Data updates](configuration.md#data-updates) describes polling defaults/ranges, modern event-triggered refresh, legacy polling, failure tolerance, setup retry and discovery recovery. Reconciled with coordinator.py and [coordinator tests](../tests/components/kef/test_coordinator.py). [Legacy DSP tests](../tests/test_legacy_dsp.py) verify last-known readings for disabled modes on powered-on speakers. Per-model request budgets remain unmeasured. |
 | docs-examples | Partial | Automation guide exists; validate examples against current entities/actions. |
 | docs-known-limitations | Partial | Model notes exist; reconcile protocol and feature restrictions with evidence. |
 | docs-supported-devices | Partial | Device support guide exists; distinguish tested hardware from protocol-based expectations. |

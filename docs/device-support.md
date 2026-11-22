@@ -34,9 +34,13 @@ desk and wall modes with attenuation, phase correction, treble, bass extension, 
 switch and frequency, and subwoofer crossover, gain, and polarity. The
 integration reads DSP while the speaker is on. Legacy desk and wall attenuation
 range from -6 to 0 dB in 0.5 dB steps. Treble ranges from -2 to +2 dB in 0.5 dB
-steps. DSP values can show as unknown while the speaker is in standby or while
-the speaker withholds the value for a disabled setting, such as high-pass
-frequency. See [DSP scenes](automations.md#switch-dsp-settings-by-input).
+steps. While the speaker is on, desk attenuation, wall attenuation, and
+high-pass frequency keep their last known values when their modes are off and
+the speaker reports an unknown reading. A fresh reading takes precedence. The
+integration learns these values from speaker readings and acknowledged writes
+until the integration reloads. DSP values can still show as unknown in standby
+or before a reading or acknowledged write. See
+[DSP scenes](automations.md#switch-dsp-settings-by-input).
 
 The **Speaker channel order** select swaps left and right on the speaker. The
 media player’s `master_channel` attribute reports the channel played by the
