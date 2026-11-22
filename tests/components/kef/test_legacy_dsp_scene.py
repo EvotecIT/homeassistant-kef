@@ -57,6 +57,12 @@ async def test_legacy_dsp_scene_after_standby_startup(hass):
         try:
             assert entity_id("switch", "desk_mode") is None
             assert b"G'\x80" not in received
+            standby = entity_id("select", "standby_mode")
+            assert standby is not None
+            assert hass.states.get(standby).state == "20 minutes"
+            assert hass.states.get(standby).attributes["options"] == [
+                "Never", "20 minutes", "60 minutes",
+            ]
 
             registers[ord("0")] = 11
             await entry.runtime_data.async_refresh()
@@ -73,7 +79,9 @@ async def test_legacy_dsp_scene_after_standby_startup(hass):
             assert all((desk, bass, wall, treble, high, crossover, phase, orientation))
             assert hass.states.get(phase).state == "on"
             assert hass.states.get(orientation).state == "Left / Right"
-            assert entity_id("select", "standby_mode") is None
+            media = registry.async_get_entity_id("media_player", DOMAIN, identity)
+            assert media is not None
+            assert hass.states.get(media).attributes["master_channel"] == "right"
             assert hass.states.get(wall).attributes["min"] == -6
             assert hass.states.get(treble).attributes["max"] == 2
             assert hass.states.get(treble).attributes["step"] == 0.5
@@ -101,6 +109,17 @@ async def test_legacy_dsp_scene_after_standby_startup(hass):
             assert registers[0x27] == 0xA9
             assert registers[ord("0")] == 75
             assert hass.states.get(phase).state == "off"
+            assert hass.states.get(orientation).state == "Right / Left"
+            assert hass.states.get(media).attributes["master_channel"] == "left"
+            await hass.services.async_call(
+                "select",
+                "select_option",
+                {"entity_id": standby, "option": "60 minutes"},
+                blocking=True,
+            )
+            await entry.runtime_data.async_refresh()
+            assert registers[ord("0")] == 91
+            assert hass.states.get(standby).state == "60 minutes"
             assert hass.states.get(orientation).state == "Right / Left"
             assert registers[0x29] == 131
             assert registers[0x2B] == 137

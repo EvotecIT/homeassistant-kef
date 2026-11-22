@@ -33,7 +33,10 @@ from .const import (
 )
 from .coordinator import KefConfigEntry, KefCoordinator
 from .entity import KefEntity, apply_eq_profile_change, get_initialized_client
-from .kef_client.const import model_has_subwoofer_preset_values
+from .kef_client.const import (
+    LEGACY_STANDBY_TIMES,
+    model_has_subwoofer_preset_values,
+)
 from .models import KefBackend, KefSnapshot
 
 # Ask HA to serialize action calls within this platform for each entry.
@@ -388,14 +391,24 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     descriptions = (*SELECTS, *SURROUND_SELECTS)
     if coordinator.data.device.backend is KefBackend.LEGACY:
+        legacy_options = {
+            "master_channel": (
+                "speaker_channel_order",
+                {"right": "Left / Right", "left": "Right / Left"},
+            ),
+            "standby_mode": (
+                "legacy_standby_mode",
+                {
+                    key: label for key, label in STANDBY_MODE_OPTIONS.items()
+                    if key in LEGACY_STANDBY_TIMES
+                },
+            ),
+        }
         descriptions = tuple(
-            replace(
-                row,
-                translation_key="speaker_channel_order",
-                options_map={"left": "Left / Right", "right": "Right / Left"},
-            ) if row.key == "master_channel" else row
+            replace(row, translation_key=options[0], options_map=options[1])
+            if (options := legacy_options.get(row.key)) is not None else row
             for row in SELECTS
-            if row.key in {"bass_extension", "subwoofer_polarity", "master_channel"}
+            if row.key in {*legacy_options, "bass_extension", "subwoofer_polarity"}
         )
 
     known_selects: set[str] = set()

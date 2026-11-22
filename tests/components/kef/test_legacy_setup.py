@@ -79,9 +79,10 @@ async def test_legacy_tcp_setup_and_reload_preserve_supported_entities(
             assert {row.entity_id.split(".", 1)[0] for row in rows} <= {
                 "media_player", "sensor", "select",
             }
-            assert [row.unique_id for row in rows if row.domain == "select"] == [
+            assert {row.unique_id for row in rows if row.domain == "select"} == {
                 f"{identity}_master_channel",
-            ]
+                f"{identity}_standby_mode",
+            }
             media_id = registry.async_get_entity_id("media_player", DOMAIN, identity)
             assert media_id is not None
             media = hass.states.get(media_id)

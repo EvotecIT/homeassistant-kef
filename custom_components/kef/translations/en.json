@@ -120,6 +120,7 @@
     },
     "select": {
       "standby_mode": { "name": "HW: Standby mode (20 min = ECO)" },
+      "legacy_standby_mode": { "name": "HW: Auto-standby time" },
       "wake_source": { "name": "HW: Second wake-up source (Default = none)" },
       "master_channel": { "name": "HW: Master channel" },
       "speaker_channel_order": { "name": "HW: Speaker channel order" },
