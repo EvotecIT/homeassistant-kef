@@ -121,6 +121,12 @@ DEFAULT_VOLUME_SOURCE_SUFFIX = {
     "tv": "TV",
 }
 
+LEGACY_STANDBY_TIMES: dict[str, int | None] = {
+    "standby_20mins": 20,
+    "standby_60mins": 60,
+    "standby_none": None,
+}
+
 LEGACY_SOURCE_LIST = (
     "Wifi",
     "Bluetooth",

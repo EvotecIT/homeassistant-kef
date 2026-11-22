@@ -34,13 +34,22 @@ desk and wall modes with attenuation, phase correction, treble, bass extension, 
 switch and frequency, and subwoofer crossover, gain, and polarity. The
 integration reads DSP while the speaker is on. Legacy desk and wall attenuation
 range from -6 to 0 dB in 0.5 dB steps. Treble ranges from -2 to +2 dB in 0.5 dB
-steps. The speaker may withhold the high-pass frequency until the filter is
-enabled. See [DSP scenes](automations.md#switch-dsp-settings-by-input).
+steps. DSP values can show as unknown while the speaker is in standby or while
+the speaker withholds the value for a disabled setting, such as high-pass
+frequency. See [DSP scenes](automations.md#switch-dsp-settings-by-input).
 
-The **Speaker channel order** select swaps left and right on the speaker
-without changing its input or standby delay. Turn the speaker on before making
-the change. The integration also offers a [Home Assistant volume cap](configuration.md#options)
-for legacy speakers.
+The **Speaker channel order** select swaps left and right on the speaker. The
+media player’s `master_channel` attribute reports the channel played by the
+primary speaker (the one with the inputs). On legacy speakers, **Left / Right**
+assigns it to the right channel, and **Right / Left** assigns it to the left.
+
+The **Auto-standby time** select offers **Never**, **20 minutes**, and
+**60 minutes**. Changing it keeps the current input and channel order. Turn the
+speaker on before changing either setting. When Home Assistant explicitly
+turns the speaker off with the 20-minute timer selected, it switches to 60
+minutes to avoid a firmware issue on original speakers. The integration also
+offers a [Home Assistant volume cap](configuration.md#options) for legacy
+speakers.
 
 Modern devices expose a configuration link to their HTTP interface. The legacy
 binary control port is not a web page, so legacy devices do not advertise that

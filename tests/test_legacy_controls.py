@@ -102,7 +102,7 @@ async def test_unknown_settings_prevent_control_writes(action):
 @pytest.mark.parametrize(
     ("operation", "arguments"),
     [
-        ("async_set_standby_mode", ("standby_20mins",)),
+        ("async_set_standby_mode", ("standby_30mins",)),
         ("async_set_startup_tone_enabled", (True,)),
         ("async_set_auto_switch_hdmi_enabled", (True,)),
         ("async_set_front_led_enabled", (True,)),
@@ -174,7 +174,7 @@ async def test_legacy_optional_queries_remain_unknown_without_tcp():
 
 @pytest.mark.parametrize(
     ("original", "channel", "target"),
-    [(47, "right", 111), (48, "left", 18), (107, "left", 43)],
+    [(47, "left", 111), (48, "right", 18), (107, "right", 43)],
     ids=["paired-bluetooth", "wifi-reply-alias", "optical"],
 )
 async def test_channel_swap_preserves_input_and_standby(original, channel, target):
@@ -187,23 +187,60 @@ async def test_channel_swap_preserves_input_and_standby(original, channel, targe
         assert (await client.async_refresh()).master_channel == channel
 
 
-async def test_channel_swap_does_not_wake_the_speaker():
+@pytest.mark.parametrize(
+    ("initial", "original_mode", "mode", "target"),
+    [
+        (11, "standby_20mins", "standby_60mins", 27),
+        (48, "standby_60mins", "standby_none", 98),
+        (111, "standby_none", "standby_20mins", 79),
+    ],
+    ids=["optical", "wifi-reply-alias", "paired-bluetooth"],
+)
+async def test_standby_update_preserves_input_and_primary_channel(
+    initial, original_mode, mode, target,
+):
+    registers = {ord("0"): initial, ord("%"): 42, ord("1"): 129, 0x27: 255}
+    async with dsp_speaker(registers) as (port, received):
+        client = LegacyBinaryClient("127.0.0.1", port=port)
+        before = await client.async_refresh()
+        assert before.standby_mode == original_mode
+
+        received.clear()
+        await client.async_set_standby_mode(mode)
+        await client.async_set_standby_mode(mode)
+        assert received == [
+            b"G0\x80", bytes([83, 48, 129, target]), b"G0\x80",
+        ]
+
+        after = await client.async_refresh()
+        assert after.standby_mode == mode
+        assert after.source == before.source
+        assert after.master_channel == before.master_channel
+
+
+@pytest.mark.parametrize(
+    ("method", "value"),
+    [("async_set_master_channel", "left"), ("async_set_standby_mode", "standby_none")],
+    ids=["master-channel", "standby"],
+)
+async def test_legacy_source_settings_do_not_wake_the_speaker(method, value):
     registers = {ord("0"): 139}
     async with dsp_speaker(registers) as (port, received):
         client = LegacyBinaryClient("127.0.0.1", port=port)
         with pytest.raises(KefResponseError, match="Turn on the speaker"):
-            await client.async_set_master_channel("right")
+            await getattr(client, method)(value)
         assert received == [b"G0\x80"]
 
 
-async def test_channel_swap_and_source_change_preserve_both_updates():
+async def test_concurrent_source_settings_preserve_each_update():
     registers = {ord("0"): 34}
     async with dsp_speaker(registers) as (port, received):
         client = LegacyBinaryClient("127.0.0.1", port=port)
         await asyncio.gather(
-            client.async_set_master_channel("right"),
+            client.async_set_master_channel("left"),
+            client.async_set_standby_mode("standby_60mins"),
             client.async_select_source("Opt"),
         )
-        # Optical, R/L, no standby timeout.
-        assert registers[ord("0")] == 107
-        assert len([command for command in received if command[0] == ord("S")]) == 2
+        # Optical, primary left, 60-minute standby.
+        assert registers[ord("0")] == 91
+        assert len([command for command in received if command[0] == ord("S")]) == 3

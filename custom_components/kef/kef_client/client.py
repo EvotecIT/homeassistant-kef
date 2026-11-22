@@ -37,6 +37,7 @@ from .const import (
     GET_DATA_ENDPOINT,
     LEGACY_PLAYBACK_SOURCES,
     LEGACY_SOURCE_LIST,
+    LEGACY_STANDBY_TIMES,
     MODERN_MODEL_SOURCE_MAP,
     PROBE_PATHS,
     SET_DATA_ENDPOINT,
@@ -98,7 +99,7 @@ _INPUT_SOURCES_BASE = {
     "Wifi": 2,
 }
 
-_STANDBY_OPTIONS = [20, 60, None]
+_LEGACY_STANDBY_MODES = {time: mode for mode, time in LEGACY_STANDBY_TIMES.items()}
 # Upper bound for a whole HTTP request, including the host name lookup.
 _REQUEST_TOTAL_TIMEOUT = 30.0
 # Optional reads that may fail on connection errors in a row before the speaker
@@ -110,16 +111,17 @@ _INPUT_SOURCES_RESPONSE: dict[int, tuple[str, int | None, str]] = {}
 for source, code in _INPUT_SOURCES_BASE.items():
     source_map = {
         option: code + index * 16
-        for index, option in enumerate(_STANDBY_OPTIONS)
+        for index, option in enumerate(LEGACY_STANDBY_TIMES.values())
     }
     _INPUT_SOURCES[source] = {
         option: (lr, lr + _LEGACY_CHANNEL_SWAP_BIT) for option, lr in source_map.items()
     }
 for source, mapping in _INPUT_SOURCES.items():
-    normalized_source = source.replace("_paired", "")
     for standby_time, (lr, rl) in mapping.items():
-        _INPUT_SOURCES_RESPONSE[lr] = (normalized_source, standby_time, "L/R")
-        _INPUT_SOURCES_RESPONSE[rl] = (normalized_source, standby_time, "R/L")
+        # The primary speaker is on the right by default. The swap bit moves it left.
+        _INPUT_SOURCES_RESPONSE[lr] = (source, standby_time, "right")
+        _INPUT_SOURCES_RESPONSE[rl] = (source, standby_time, "left")
+# Some speakers report this alias for Wi-Fi, primary left, 60 minutes.
 _INPUT_SOURCES_RESPONSE[48] = _INPUT_SOURCES_RESPONSE[82]
 
 
@@ -2619,10 +2621,9 @@ class LegacyBinaryClient(BaseKefClient):
             bytes([_LEGACY_GET_START, ord("%"), _LEGACY_GET_END])
         )
         is_on = source_response <= 128
-        source_code = source_response % 128
-        source, _, orientation = _INPUT_SOURCES_RESPONSE.get(
-            source_code, ("Unknown", None, None)
-        )
+        settings = _INPUT_SOURCES_RESPONSE.get(source_response % 128)
+        source, standby_time, master_channel = settings or ("Unknown", None, None)
+        source = source.removesuffix("_paired")
         play_pause_response = None
         if source in LEGACY_PLAYBACK_SOURCES:
             try:
@@ -2647,7 +2648,7 @@ class LegacyBinaryClient(BaseKefClient):
             speaker_status="powerOn" if is_on else STATE_OFF,
             source=source,
             cable_mode=None,
-            master_channel={"L/R": "left", "R/L": "right"}.get(orientation or ""),
+            master_channel=master_channel,
             volume_raw=volume_raw,
             volume_level=volume_raw / 100.0,
             is_muted=is_muted,
@@ -2656,7 +2657,9 @@ class LegacyBinaryClient(BaseKefClient):
             eq_profile=await self._dsp.async_read_profile() if is_on else None,
             firmware_update=None,
             wifi_info=None,
-            standby_mode=None,
+            standby_mode=(
+                _LEGACY_STANDBY_MODES[standby_time] if settings is not None else None
+            ),
             startup_tone_enabled=None,
             auto_switch_hdmi=None,
             front_led_enabled=None,
@@ -2768,8 +2771,12 @@ class LegacyBinaryClient(BaseKefClient):
         await self._set_source(source)
 
     async def async_set_standby_mode(self, mode: str) -> None:
-        """Legacy speakers do not expose standby mode settings."""
-        raise KefUnsupportedDeviceError("Standby mode is not supported for legacy KEF")
+        """Set the auto-standby time without changing input or channel order."""
+        if mode not in LEGACY_STANDBY_TIMES:
+            raise KefUnsupportedDeviceError(f"Unsupported legacy standby mode: {mode}")
+        await self._async_change_source_settings(
+            standby_time=LEGACY_STANDBY_TIMES[mode]
+        )
 
     async def async_set_startup_tone_enabled(self, enabled: bool) -> None:
         """Legacy speakers do not expose startup tone settings."""
@@ -3009,25 +3016,7 @@ class LegacyBinaryClient(BaseKefClient):
         """Choose which stereo channel is assigned to the primary speaker."""
         if channel not in {"left", "right"}:
             raise KefUnsupportedDeviceError(f"Unsupported legacy channel: {channel}")
-        async with self._source_lock:
-            current = await self._async_read_register(ord("0"))
-            source_code = current % 128
-            settings = _INPUT_SOURCES_RESPONSE.get(source_code)
-            if settings is None:
-                raise KefResponseError(f"Unknown legacy source settings: {current}")
-            source, standby, orientation = settings
-            want_right = channel == "right"
-            if want_right == (orientation == "R/L"):
-                return
-            if current >= 128:
-                raise KefResponseError("Turn on the speaker before swapping channels")
-            if source_code == 48:
-                # Some LSX/LS50W speakers report this alias for Wi-Fi, R/L, 60m.
-                target = _INPUT_SOURCES[source][standby][0]
-            else:
-                # Preserve the exact input code, including the paired Bluetooth code.
-                target = source_code ^ _LEGACY_CHANNEL_SWAP_BIT
-            await self._async_write_register(ord("0"), target)
+        await self._async_change_source_settings(master_channel=channel)
 
     async def async_set_wireless_rear_mode(self, mode: str) -> None:
         """Legacy speakers do not expose wireless surround."""
@@ -3128,6 +3117,31 @@ class LegacyBinaryClient(BaseKefClient):
             "Firmware updates are not supported for legacy KEF"
         )
 
+    async def _async_change_source_settings(
+        self,
+        *,
+        master_channel: str | None = None,
+        standby_time: int | None | Literal["preserve"] = "preserve",
+    ) -> None:
+        """Update one packed setting while keeping the exact input code."""
+        async with self._source_lock:
+            current = await self._async_read_register(ord("0"))
+            settings = _INPUT_SOURCES_RESPONSE.get(current % 128)
+            if settings is None:
+                raise KefResponseError(f"Unknown legacy source settings: {current}")
+            source, current_standby, current_channel = settings
+            standby = current_standby if standby_time == "preserve" else standby_time
+            channel = master_channel or current_channel
+            if (standby, channel) == (current_standby, current_channel):
+                return
+            if current >= 128:
+                raise KefResponseError(
+                    "Turn on the speaker before changing its settings"
+                )
+            await self._async_write_register(
+                ord("0"), _INPUT_SOURCES[source][standby][int(channel == "left")]
+            )
+
     async def _set_source(self, source: str | None, *, off: bool = False) -> None:
         """Set source/power without overwriting channel or standby settings."""
         if source is not None and source not in _INPUT_SOURCES:
@@ -3139,14 +3153,14 @@ class LegacyBinaryClient(BaseKefClient):
                 raise KefResponseError(f"Unknown legacy source settings: {current}")
             if off and current >= 128:
                 return
-            current_source, current_standby, orientation = settings
-            source = source or current_source
+            current_source, current_standby, master_channel = settings
+            source = source or current_source.removesuffix("_paired")
             standby = (
                 current_standby
                 if self._standby_time == "preserve"
                 else self._standby_time
             )
-            channel = 1 if orientation == "R/L" else 0
+            channel = int(master_channel == "left")
             source_code = _INPUT_SOURCES[source][standby][channel]
             if off and (current_standby == 20 or standby == 20):
                 # Original speakers can crash their control server when powered

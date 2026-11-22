@@ -47,6 +47,9 @@
       "standby_mode": {
         "default": "mdi:sleep"
       },
+      "legacy_standby_mode": {
+        "default": "mdi:sleep"
+      },
       "wake_source": {
         "default": "mdi:power-plug"
       },
