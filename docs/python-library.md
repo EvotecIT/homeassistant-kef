@@ -106,7 +106,9 @@ For modern devices, `async_refresh()` includes source, power state, volume, mute
 - Use `ModernKefClient` when you know the device is from the newer HTTP-based family.
 - Use `LegacyBinaryClient` for first-generation speakers that still expose the older binary port.
   `async_refresh()` reports the channel played by the primary speaker and its
-  current standby timer. While the speaker is on, call
+  current standby timer. While the speaker is on, its DSP profile retains the last
+  confirmed desk, wall, and high-pass values if their respective modes are off
+  and the device reports an unknown reading. Call
   `async_set_standby_mode("standby_20mins")`, `async_set_standby_mode("standby_60mins")`,
   or `async_set_standby_mode("standby_none")` to change the timer without changing
   the source or channel order. The default constructor setting

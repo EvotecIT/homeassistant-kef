@@ -31,6 +31,7 @@ class LegacyDspNumber:
     register: int
     field: str
     values: tuple[int | float, ...]
+    mode_bit: int = 0
 
     @property
     def step(self) -> float:
@@ -54,16 +55,19 @@ class LegacyDspNumber:
 
 LEGACY_DSP_NUMBERS = {
     "desk_mode_db": LegacyDspNumber(
-        0x28, "desk_mode_setting", tuple(i / 2 for i in range(-12, 1))
+        0x28, "desk_mode_setting", tuple(i / 2 for i in range(-12, 1)),
+        mode_bit=_MODE_BITS["desk_mode"],
     ),
     "wall_mode_db": LegacyDspNumber(
-        0x29, "wall_mode_setting", tuple(i / 2 for i in range(-12, 1))
+        0x29, "wall_mode_setting", tuple(i / 2 for i in range(-12, 1)),
+        mode_bit=_MODE_BITS["wall_mode"],
     ),
     "treble_amount": LegacyDspNumber(
         0x2A, "treble_amount", tuple(i / 2 for i in range(-4, 5))
     ),
     "high_pass_frequency": LegacyDspNumber(
-        0x2B, "high_pass_frequency", tuple(range(50, 121, 5))
+        0x2B, "high_pass_frequency", tuple(range(50, 121, 5)),
+        mode_bit=_MODE_BITS["high_pass_mode"],
     ),
     "sub_out_low_pass_frequency": LegacyDspNumber(
         0x2C, "sub_out_low_pass_frequency", tuple(range(40, 251, 5))
@@ -83,6 +87,7 @@ class LegacyDsp:
         self._read = read
         self._write = write
         self._mode_lock = asyncio.Lock()
+        self._last_known_numbers: dict[int, int | float] = {}
 
     async def async_read_profile(self) -> KefEqProfile | None:
         """Read available DSP values without depending on them for basic playback."""
@@ -96,15 +101,21 @@ class LegacyDsp:
         values: dict[str, int | float | None] = {}
         for setting in LEGACY_DSP_NUMBERS.values():
             try:
-                values[setting.field] = setting.decode(
-                    await self._read(setting.register)
-                )
+                response = await self._read(setting.register)
             except KefConnectionError:
                 # A source or power transition can interrupt the optional reads.
                 # Do not wait out the remaining registers on a lost connection.
                 break
             except KefResponseError:
                 continue
+            number = setting.decode(response)
+            if setting.mode_bit:
+                if number is not None:
+                    self._last_known_numbers[setting.register] = number
+                elif response == _UNKNOWN and not (mode & setting.mode_bit):
+                    # Disabled modes can hide a setting the speaker still stores.
+                    number = self._last_known_numbers.get(setting.register)
+            values[setting.field] = number
         gain = values.get("subwoofer_gain")
         return KefEqProfile(
             api_version="legacy",
@@ -144,7 +155,12 @@ class LegacyDsp:
     async def async_set_number(self, field: str, value: float) -> None:
         """Write a value to an individual DSP register."""
         setting = LEGACY_DSP_NUMBERS[field]
-        await self._write(setting.register, setting.encode(value))
+        encoded = setting.encode(value)
+        await self._write(setting.register, encoded)
+        if setting.mode_bit:
+            self._last_known_numbers[setting.register] = setting.values[
+                encoded - _VALUE_BASE
+            ]
 
     async def _async_update_mode(self, mask: int, value: int) -> None:
         # Scene actions on separate HA platforms can run at the same time.
